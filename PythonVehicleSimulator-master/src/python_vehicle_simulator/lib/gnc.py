@@ -13,6 +13,8 @@ Modified by:   Omid Mirzaeedodangeh
 
 import numpy as np
 import math
+from sympy import symbols, lambdify
+from scipy.interpolate import PchipInterpolator, CubicSpline, interp1d
 
 #------------------------------------------------------------------------------
 
@@ -54,6 +56,119 @@ def Smtrx(a):
 
 
 #------------------------------------------------------------------------------
+
+
+#------------------------------------------------------------------------------
+def skew_symmetric(vector):
+    """
+    Generates a skew-symmetric matrix for a given vector.
+
+    Args:
+        vector (numpy array): A 3-element vector.
+
+    Returns:
+        numpy array: A 3x3 skew-symmetric matrix.
+    """
+    return np.array([
+        [0, -vector[2], vector[1]],
+        [vector[2], 0, -vector[0]],
+        [-vector[1], vector[0], 0]
+    ])
+
+#------------------------------------------------------------------------------
+
+
+
+#------------------------------------------------------------------------------
+
+def dcm_derivatives(C, omega_b_bn, omega_dot_b_bn):
+    """
+    Calculates the derivatives of the Direction Cosine Matrix (DCM) and its inverse.
+
+    Args:
+        C (numpy array): 3x3 Direction Cosine Matrix (DCM) representing the
+                         rotation from navigation to body frame.
+        omega_b_bn (numpy array): Angular velocity vector in the **body frame**
+                                  relative to the navigation frame (rad/s).
+        omega_dot_b_bn (numpy array): Angular acceleration vector in the **body frame**
+                                      relative to the navigation frame (rad/s²).
+
+    Returns:
+        dict: A dictionary containing:
+            - "C_dot": Derivative of the DCM (rotation rate matrix in the body frame).
+            - "C_dot_inv": Derivative of the inverse DCM.
+            - "C_ddot_inv": Second derivative of the inverse DCM.
+    """
+    # Calculate skew-symmetric matrices for angular velocity and acceleration
+    S_omega_b_bn = skew_symmetric(omega_b_bn)  # S(omega_b_bn)
+    S_omega_dot_b_bn = skew_symmetric(omega_dot_b_bn)  # S(omega_dot_b_bn)
+    S2_omega_b_bn = S_omega_b_bn @ S_omega_b_bn  # S^2(omega_b_bn)
+
+    # Derivative of the DCM
+    # \dot{C} = S^2(\omega_{b_bn})C - S(\dot{\omega}_{b_bn})C
+    C_dot = S2_omega_b_bn @ C - S_omega_dot_b_bn @ C
+
+    # Inverse of the DCM (C^{-1} = C^T for orthogonal rotation matrices)
+    C_inv = C.T
+
+    # Derivative of the inverse DCM
+    # \dot{C}^{-1} = C^{-1} S(\omega_{b_bn})
+    C_dot_inv = C_inv @ S_omega_b_bn
+
+    # Second derivative of the inverse DCM
+    # \ddot{C}^{-1} = C^{-1} [ S^2(\omega_{b_bn}) + S(\dot{\omega}_{b_bn}) ]
+    C_ddot_inv = C_inv @ (S2_omega_b_bn + S_omega_dot_b_bn)
+
+    return {
+        "C_dot": C_dot,
+        "C_dot_inv": C_dot_inv,
+        "C_ddot_inv": C_ddot_inv
+    }
+
+#------------------------------------------------------------------------------
+
+
+#------------------------------------------------------------------------------
+def dcm_derivative_single_axis(theta, theta_dot, axis):
+    """
+    Calculates the time derivative of the DCM around a single principal axis.
+
+    Args:
+        theta (float): Rotation angle (rad) for the selected axis.
+        theta_dot (float): Angular rate (rad/s) for the selected axis.
+        axis (int): The axis of interest (1, 2, or 3).
+
+    Returns:
+        numpy array: 3x3 matrix representing the time derivative of the DCM for the selected axis.
+    """
+    if axis == 1:
+        # Time derivative of DCM around the first principal axis
+        C_dot = np.array([
+            [0, 0, 0],
+            [0, -np.sin(theta) * theta_dot, np.cos(theta) * theta_dot],
+            [0, -np.cos(theta) * theta_dot, -np.sin(theta) * theta_dot]
+        ])
+    elif axis == 2:
+        # Time derivative of DCM around the second principal axis
+        C_dot = np.array([
+            [-np.sin(theta) * theta_dot, 0, -np.cos(theta) * theta_dot],
+            [0, 0, 0],
+            [np.cos(theta) * theta_dot, 0, -np.sin(theta) * theta_dot]
+        ])
+    elif axis == 3:
+        # Time derivative of DCM around the third principal axis
+        C_dot = np.array([
+            [-np.sin(theta) * theta_dot, np.cos(theta) * theta_dot, 0],
+            [np.cos(theta) * theta_dot, -np.sin(theta) * theta_dot, 0],
+            [0, 0, 0]
+        ])
+    else:
+        raise ValueError("Invalid axis. Must be 1, 2, or 3.")
+
+    return C_dot
+#------------------------------------------------------------------------------
+
+
 
 #------------------------------------------------------------------------------
 def dot_skew_squared(r, r_dot):
@@ -648,3 +763,406 @@ def gvect(W,B,theta,phi,r_bg,r_bb):
     return g
 
 
+def calculate_dcm(order, angles):
+    """
+    Calculates the Direction Cosine Matrix (DCM) for a given rotation order and angles.
+
+    Parameters:
+        order (list or tuple): A sequence of integers specifying the order of rotation (e.g., 1 for X, 2 for Y, 3 for Z).
+        angles (list or tuple): A vector of rotation angles in radians.
+
+    Returns:
+        numpy.ndarray: A 3x3 DCM matrix.
+    """
+
+    def rotation_matrix(axis, angle):
+        """
+        Creates a rotation matrix for a given axis and angle.
+
+        Parameters:
+            axis (int): An identifier for the axis of rotation (arbitrary numbers are mapped to X, Y, Z).
+            angle (float): Rotation angle in radians.
+
+        Returns:
+            numpy.ndarray: 3x3 rotation matrix for the axis.
+        """
+        c = np.cos(angle)
+        s = np.sin(angle)
+
+        # Map arbitrary numbers to X, Y, Z
+        if axis in [1, 'X']:  # X-axis
+            return np.array([
+                [1, 0, 0],
+                [0, c, s],
+                [0, -s, c]
+            ])
+        elif axis in [2, 'Y']:  # Y-axis
+            return np.array([
+                [c, 0, -s],
+                [0, 1, 0],
+                [s, 0, c]
+            ])
+        elif axis in [3, 'Z']:  # Z-axis
+            return np.array([
+                [c, s, 0],
+                [-s, c, 0],
+                [0, 0, 1]
+            ])
+        else:
+            raise ValueError("Invalid axis identifier. Use 1 (X), 2 (Y), or 3 (Z).")
+
+    # Validate inputs
+    if len(order) != len(angles):
+        raise ValueError("Order and angles must have the same number of elements.")
+
+    # Compute the DCM
+    dcm = np.eye(3)  # Start with the identity matrix
+    for axis, angle in zip(order, angles):
+        dcm = np.dot(rotation_matrix(axis, angle), dcm)
+
+    return dcm
+
+
+
+
+class MultiVariablePiecewiseSignal:
+    """
+    MultiVariablePiecewiseSignal allows creating and evaluating piecewise-defined signals for multiple variables.
+
+    Features:
+    - **Supports multiple variables**: Each variable can have its own independent piecewise definition.
+    - **Built-in signal types**:
+        - `sin`: Sinusoidal wave with frequency, amplitude, and optional phase.
+        - `cos`: Cosine wave with frequency, amplitude, and optional phase.
+        - `square`: Square wave with customizable upper/lower bounds, period, and duty cycle.
+        - `ramp`: Linearly increasing or decreasing signal based on start and end values or slope.
+        - `constant`: Fixed-value signal over a specified interval.
+        - `custom`: User-defined symbolic function, allowing advanced mathematical expressions.
+        - `data`: Interpolation over user-provided data points.
+    - **Direct Evaluation for Functions**:
+        - For `sin`, `cos`, `ramp`, `constant`, `custom`, and `square`, values are computed directly at query time.
+        - No global interpolation is applied for these function-based signals.
+    - **Advanced Interpolation for `data`**:
+        - Only `data` signals use interpolation at query time, based on specified methods (`"linear"`, `"pchip"`, `"spline"`, etc.).
+    - **Out-of-Range Handling**:
+        - Supports `"zero"`, `"continue"`, and `"function"` modes for times outside defined intervals.
+        - Out-of-range logic is applied both at initialization (for the precomputed signal) and at query time.
+    - **Relative and Absolute Time Handling**:
+        - `time_mode="relative"`: Each interval's time starts at zero from its own start.
+        - `time_mode="absolute"`: Uses the global time as-is.
+    - **Continuity Handling**:
+        - If `continuity=True`, adjusts the piece's starting value to ensure a smooth transition from the previous piece.
+    - **Interval Endpoint Handling**:
+        - Interval endpoints belong to the earlier piece if two intervals share a boundary. For example, if intervals are (0,3) and (3,7), the value at t=3 belongs to the first interval.
+    - **Boundary Inclusion**:
+        - All interval boundaries are included in the global `self.time` array, ensuring correct evaluation at exact boundaries.
+    """
+
+    def __init__(self, time, variable_pieces):
+        """
+        Parameters:
+        - time (array-like): Global time array.
+        - variable_pieces (list): List of piecewise definitions for each variable.
+
+        Initialization steps:
+        1. Convert the input `time` to a NumPy array.
+        2. Extract all interval boundaries from the provided piecewise definitions.
+        3. Combine the original `time` with these boundaries, ensuring they are included in `self.time`.
+        4. Precompute the piecewise-defined signals for each variable over `self.time`, applying continuity and out-of-range rules.
+        5. Store piecewise metadata for later direct evaluation at query time.
+        """
+        self.variable_pieces = variable_pieces
+
+        # Convert to numpy array for consistent handling
+        time = np.array(time, dtype=float)
+
+        # Extract all start and end points of intervals from all variables
+        boundaries = []
+        for var_pieces in variable_pieces:
+            for piece in var_pieces:
+                start, end = piece["interval"]
+                boundaries.append(start)
+                boundaries.append(end)
+        boundaries = np.unique(boundaries)
+
+        # Combine user-provided time with interval boundaries
+        combined_time = np.unique(np.concatenate((time, boundaries)))
+        self.time = combined_time
+
+        # Compute signals and store piece info
+        self.signals = []
+        self.variable_info = []  # Stores metadata needed for direct evaluation at query time
+        for pieces in self.variable_pieces:
+            sig, info = self._generate_signal(pieces)
+            self.signals.append(sig)
+            self.variable_info.append(info)
+
+    def _evaluate_function(self, name, params, t, t_start, t_end, offset=0):
+        """
+        Evaluates a given function for time array `t`, applying any continuity `offset` if needed.
+
+        Supported Functions and their parameters:
+        - `sin` and `cos`: freq (Hz), amp, optional phase.
+        - `square`: period, upper, lower, duty cycle.
+        - `ramp`: start_val, end_val/slope.
+        - `constant`: val.
+        - `custom`: formula (string).
+        - `data`: data_points, interp_method.
+
+        If `data` is used, interpolation is performed from given data points.
+        For all others, values are computed directly from mathematical formulas.
+
+        The `offset` shifts the evaluated result to ensure continuity if `continuity=True` was used.
+        """
+        if name == "sin":
+            freq = params.get("freq", 1)
+            amp = params.get("amp", 1)
+            return amp * np.sin(2 * np.pi * freq * t + offset)
+        elif name == "cos":
+            freq = params.get("freq", 1)
+            amp = params.get("amp", 1)
+            return amp * np.cos(2 * np.pi * freq * t + offset)
+        elif name == "square":
+            period = params.get("period", 1)
+            upper = params.get("upper", 1)
+            lower = params.get("lower", -1)
+            duty = params.get("duty", 50) / 100
+            t_adjusted = t % period
+            return np.where(t_adjusted < (duty * period), upper, lower)
+        elif name == "ramp":
+            start_val = params.get("start_val", 0) + offset
+            if "end_val" in params:
+                end_val = params["end_val"]
+                return start_val + (end_val - start_val) * (t - t_start) / (t_end - t_start)
+            elif "slope" in params:
+                slope = params["slope"]
+                return start_val + slope * (t - t_start)
+            else:
+                raise ValueError("Ramp must define either 'end_val' or 'slope'.")
+        elif name == "constant":
+            return np.full_like(t, params.get("val", 0) + offset)
+        elif name == "custom":
+            formula = params.get("formula", "0")
+            t_sym = symbols("t")
+            custom_func = lambdify(t_sym, formula, "numpy")
+            return custom_func(t) + offset
+        elif name == "data":
+            # For data, we interpolate from given points
+            data_points = params.get("data_points")
+            interp_method = params.get("interp_method", "linear")
+            if not data_points or len(data_points) < 2:
+                raise ValueError("Data interpolation requires at least two points.")
+            data_t, data_vals = zip(*data_points)
+            data_t = np.array(data_t, dtype=float)
+            data_vals = np.array(data_vals, dtype=float)
+
+            # Choose appropriate interpolation method
+            if interp_method == "pchip":
+                interpolator = PchipInterpolator(data_t, data_vals)
+            elif interp_method == "spline":
+                interpolator = CubicSpline(data_t, data_vals)
+            else:
+                interpolator = interp1d(data_t, data_vals, kind=interp_method, fill_value="extrapolate")
+
+            return interpolator(t) + offset
+        else:
+            raise ValueError(f"Unsupported function name: {name}")
+
+    def _generate_signal(self, pieces):
+        """
+        Generates the piecewise-defined signal for a single variable over `self.time`.
+
+        Steps:
+        1. Initialize a zero array for `signal`.
+        2. Iterate over each piece (interval).
+        3. Apply continuity if `continuity=True`.
+        4. Compute the piece's values and store them in the `signal`.
+        5. Keep track of `last_value` for continuity with the next piece.
+        6. After all pieces are processed, handle out-of-range behavior for times beyond the last interval.
+
+        This method also collects `piece_info` which includes:
+        - start, end
+        - name, params
+        - time_mode (relative/absolute)
+        - offset (for continuity)
+        - out_of_range mode
+        - last_value (for continuing the signal if needed out-of-range)
+
+        The final computed `signal` over `self.time` includes in-range values and properly assigned out-of-range values.
+        """
+        signal = np.zeros_like(self.time)
+        last_value = 0
+        prev_end = None
+
+        piece_info = []
+
+        # Variables to store final piece info for out-of-range handling after the loop
+        final_name = None
+        final_params = {}
+        final_offset = 0
+        final_start = None
+        final_end = None
+        final_out_of_range = "zero"
+
+        for idx, piece in enumerate(pieces):
+            start, end = piece["interval"]
+            name = piece["name"]
+            params = piece.get("params", {})
+            continuity = piece.get("continuity", False)
+            out_of_range = piece.get("out_of_range", "zero") if idx == len(pieces) - 1 else None
+            time_mode = piece.get("time_mode", "absolute")
+
+            # Determine the mask for this interval:
+            # If start equals the previous end, then this interval starts strictly after that point.
+            if prev_end is not None and np.isclose(start, prev_end, atol=1e-15):
+                mask = (self.time > start) & (self.time <= end)
+            else:
+                mask = (self.time >= start) & (self.time <= end)
+
+            # Determine input time array for this piece (relative or absolute)
+            t_input = self.time[mask] - start if time_mode == "relative" else self.time[mask]
+
+            # Handle continuity if needed
+            if continuity and mask.any():
+                if name == "square":
+                    # Continuity doesn't really apply for a discrete jump signal like square, but we warn anyway.
+                    print(f"Warning: Continuity ignored for square wave at {start}-{end}.")
+                    offset = 0
+                else:
+                    # Evaluate the first point of this piece to see if we need an offset for continuity
+                    calculated_start = self._evaluate_function(name, params, np.array([t_input[0]]), start, end)[0]
+                    if not np.isclose(last_value, calculated_start, atol=1e-6):
+                        print(f"Warning: Continuity enforced at interval {start}-{end}. Adjusting start value.")
+                    offset = last_value - calculated_start
+            else:
+                offset = 0
+
+            # Evaluate this piece and store in the signal
+            if mask.any():
+                signal[mask] = self._evaluate_function(name, params, t_input, start, end, offset)
+                last_value = signal[mask][-1]  # Update last_value for continuity/out_of_range
+
+            # Store metadata for query-time direct evaluations
+            piece_info.append({
+                "start": start,
+                "end": end,
+                "name": name,
+                "params": params,
+                "time_mode": time_mode,
+                "offset": offset,
+                "out_of_range": out_of_range,
+                "last_value": last_value
+            })
+
+            # Update final piece info
+            final_name = name
+            final_params = params
+            final_offset = offset
+            final_start = start
+            final_end = end
+            if out_of_range is not None:
+                final_out_of_range = out_of_range
+
+            prev_end = end
+
+        # Handle out-of-range for times beyond the last interval
+        if final_end is not None:
+            beyond_mask = self.time > final_end
+            if final_out_of_range == "zero":
+                # Assign zero beyond the last piece
+                signal[beyond_mask] = 0
+            elif final_out_of_range == "continue":
+                # Hold the last value constant beyond the last piece
+                signal[beyond_mask] = last_value
+            elif final_out_of_range == "function":
+                # Continue the function beyond its end
+                extended_time = self.time[beyond_mask]
+                t_input = extended_time - final_end
+                out_of_range_values = self._evaluate_function(final_name, final_params, t_input, final_start, final_end, final_offset)
+                signal[beyond_mask] = out_of_range_values
+
+        return signal, piece_info
+
+    def __call__(self, t, method=None):
+        """
+        Evaluates the signals at the given time points `t`.
+
+        Query-Time Logic:
+        - For each queried time and each variable, determine which piece interval it falls into.
+        - If it's a function-based piece (sin, cos, square, ramp, constant, custom), directly compute using stored piece params and offset.
+        - If it's a data-based piece, interpolate using that piece's data and interpolation method.
+        - If the query time is out-of-range, apply the final piece's out_of_range rules.
+
+        The `method` parameter is retained for interface compatibility but isn't used to override per-piece interpolation methods.
+
+        Returns:
+        - A list of arrays, one per variable, with the evaluated signals at the queried times.
+        """
+        t = np.array(t, dtype=float)
+        results = []
+
+        for var_idx, var_info in enumerate(self.variable_info):
+            var_results = np.zeros_like(t, dtype=float)
+
+            # The last piece defines out-of-range rules for times beyond the last interval
+            last_piece = var_info[-1]
+
+            for i, query_time in enumerate(t):
+                piece_found = False
+                # Determine which piece this query time belongs to
+                for idx, piece in enumerate(var_info):
+                    start = piece["start"]
+                    end = piece["end"]
+                    name = piece["name"]
+                    params = piece["params"]
+                    time_mode = piece["time_mode"]
+                    offset = piece["offset"]
+                    out_of_range = piece["out_of_range"]
+                    last_val_piece = piece["last_value"]
+
+                    # Check if query_time falls into this interval.
+                    # If the start matches previous piece's end, start is exclusive for this piece.
+                    if idx > 0 and np.isclose(start, var_info[idx-1]["end"], atol=1e-15):
+                        in_interval = (query_time > start) and (query_time <= end)
+                    else:
+                        in_interval = (query_time >= start) and (query_time <= end)
+
+                    if in_interval:
+                        # Evaluate directly for function-based, or interpolate if data-based
+                        t_input = query_time - start if time_mode == "relative" else query_time
+                        t_input = np.array([t_input])
+                        val = self._evaluate_function(name, params, t_input, start, end, offset)[0]
+                        var_results[i] = val
+                        piece_found = True
+                        break
+
+                if not piece_found:
+                    # If not found in any piece, it's out-of-range
+                    first_piece = var_info[0]
+                    if query_time < first_piece["start"]:
+                        # Before the first interval: default to zero
+                        var_results[i] = 0
+                    else:
+                        # Beyond the last interval
+                        start = last_piece["start"]
+                        end = last_piece["end"]
+                        name = last_piece["name"]
+                        params = last_piece["params"]
+                        offset = last_piece["offset"]
+                        out_of_range = last_piece["out_of_range"]
+                        last_val_piece = last_piece["last_value"]
+
+                        if out_of_range == "zero":
+                            var_results[i] = 0
+                        elif out_of_range == "continue":
+                            var_results[i] = last_val_piece
+                        elif out_of_range == "function":
+                            t_input = np.array([query_time - end])
+                            val = self._evaluate_function(name, params, t_input, start, end, offset)[0]
+                            var_results[i] = val
+                        else:
+                            var_results[i] = 0
+
+            results.append(var_results)
+
+        return results
