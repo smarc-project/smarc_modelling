@@ -409,39 +409,49 @@ class SAM:
         self.beta_c = beta_current * self.D2R  # Current water direction (rad)
         self.controlMode = controlSystem
 
+        # NOTE: Adjusted the values for more realistic ones
+        #   It's unclear why SAM moves forward with 2m/s still when there's no actuation.
+        #   Even with wrong inertia tensors, this shouldn't happen. Slightly dubious.
+        # FIXME: Check for the correct values and the re-evaluate. Otherwise it's a bit 
+        #   futile.
         # Initialize subsystems
         self.solid_structure = SolidStructure(
             l_SS=1.5,
             d_SS=0.19,
-            m_SS=31.9,
+            m_SS=14.9,
             J_SS_c=np.array([[10, 0, 0], [0, 15, 0], [0, 0, 20]]),
             r_SS_c=np.array([0.75, 0, 0.1])
         )
 
+        # NOTE: Adjusted values
+        # All values in m
+        # Now the water mass for a full VBS makes more sense
         self.vbs = VariableBuoyancySystem(
-            d_vbs=0.5,
-            l_vbs_l=0.3,
-            h_vbs=0.1,
+            d_vbs=0.085,
+            l_vbs_l=0.045,
+            h_vbs=0.01,
             l_vbs_b=0.2,
             m_vbs_sh=0.1,
             r_vbs_sh_cg=np.array([0.1, 0, 0]),
             J_vbs_sh_cg=np.diag([1, 2, 3])
         )
 
+        # NOTE: Adjusted Values
         self.lcg = LongitudinalCenterOfGravityControl(
-            l_lcg_l=0.8,
-            l_lcg_r=0.5,
-            l_lcg_b=0.1,
+            l_lcg_l=0.2,
+            l_lcg_r=0.06,
+            l_lcg_b=1.0,
             h_lcg=0.1,
-            m_lcg=5.0,
-            h_lcg_dim=0.2,
+            m_lcg=2.6,
+            h_lcg_dim=0.1,
             d_lcg=0.1
         )
 
+        # NOTE: Adjusted values
         self.thruster_shaft = ThrusterShaft(
             l_t_sh=0.3,
             r_t_sh_t=np.array([0.15, 0, -0.05]),
-            m_t_sh=10.0,
+            m_t_sh=1.0,
             J_t_sh_t=np.array([[1, 0, 0], [0, 2, 0], [0, 0, 3]])
         )
 
@@ -834,6 +844,34 @@ class SAM:
 
         return ksi_ddot_bounded
 
+    def bound_ksi(self, ksi, ksi_dot):
+        """
+        Computes the bounds of the actuators, i.e. prevents them to 
+        move past the physical actuator limits
+
+        Args:
+            ksi: actuator position
+            ksi_dot: actuator velocity
+
+        Returns:
+            ksi_bounded: bounded actuator position
+            ksi_dot_bounded: bounded velocity. Either current one or 0
+        """
+
+        ksi_bounded = ksi.copy()
+        ksi_dot_bounded = ksi_dot.copy()
+
+        for i in range(len(ksi)):
+            if ksi[i] < self.ksi_min[i] and ksi_dot[i] < 0:
+                ksi_bounded[i] = self.ksi_min[i]
+                ksi_dot_bounded[i] = 0.0
+            elif ksi[i] > self.ksi_max[i] and ksi_dot[i] > 0:
+                ksi_bounded[i] = self.ksi_max[i]
+                ksi_dot_bounded[i] = 0.0
+
+        return ksi_bounded, ksi_dot_bounded
+
+
     def nu_dynamics(self, eta, nu, ksi, ksi_dot, ksi_ddot_bounded):
         """
         Compute body-fixed accelerations (nu_dot) with updated mass, CG, and inertia modeling.
@@ -872,11 +910,14 @@ class SAM:
         m_dot_total = cg_data.get("m_dot_vbs_w", 0.0)
 
         # Weight and buoyancy
-        W = m_total * g
-        B = W
+        W = m_total * g # FIXME: the mass is very off. With full VBS, it'd be 110kg. This doesn't seem right. With Empty VBS it's 50kg. So even that is too much. it's supposed to be 16kg.
+        B = W # NOTE: Why is SAM neutrally buoyant with 1.25*W? Shouldn't it be W=B?
+        print(f"m_total: {m_total}, W: {W}, B: {B}")
+        cg_mass = cg_data["mass_contributions"]
+        print(f"cg mass: {cg_mass}")
 
         # Extract Euler angles
-        phi, theta, psi = quaternion_to_angles(eta[3:7])
+        phi, theta, psi = quaternion_to_angles(eta[3:7]) # NOTE: the function uses quaternions as x, y, z, w
 
         # Relative velocities due to current
         u, v, w, p, q, r = nu
@@ -1243,12 +1284,16 @@ class SAM:
         # First get bounded ksi_ddot from ksi_dynamics
         ksi_ddot_bounded = self.ksi_dynamics(t, ksi, ksi_dot, ksi_ddot_input)
 
+        # Added by David because the actuators would go beyond the phyiscal limits
+        ksi_bounded, ksi_dot_bounded = self.bound_ksi(ksi, ksi_dot)
+
         # Calculate other dynamics using bounded values
         eta_dot = self.eta_dynamics(eta, nu)
-        nu_dot = self.nu_dynamics(eta, nu, ksi, ksi_dot, ksi_ddot_bounded)
+        #nu_dot = self.nu_dynamics(eta, nu, ksi, ksi_dot, ksi_ddot_bounded)
+        nu_dot = self.nu_dynamics(eta, nu, ksi_bounded, ksi_dot_bounded, ksi_ddot_bounded)
 
         # Combine all derivatives
-        state_vector_dot = np.concatenate([eta_dot, nu_dot, ksi_dot, ksi_ddot_bounded])
+        state_vector_dot = np.concatenate([eta_dot, nu_dot, ksi_dot_bounded, ksi_ddot_bounded])
 
         return state_vector_dot
 
@@ -1314,7 +1359,7 @@ class SAM:
         r_vbs_sh_cg = np.array(self.vbs.r_vbs_sh_cg)  # Shaft CG position from SAM class
 
         # --- Mass of VBS Water ---
-        m_vbs_w = (rho * np.pi * d_vbs ** 2 * x_vbs) / 4
+        m_vbs_w = (rho * np.pi * d_vbs ** 2 * x_vbs) / 4 # FIXME: This is 60kg for x_vbs max. In reality it's at most 300ml, so 0.3.
         m_dot_vbs_w = (rho * np.pi * d_vbs ** 2 * x_dot_vbs) / 4
         m_ddot_vbs_w = (rho * np.pi * d_vbs ** 2 * x_ddot_vbs) / 4
 
