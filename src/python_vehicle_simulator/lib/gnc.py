@@ -303,22 +303,22 @@ def dcm_to_quaternion(dcm):
 # ------------------------------------------------------------------------------
 def quat_to_dcm_closed_form(q):
     """
-    Converts a quaternion [q1, q2, q3, q4] to a Direction Cosine Matrix (DCM)
+    Converts a quaternion [q1, q2, q3, q0] to a Direction Cosine Matrix (DCM)
     using the closed-form expression.
 
     Parameters:
-        q (list or numpy array): Quaternion [q1, q2, q3, q4], where q1, q2, q3
-                                 are the vector components and q4 is the scalar part.
+        q (list or numpy array): Quaternion [q1, q2, q3, q0], where q1, q2, q3
+                                 are the vector components and q0 is the scalar part.
 
     Returns:
         numpy array: 3x3 Direction Cosine Matrix (DCM)
     """
     # Extract quaternion components
-    q1, q2, q3, q4 = q
+    q1, q2, q3, q0 = q
 
     # Construct the vector part and scalar part
     q_vec = np.array([q1, q2, q3])
-    q4_squared = q4 ** 2
+    q0_squared = q0 ** 2
 
     # Identity matrix
     I = np.identity(3)
@@ -330,7 +330,7 @@ def quat_to_dcm_closed_form(q):
     q_cross = Smtrx(q_vec)
 
     # Compute the DCM using the closed-form expression
-    DCM = (2 * q4_squared - 1) * I + 2 * qqT - 2 * q4 * q_cross
+    DCM = (2 * q0_squared - 1) * I + 2 * qqT - 2 * q0 * q_cross
 
     return DCM
 

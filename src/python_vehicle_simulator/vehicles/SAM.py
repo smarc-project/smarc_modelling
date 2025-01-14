@@ -228,136 +228,6 @@ class Propellers:
 
 
 
-
-
-
-# import numpy as np
-# import math
-# import sys
-# from python_vehicle_simulator.lib.control import integralSMC
-# from python_vehicle_simulator.lib.gnc import *
-# class SolidStructure:
-#     """
-#     Represents the Solid Structure (SS) of the SAM AUV.
-#
-#     Attributes:
-#         l_SS: Length of the solid structure (m).
-#         d_SS: Diameter of the solid structure (m).
-#         m_SS: Mass of the solid structure (kg).
-#         J_SS_c: Inertia tensor of the solid structure relative to the body frame (kg·m²).
-#         r_SS_c: Position vector of the SS center of gravity (CG) relative to the central frame (m).
-#     """
-#     def __init__(self, l_SS, d_SS, m_SS, J_SS_c, r_SS_c):
-#         self.l_SS = l_SS  # Length of the solid structure
-#         self.d_SS = d_SS  # Diameter of the solid structure
-#         self.m_SS = m_SS  # Mass of the solid structure
-#         self.J_SS_c = J_SS_c  # Inertia tensor in the central frame
-#         self.r_SS_c = r_SS_c  # Position vector of the CG relative to the central frame
-# class VariableBuoyancySystem:
-#     """
-#     VariableBuoyancySystem Class
-#
-#     Represents the Variable Buoyancy System (VBS) of the AUV.
-#
-#     Parameters:
-#         -d_vbs (float): Diameter of the VBS (m).
-#         -l_vbs_l (float): Length of the VBS capsule (m).
-#         -h_vbs (float): Vertical offset of the VBS CG (m).
-#         -l_vbs_b (float): Horizontal offset length of the VBS CG (m).
-#         -m_vbs_sh (float): Mass of the VBS shaft (kg).
-#         -r_vbs_sh_cg (list or np.array): Vector from the shaft center to the end boundary of the water in the VBS (m).
-#         -J_vbs_sh_cg (np.array): Moment of inertia of the VBS shaft around its CG (3x3 matrix).
-#     """
-#
-#     def __init__(self, d_vbs, l_vbs_l, h_vbs, l_vbs_b, m_vbs_sh, r_vbs_sh_cg, J_vbs_sh_cg):
-#         """
-#         Initialize the Variable Buoyancy System with its properties.
-#
-#         """
-#         self.d_vbs = d_vbs  # Diameter of VBS (m)
-#         self.l_vbs_l = l_vbs_l  # Length of the VBS capsule (m).
-#         self.h_vbs = h_vbs  # Vertical offset of VBS CG (m)
-#         self.l_vbs_b = l_vbs_b  # Horizontal offset length of VBS CG (m)
-#         self.m_vbs_sh = m_vbs_sh  # Mass of VBS shaft (kg)
-#         self.r_vbs_sh_cg = r_vbs_sh_cg  # Vector from the shaft center to the end boundary of the water in the VBS (m).
-#         self.J_vbs_sh_cg = J_vbs_sh_cg  # Moment of inertia of VBS shaft around its CG (3x3 matrix)
-# class VariableBuoyancySystem:
-#     """
-#     Represents the Variable Buoyancy System (VBS) of the SAM AUV.
-#
-#     Attributes:
-#         l_vbs_b: Fixed offset of the CG along the x-axis relative to the rear end of the VBS (m).
-#         h_vbs: Vertical offset of the CG along the z-axis relative to the central frame (m).
-#         l_vbs_l: Maximum length of the VBS capsule (m).
-#         d_vbs: Diameter of the VBS capsule (m).
-#         r_vbs_sh_cg: Vector from the shaft center to the end boundary of the water in the VBS (m).
-#     """
-#     def __init__(self, l_vbs_b, h_vbs, l_vbs_l, d_vbs, m_vbs_sh, r_vbs_sh_cg):
-#         self.l_vbs_b = l_vbs_b  # Fixed offset in the x-direction
-#         self.h_vbs = h_vbs  # Vertical offset of the CG
-#         self.l_vbs_l = l_vbs_l  # Maximum length of the capsule
-#         self.m_vbs_sh = m_vbs_sh  # Mass of the VBS capsule
-#         self.r_vbs_sh_cg = r_vbs_sh_cg  # Position vector from shaft center to end boundary
-# class LongitudinalCenterOfGravityControl:
-#     """
-#     Represents the Longitudinal Center of Gravity Control (LCG) of the SAM AUV.
-#
-#     Attributes:
-#         l_lcg_l: Length of the LCG structure along the x-axis (m).
-#         l_lcg_r: Maximum position of the LCG in the x-direction (m).
-#         l_lcg_b: Additional offset length along the x-axis (m).
-#         h_lcg: Vertical offset of the CG along the z-axis relative to the central frame (m).
-#         m_lcg: Mass of the LCG (kg).
-#         h_lcg_dim: Height of the LCG structure (m).
-#         d_lcg: Width of the LCG structure (m).
-#     """
-#     def __init__(self, l_lcg_l, l_lcg_r, l_lcg_b, h_lcg, m_lcg, h_lcg_dim, d_lcg):
-#         self.l_lcg_l = l_lcg_l  # Length of the LCG
-#         self.l_lcg_r = l_lcg_r  # Maximum position in x-direction
-#         self.l_lcg_b = l_lcg_b  # Additional offset in the x-direction
-#         self.h_lcg = h_lcg  # Vertical offset of the CG
-#         self.m_lcg = m_lcg  # Mass of the LCG
-#         self.h_lcg_dim = h_lcg_dim  # Height of the LCG
-#         self.d_lcg = d_lcg  # Width of the LCG
-#
-# class ThrusterShaft:
-#     """
-#     Represents the Thruster Shaft (Tsh) of the SAM AUV.
-#
-#     Attributes:
-#         l_t_sh: Length of the thruster shaft (m).
-#         r_t_sh_t: Position vector of the CG relative to the thruster frame origin (m).
-#         m_t_sh: Mass of the thruster shaft (kg).
-#         J_t_sh_t: Inertia tensor of the thruster shaft relative to the thruster frame (kg·m²).
-#     """
-#     def __init__(self, l_t_sh, r_t_sh_t, m_t_sh, J_t_sh_t):
-#         self.l_t_sh = l_t_sh  # Length of the thruster shaft
-#         self.r_t_sh_t = r_t_sh_t  # Position vector of the CG
-#         self.m_t_sh = m_t_sh  # Mass of the thruster shaft
-#         self.J_t_sh_t = J_t_sh_t  # Inertia tensor in the thruster frame
-# class Propellers:
-#     """
-#     Represents the Propellers (TP) of the SAM AUV.
-#
-#     Attributes:
-#         n_p: Number of propellers.
-#         l_t_p (np.array): List of fixed offsets of each propeller along the x-axis relative to the thruster frame (m).
-#         m_t_p (np.array): List of masses of each propeller (kg).
-#         r_t_p: List of CG position vectors of each propeller (np.array) relative to the propeller frame (m).
-#         r_t_p_sh: List of each propeller location on thruster shaft (np.array) relative to the thruster frame (m).
-#         J_t_p: List of inertia tensors of each propellers (np.array) in the propeller frame (kg·m²).
-#     """
-#     def __init__(self, n_p, l_t_p, m_t_p, r_t_p, r_t_p_sh, J_t_p):
-#         self.n_p = n_p  # Number of propellers
-#         self.l_t_p = l_t_p  # List of x-axis offsets for each propeller
-#         self.m_t_p = m_t_p  # List of masses for each propeller
-#         self.r_t_p = r_t_p  # List of CG position vectors for each propeller
-#         self.r_t_p_sh = r_t_p_sh  # List of each propeller center location on shaft.
-#         self.J_t_p = J_t_p  # List of inertia tensors for each propeller
-
-
-
-
 # Class Vehicle
 class SAM:
     """
@@ -384,6 +254,10 @@ class SAM:
             V_current=0,
             beta_current=0,
     ):
+        # FIXME: There's a lot of stuff happening in the init that is not
+        #   used later on. Remove as you see fit (a lot is from the init
+        #   of the remus100.py, but we do different calculations).
+
         # Constants
         self.r_cb = np.array([0, 0, 0], float)  # Body frame offset vector
         self.D2R = math.pi / 180  # Degrees to radians
@@ -511,33 +385,8 @@ class SAM:
         self.eta = np.zeros(7)  # [x, y, z, q0, q1, q2, q3]
         self.eta[3] = 1.0  # Initialize quaternion to identity rotation
 
-
-    # Method to update LCG position
-    # def update_lcg_position(self, new_x_lcg):
-    #     """
-    #     Updates the longitudinal center of gravity position.
-    #
-    #     Args:
-    #         new_x_lcg (float): New x-axis position of LCG (m).
-    #     """
-    #     if 0 <= new_x_lcg <= self.lcg.l_lcg_r:
-    #         self.lcg.l_lcg_r = new_x_lcg
-    #         print(f"LCG position updated to {new_x_lcg} m.")
-    #     else:
-    #         raise ValueError("LCG position out of range.")
-
-    # Method to update VBS water mass
-    # def update_vbs_water_mass(self, new_x_vbs):
-    #     """
-    #     Updates the water mass and CG in the Variable Buoyancy System.
-    #
-    #     Args:
-    #         new_x_vbs (float): New length of water in the VBS capsule (m).
-    #     """
-    #     self.vbs.r_vbs_sh_cg[0] = new_x_vbs
-    #     print(f"VBS water mass updated. New water length: {new_x_vbs} m.")
-
-    # Method to retrieve propeller configuration
+        # Method to retrieve propeller configuration
+        # FIXME: Isn't the same if statement above?
         if controlSystem == "depthHeadingAutopilot":
             self.controlDescription = (
                     "Depth and heading autopilots, z_d = "
@@ -588,12 +437,14 @@ class SAM:
         if r_z > 100.0 or r_z < 0.0:
             sys.exit('desired depth must be between 0-100 m')
 
-            # Hydrodynamics (Fossen 2021, Section 8.4.2)
+        # Hydrodynamics (Fossen 2021, Section 8.4.2)
         self.S = 0.7 * self.L * self.diam  # S = 70% of rectangle L * diam
         a = self.L / 2  # semi-axes
         b = self.diam / 2
+
+        # FIXME: The CB is not in the CO, same as the CG is not in the CO either
         self.r_bg = np.array([0, 0, 0.02], float)  # CG w.r.t. to the CO
-        self.r_bb = np.array([0, 0, 0], float)  # CB w.r.t. to the CO
+        self.r_bb = np.array([0.75, 0, -0.06], float)  # CB w.r.t. to the CO
 
         # Parasitic drag coefficient CD_0, i.e. zero lift and alpha = 0
         # F_drag = 0.5 * rho * Cd * (pi * b^2)
@@ -601,9 +452,10 @@ class SAM:
         Cd = 0.42  # from Allen et al. (2000)
         self.CD_0 = Cd * math.pi * b ** 2 / self.S
 
+        # FIXME: Why not using the mass of SAM as specified above?
         # Rigid-body mass matrix expressed in CO
         m_dry = 4 / 3 * math.pi * self.rho * a * b ** 2  # mass of spheriod, 11.85 from Matlab
-        m_water =0
+        m_water = 0
         m = m_water + m_dry
         Ix = (2 / 5) * m * b ** 2  # moment of inertia
         Iy = (1 / 5) * m * (a ** 2 + b ** 2)
@@ -612,7 +464,7 @@ class SAM:
         H_rg = Hmtrx(self.r_bg)
         self.MRB = H_rg.T @ MRB_CG @ H_rg  # MRB expressed in the CO
 
-
+        # FIXME: The buoyancy is not right. Should be fixed
         # Weight and buoyancy
         self.W = m * g
         self.B = self.W
@@ -701,85 +553,6 @@ class SAM:
         self.theta_int = 0  # pitch angle integral state
 
 
-
-    # def ksi_dynamics(self, t, ksi_full, bounds, ksi_ddot_func):
-    #     """
-    #     ODE function for ksi dynamics with zero-initialized inputs.
-    #
-    #     Both ksi_dot and ksi_ddot are initialized as zero and assigned their values
-    #     only if the corresponding conditions for staying within bounds are met.
-    #
-    #     Args:
-    #         t (float): Current time.
-    #         ksi_full (ndarray): Concatenated state vector [ksi, ksi_dot] (2n).
-    #         bounds (dict): Contains the bounds:
-    #             'ksi_min' (ndarray): Lower bounds for ksi (n).
-    #             'ksi_max' (ndarray): Upper bounds for ksi (n).
-    #             'ksi_dot_min' (ndarray): Lower bounds for ksi_dot (n).
-    #             'ksi_dot_max' (ndarray): Upper bounds for ksi_dot (n).
-    #         ksi_ddot_func (function): Function handle for time-varying acceleration input ksi_ddot(t).
-    #
-    #     Returns:
-    #         dksi_dt (ndarray): Time derivative of state vector [ksi_dot, ksi_ddot] (2n).
-    #     """
-    #     n = len(bounds['ksi_min'])
-    #     ksi = ksi_full[:n]
-    #     ksi_dot = ksi_full[n:]
-    #
-    #     # Initialize ksi_dot and ksi_ddot to zero
-    #     ksi_dot_output = np.zeros_like(ksi_dot)
-    #     ksi_ddot_output = np.zeros_like(ksi_dot)
-    #
-    #     # Evaluate acceleration input ksi_ddot at current time
-    #     ksi_ddot = ksi_ddot_func(t)
-    #
-    #     # Assign values to ksi_dot_output only if ksi is within bounds
-    #     for i in range(n):
-    #         if bounds['ksi_min'][i] <= ksi[i] <= bounds['ksi_max'][i]:
-    #             ksi_dot_output[i] = ksi_dot[i]  # Assign current velocity if within bounds
-    #
-    #     # Assign values to ksi_ddot_output only if ksi_dot_output is within bounds
-    #     for i in range(n):
-    #         if bounds['ksi_dot_min'][i] <= ksi_dot_output[i] <= bounds['ksi_dot_max'][i]:
-    #             ksi_ddot_output[i] = ksi_ddot[i]  # Assign current acceleration if within bounds
-    #
-    #     # Dynamics
-    #     dksi_dt = np.concatenate([ksi_dot_output, ksi_ddot_output])
-    #
-    #     return dksi_dt
-    #
-    # def dynamics(self, t, state_vector, signal_generator):
-    #     """
-    #     Main dynamics function for integrating the complete AUV state.
-    #
-    #     Args:
-    #         t: Current time
-    #         state_vector: Combined state vector [eta, nu, ksi, ksi_dot]
-    #         signal_generator: MultiVariablePiecewiseSignal object for ksi_ddot signals
-    #
-    #     Returns:
-    #         state_vector_dot: Time derivative of complete state vector
-    #     """
-    #     # Extract states from state vector
-    #     eta = state_vector[0:7]  # Position and quaternion [x, y, z, q0, q1, q2, q3]
-    #     nu = state_vector[7:13]  # Body velocities [u, v, w, p, q, r]
-    #     n_ksi = len(self.ksi_min)  # Number of ksi parameters
-    #     ksi = state_vector[13:13 + n_ksi]  # Time-varying parameters
-    #     ksi_dot = state_vector[13 + n_ksi:]  # Parameter derivatives
-    #
-    #     # Get ksi_ddot signals for current time
-    #     ksi_ddot = signal_generator(t)[0]  # [0] since signal_generator returns a list
-    #
-    #     # Calculate individual dynamics
-    #     eta_dot = self.eta_dynamics(eta, nu)
-    #     nu_dot = self.nu_dynamics(eta, nu, ksi, ksi_dot)
-    #     ksi_ddot_bounded = self.ksi_dynamics(t, ksi, ksi_dot, ksi_ddot)
-    #
-    #     # Combine all derivatives
-    #     state_vector_dot = np.concatenate([eta_dot, nu_dot, ksi_dot, ksi_ddot_bounded])
-    #
-    #     return state_vector_dot
-
     def eta_dynamics(self, eta, nu):
         """
         Computes the time derivative of position and quaternion orientation.
@@ -793,7 +566,9 @@ class SAM:
         """
         # Extract position and quaternion
         pos = eta[0:3]
+        # FIXME: Check the quaternion order
         q = eta[3:7]  # [q0, q1, q2, q3] where q0 is scalar part
+        q_tilde = np.array([eta[4], eta[5], eta[6], eta[3]])
 
         # Convert quaternion to DCM for position kinematics
         C = quaternion_to_dcm(q)
@@ -910,13 +685,19 @@ class SAM:
         m_dot_total = cg_data.get("m_dot_vbs_w", 0.0)
 
         # Weight and buoyancy
-        W = m_total * g # FIXME: the mass is very off. With full VBS, it'd be 110kg. This doesn't seem right. With Empty VBS it's 50kg. So even that is too much. it's supposed to be 16kg.
-        B = W # NOTE: Why is SAM neutrally buoyant with 1.25*W? Shouldn't it be W=B?
-        print(f"m_total: {m_total}, W: {W}, B: {B}")
-        cg_mass = cg_data["mass_contributions"]
-        print(f"cg mass: {cg_mass}")
+        W = m_total * g 
+        B = W # FIXME: This is not correct. The buoynacy is constant, at least
+                # we assume that. But with B = W, we have the buoyancy changing with the
+                # weight.
+            # NOTE: Why is SAM neutrally buoyant with 1.25*W? Shouldn't it be W=B?
+        #print(f"m_total: {m_total:.3f}, W: {W:.3f}, B: {B:.3f}")
+        #cg_mass = cg_data["mass_contributions"]
+        #print(f"cg mass: {cg_mass}")
 
         # Extract Euler angles
+        # FIXME: How do we deal with the quaternions?
+        q = [eta[4], eta[5], eta[6], eta[3]]
+        #phi, theta, psi = quaternion_to_angles(q) # NOTE: the function uses quaternions as x, y, z, w
         phi, theta, psi = quaternion_to_angles(eta[3:7]) # NOTE: the function uses quaternions as x, y, z, w
 
         # Relative velocities due to current
@@ -936,6 +717,8 @@ class SAM:
         # Hydrodynamic forces
         tau_liftdrag = forceLiftDrag(self.diam, self.S, self.CD_0, alpha, U_r)
         tau_crossflow = crossFlowDrag(self.L, self.diam, self.diam, nu_r)
+
+        print(f"r_bg: {r_bg}, r_bb: {self.r_bb}")
 
         # Restoring forces
         g_vec = gvect(W, B, theta, phi, r_bg, self.r_bb)
@@ -1041,48 +824,6 @@ class SAM:
         nu_dot = np.linalg.inv(M_total) @ RHS
         return nu_dot
 
-    #
-    # #def stepInput(self, t):
-    #     """
-    #     u = stepInput(t) generates propeller step inputs.
-    #     """
-    #     n1 = 100  # rad/s
-    #     n2 = 80
-    #
-    #     if t > 30 and t < 100:
-    #         n1 = 80
-    #         n2 = 120
-    #     else:
-    #         n1 = 0
-    #         n2 = 0
-    #
-    #     u_control = np.array([n1, n2], float)
-    #
-    #     return u_control
-    #
-    # def stepInput(self, t):
-    #     """
-    #     u_c = stepInput(t) generates step inputs.
-    #
-    #     Returns:
-    #
-    #         u_control = [ delta_r   rudder angle (rad)
-    #                      delta_s    stern plane angle (rad)
-    #                      n          propeller revolution (rpm) ]
-    #     """
-    #     delta_r = 5 * self.D2R  # rudder angle (rad)
-    #     delta_s = -5 * self.D2R  # stern angle (rad)
-    #     n = 1525  # propeller revolution (rpm)
-    #
-    #     if t > 100:
-    #         delta_r = 0
-    #
-    #     if t > 50:
-    #         delta_s = 0
-    #
-    #     u_control = np.array([delta_r, delta_s, n], float)
-    #
-    #     return u_control
 
     def depthHeadingAutopilot(self, eta, nu, sampleTime):
         """
@@ -1246,18 +987,6 @@ class SAM:
             "J_t_p": self.propellers.J_t_p
         }
 
-    # Method to print system summary
-    # def print_summary(self):
-    #     """
-    #     Prints a summary of all subsystems.
-    #     """
-    #     print("SAM System Summary:")
-    #     print(f"Solid Structure: Length={self.solid_structure.l_ss}, Mass={self.solid_structure.m_ss}")
-    #     print(f"VBS: Length={self.vbs.l_vbs_l}, Diameter={self.vbs.d_vbs}")
-    #     print(f"LCG: Length={self.lcg.l_lcg_l}, Mass={self.lcg.m_lcg}")
-    #     print(f"Thruster Shaft: Length={self.thruster_shaft.l_t_sh}, Mass={self.thruster_shaft.m_t_sh}")
-    #     print(f"Propellers: Number={self.propellers.n_p}")
-
     def dynamics(self, t, state_vector, signal_generator):
         """
         Main dynamics function for integrating the complete AUV state.
@@ -1359,7 +1088,7 @@ class SAM:
         r_vbs_sh_cg = np.array(self.vbs.r_vbs_sh_cg)  # Shaft CG position from SAM class
 
         # --- Mass of VBS Water ---
-        m_vbs_w = (rho * np.pi * d_vbs ** 2 * x_vbs) / 4 # FIXME: This is 60kg for x_vbs max. In reality it's at most 300ml, so 0.3.
+        m_vbs_w = (rho * np.pi * d_vbs ** 2 * x_vbs) / 4 
         m_dot_vbs_w = (rho * np.pi * d_vbs ** 2 * x_dot_vbs) / 4
         m_ddot_vbs_w = (rho * np.pi * d_vbs ** 2 * x_ddot_vbs) / 4
 

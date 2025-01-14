@@ -8,7 +8,8 @@ matplotlib.use('TkAgg')  # or 'Qt5Agg', depending on what you have installed
 
 # Initial conditions
 eta0 = np.zeros(7)
-#eta0[3] = 1.0  # Initial quaternion (no rotation) # NOTE: Shouldn't that be eta0[6]? the normalizing factor is the last one
+# NOTE: Shouldn't that be eta0[6]? the normalizing factor is the last one
+eta0[6] = 1.0  # Initial quaternion (no rotation) 
 nu0 = np.zeros(6)  # Zero initial velocities
 ksi0 = np.zeros(6)  # All systems start at zero position
 ksi_dot0 = np.zeros(6)  # All rates start at zero
@@ -97,6 +98,7 @@ def run_simulation(t_span, x0, sam, signal_gen):
         return sam.dynamics(t, x, signal_gen)
 
     # Run integration
+    print(f" Start simulation")
     sol = solve_ivp(
         dynamics_wrapper,
         t_span,
@@ -106,6 +108,10 @@ def run_simulation(t_span, x0, sam, signal_gen):
         rtol=1e-6,
         atol=1e-9
     )
+    if sol.status == -1:
+        print(f" Simulation failed: {sol.message}")
+    else:
+        print(f" Simulation complete!")
 
     # Extract bounded ksi_ddot from solution
     ksi_ddot_bounded = np.array([
@@ -126,23 +132,18 @@ def plot_results(sol, ksi_ddot_unbounded, ksi_ddot_bounded):
 
     def quaternion_to_euler_vec(sol):
 
-        n = len(sol.y[4])
+        n = len(sol.y[3])
         psi = np.zeros(n)
         theta = np.zeros(n)
         phi = np.zeros(n)
 
         for i in range(n):
-            q = [sol.y[4,i], sol.y[5,i], sol.y[6,i], sol.y[3,i]]
+            q = [sol.y[3,i], sol.y[4,i], sol.y[5,i], sol.y[6,i]]
             psi[i], theta[i], phi[i] = gnc.quaternion_to_angles(q)
 
         return psi, theta, phi
 
-    
-
     psi_vec, theta_vec, phi_vec = quaternion_to_euler_vec(sol)
-
-
-
 
     fig, axs = plt.subplots(7, 1, figsize=(12, 25))
 
@@ -154,14 +155,14 @@ def plot_results(sol, ksi_ddot_unbounded, ksi_ddot_bounded):
     axs[0].legend()
 
     # Quaternion plots
-    axs[1].plot(sol.t, sol.y[3], label='q0')
-    axs[1].plot(sol.t, sol.y[4], label='q1')
-    axs[1].plot(sol.t, sol.y[5], label='q2')
-    axs[1].plot(sol.t, sol.y[6], label='q3')
+    axs[1].plot(sol.t, sol.y[3], label='q1')
+    axs[1].plot(sol.t, sol.y[4], label='q2')
+    axs[1].plot(sol.t, sol.y[5], label='q3')
+    axs[1].plot(sol.t, sol.y[6], label='q0')
     axs[1].set_ylabel('Quaternion')
     axs[1].legend()
 
-    # Eulre plots
+    # Euler plots
     axs[2].plot(sol.t, phi_vec, label='roll')
     axs[2].plot(sol.t, theta_vec, label='pitch')
     axs[2].plot(sol.t, psi_vec, label='yaw')
@@ -199,14 +200,14 @@ def plot_results(sol, ksi_ddot_unbounded, ksi_ddot_bounded):
     axs[5].legend()
 
     # ksi_ddot comparison
-    labels = ['VBS', 'LCG', 'δs', 'δr', 'θ1', 'θ2']
-    for i in range(6):
-        axs[6].plot(sol.t, ksi_ddot_unbounded[:, i], '--',
-                    label=f'{labels[i]} (unbounded)')
-        axs[6].plot(sol.t, ksi_ddot_bounded[:, i], '-',
-                    label=f'{labels[i]} (bounded)')
-    axs[6].set_ylabel('ksi_ddot')
-    axs[6].legend()
+#    labels = ['VBS', 'LCG', 'δs', 'δr', 'θ1', 'θ2']
+#    for i in range(6):
+#        axs[6].plot(sol.t, ksi_ddot_unbounded[:, i], '--',
+#                    label=f'{labels[i]} (unbounded)')
+#        axs[6].plot(sol.t, ksi_ddot_bounded[:, i], '-',
+#                    label=f'{labels[i]} (bounded)')
+#    axs[6].set_ylabel('ksi_ddot')
+#    axs[6].legend()
 
     plt.xlabel('Time [s]')
     plt.tight_layout()
