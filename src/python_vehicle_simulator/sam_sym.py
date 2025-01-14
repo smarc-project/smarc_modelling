@@ -12,6 +12,8 @@ eta0 = np.zeros(7)
 eta0[6] = 1.0  # Initial quaternion (no rotation) 
 nu0 = np.zeros(6)  # Zero initial velocities
 ksi0 = np.zeros(6)  # All systems start at zero position
+#ksi0[0] = 0.088
+#ksi0[1] = 0.057/2
 ksi_dot0 = np.zeros(6)  # All rates start at zero
 x0 = np.concatenate([eta0, nu0, ksi0, ksi_dot0])
 

@@ -283,38 +283,54 @@ class SAM:
         self.beta_c = beta_current * self.D2R  # Current water direction (rad)
         self.controlMode = controlSystem
 
-        # NOTE: Adjusted the values for more realistic ones
-        #   It's unclear why SAM moves forward with 2m/s still when there's no actuation.
-        #   Even with wrong inertia tensors, this shouldn't happen. Slightly dubious.
         # FIXME: Check for the correct values and the re-evaluate. Otherwise it's a bit 
         #   futile.
         # Initialize subsystems
+        l_SS=1.336
+        d_SS=0.25
+        m_SS=14.9
+        Ix_ss = (2 / 5) * m_SS * (d_SS/2) ** 2  # moment of inertia
+        Iy_ss = (1 / 5) * m_SS * ((l_SS/2) ** 2 + (d_SS/2) ** 2)
+        Iz_ss = Iy_ss
+        J_SS_c=np.array([Ix_ss, Iy_ss, Iz_ss]),
+        r_SS_c=np.array([l_SS/2, 0, 0])   # FIXME: Should ther be a -sign? is it cg->co or co->cg?
         self.solid_structure = SolidStructure(
-            l_SS=1.5,
-            d_SS=0.19,
-            m_SS=14.9,
-            J_SS_c=np.array([[10, 0, 0], [0, 15, 0], [0, 0, 20]]),
-            r_SS_c=np.array([0.75, 0, 0.1])
+            l_SS=l_SS,
+            d_SS=d_SS,
+            m_SS=m_SS,
+            J_SS_c=J_SS_c,
+            r_SS_c=r_SS_c
         )
 
         # NOTE: Adjusted values
         # All values in m
         # Now the water mass for a full VBS makes more sense
+        d_vbs=0.085
+        l_vbs_l=0.088
+        h_vbs=0.01
+        l_vbs_b=0.398
+        m_vbs_sh=0.1
+        r_vbs_sh = 0.005/2 # Guesstimate for the radius of the vbs shaft
+        r_vbs_sh_cg=np.array([0.044, 0, 0]) # FIXME: What about the direction?
+        Ix_vbs = (1 / 2) * m_vbs_sh * r_vbs_sh ** 2  # moment of inertia
+        Iy_vbs = (1 / 12) * m_SS * (l_vbs_l ** 2 + 3*r_vbs_sh ** 2)
+        Iz_vbs = Iy_vbs
+        J_vbs_sh_cg=np.array([Ix_vbs, Iy_vbs, Iz_vbs])
         self.vbs = VariableBuoyancySystem(
-            d_vbs=0.085,
-            l_vbs_l=0.045,
-            h_vbs=0.01,
-            l_vbs_b=0.2,
-            m_vbs_sh=0.1,
-            r_vbs_sh_cg=np.array([0.1, 0, 0]),
-            J_vbs_sh_cg=np.diag([1, 2, 3])
+            d_vbs=d_vbs,
+            l_vbs_l=l_vbs_l,
+            h_vbs=h_vbs,
+            l_vbs_b=l_vbs_b,
+            m_vbs_sh=m_vbs_sh,
+            r_vbs_sh_cg=r_vbs_sh_cg,
+            J_vbs_sh_cg=J_vbs_sh_cg
         )
 
         # NOTE: Adjusted Values
         self.lcg = LongitudinalCenterOfGravityControl(
-            l_lcg_l=0.2,
-            l_lcg_r=0.06,
-            l_lcg_b=1.0,
+            l_lcg_l=0.223,
+            l_lcg_r=0.057,
+            l_lcg_b=0.618,
             h_lcg=0.1,
             m_lcg=2.6,
             h_lcg_dim=0.1,
@@ -322,24 +338,33 @@ class SAM:
         )
 
         # NOTE: Adjusted values
+        l_t_sh=0.3
+        r_t_sh_t=np.array([0.15, 0, -0.05])
+        m_t_sh=1.0
+        r_t_sh=0.005/2
+        Ix_t_sh = (1 / 2) * m_t_sh * r_t_sh ** 2  # moment of inertia
+        Iy_t_sh = (1 / 12) * m_t_sh * (l_t_sh ** 2 + 3*r_t_sh ** 2)
+        Iz_t_sh = Iy_vbs
+        J_t_sh_t=np.array([Ix_t_sh, Iy_t_sh, Iz_t_sh])
         self.thruster_shaft = ThrusterShaft(
-            l_t_sh=0.3,
-            r_t_sh_t=np.array([0.15, 0, -0.05]),
-            m_t_sh=1.0,
-            J_t_sh_t=np.array([[1, 0, 0], [0, 2, 0], [0, 0, 3]])
+            l_t_sh=l_t_sh,
+            r_t_sh_t=r_t_sh_t,
+            m_t_sh=m_t_sh,
+            J_t_sh_t=J_t_sh_t
         )
 
+        # NOTE: Adjuste values
         self.propellers = Propellers(
             n_p=2,
             l_t_p=np.array([0.1, 0.15]),
-            m_t_p=np.array([1.5, 1.8]),
+            m_t_p=np.array([0.01, 0.01]),
             r_t_p=[
-                np.array([0.05, 0, -0.02]),
-                np.array([0.075, 0, -0.03])
+                np.array([0.0, 0, 0.0]),
+                np.array([0.0, 0, 0.0])
             ],
             r_t_p_sh=[
-                np.array([0.3, 0, 0]),
-                np.array([0.4, 0, 0])
+                np.array([0.03, 0, 0]),
+                np.array([0.04, 0, 0])
             ],
             J_t_p=[
                 np.array([[0.3, 0, 0], [0, 0.4, 0], [0, 0, 0.5]]),
@@ -411,18 +436,18 @@ class SAM:
         # Initialize the AUV model
         self.name = (
             "SAM (Small and Affordable Maritime) cylinder-shaped autonomous underwater vehicle (AUV)")
-        self.L = 1.6  # length (m)
-        self.diam = 0.19  # cylinder diameter (m)
+        self.L = self.solid_structure.l_SS  # length (m)
+        self.diam = self.solid_structure.d_SS  # cylinder diameter (m)
 
         self.nu = np.array([0, 0, 0, 0, 0, 0], float)  # velocity vector
         self.u_actual = np.array([0, 0, 0], float)  # control input vector
 
-        self.controls = [
-            "Tail rudder (deg)",
-            "Stern plane (deg)",
-            "Propeller revolution (rpm)"
-        ]
-        self.dimU = len(self.controls)
+#        self.controls = [
+#            "Tail rudder (deg)",
+#            "Stern plane (deg)",
+#            "Propeller revolution (rpm)"
+#        ]
+#        self.dimU = len(self.controls)
 
         # Actuator dynamics
         self.deltaMax_r = 15 * self.D2R  # max rudder angle (rad)
@@ -443,7 +468,7 @@ class SAM:
         b = self.diam / 2
 
         # FIXME: The CB is not in the CO, same as the CG is not in the CO either
-        self.r_bg = np.array([0, 0, 0.02], float)  # CG w.r.t. to the CO
+        self.r_bg = np.array([0.75, 0, 0.02], float)  # CG w.r.t. to the CO
         self.r_bb = np.array([0.75, 0, -0.06], float)  # CB w.r.t. to the CO
 
         # Parasitic drag coefficient CD_0, i.e. zero lift and alpha = 0
@@ -452,10 +477,9 @@ class SAM:
         Cd = 0.42  # from Allen et al. (2000)
         self.CD_0 = Cd * math.pi * b ** 2 / self.S
 
-        # FIXME: Why not using the mass of SAM as specified above?
         # Rigid-body mass matrix expressed in CO
-        m_dry = 4 / 3 * math.pi * self.rho * a * b ** 2  # mass of spheriod, 11.85 from Matlab
-        m_water = 0
+        m_dry = self.solid_structure.m_SS + self.lcg.m_lcg + self.vbs.m_vbs_sh + self.thruster_shaft.m_t_sh 
+        m_water = 0.15 # Neutrally buoyant at 50% vbs
         m = m_water + m_dry
         Ix = (2 / 5) * m * b ** 2  # moment of inertia
         Iy = (1 / 5) * m * (a ** 2 + b ** 2)
@@ -686,11 +710,11 @@ class SAM:
 
         # Weight and buoyancy
         W = m_total * g 
-        B = W # FIXME: This is not correct. The buoynacy is constant, at least
+        B = self.B #W # FIXME: This is not correct. The buoynacy is constant, at least
                 # we assume that. But with B = W, we have the buoyancy changing with the
                 # weight.
             # NOTE: Why is SAM neutrally buoyant with 1.25*W? Shouldn't it be W=B?
-        #print(f"m_total: {m_total:.3f}, W: {W:.3f}, B: {B:.3f}")
+        print(f"m_total: {m_total:.3f}, W: {W:.3f}, B: {B:.3f}")
         #cg_mass = cg_data["mass_contributions"]
         #print(f"cg mass: {cg_mass}")
 
@@ -718,7 +742,7 @@ class SAM:
         tau_liftdrag = forceLiftDrag(self.diam, self.S, self.CD_0, alpha, U_r)
         tau_crossflow = crossFlowDrag(self.L, self.diam, self.diam, nu_r)
 
-        print(f"r_bg: {r_bg}, r_bb: {self.r_bb}")
+        #print(f"r_bg: {r_bg}, r_bb: {self.r_bb}")
 
         # Restoring forces
         g_vec = gvect(W, B, theta, phi, r_bg, self.r_bb)
