@@ -479,7 +479,7 @@ class SAM:
 
         # Rigid-body mass matrix expressed in CO
         m_dry = self.solid_structure.m_SS + self.lcg.m_lcg + self.vbs.m_vbs_sh + self.thruster_shaft.m_t_sh 
-        m_water = 0.15 # Neutrally buoyant at 50% vbs
+        m_water= (self.rho_w * np.pi * d_vbs ** 2 * l_vbs_l/2) / 4 
         m = m_water + m_dry
         Ix = (2 / 5) * m * b ** 2  # moment of inertia
         Iy = (1 / 5) * m * (a ** 2 + b ** 2)
@@ -1115,6 +1115,8 @@ class SAM:
         m_vbs_w = (rho * np.pi * d_vbs ** 2 * x_vbs) / 4 
         m_dot_vbs_w = (rho * np.pi * d_vbs ** 2 * x_dot_vbs) / 4
         m_ddot_vbs_w = (rho * np.pi * d_vbs ** 2 * x_ddot_vbs) / 4
+
+        #print(f"m_vbs: {m_vbs_w}")
 
         # --- Inertia of VBS Water around its CG ---
         J1 = 0
