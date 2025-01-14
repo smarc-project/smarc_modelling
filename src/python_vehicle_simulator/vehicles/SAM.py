@@ -292,7 +292,7 @@ class SAM:
         Ix_ss = (2 / 5) * m_SS * (d_SS/2) ** 2  # moment of inertia
         Iy_ss = (1 / 5) * m_SS * ((l_SS/2) ** 2 + (d_SS/2) ** 2)
         Iz_ss = Iy_ss
-        J_SS_c=np.array([Ix_ss, Iy_ss, Iz_ss]),
+        J_SS_c=np.diag([Ix_ss, Iy_ss, Iz_ss])
         r_SS_c=np.array([l_SS/2, 0, 0])   # FIXME: Should ther be a -sign? is it cg->co or co->cg?
         self.solid_structure = SolidStructure(
             l_SS=l_SS,
@@ -310,12 +310,12 @@ class SAM:
         h_vbs=0.01
         l_vbs_b=0.398
         m_vbs_sh=0.1
-        r_vbs_sh = 0.005/2 # Guesstimate for the radius of the vbs shaft
+        r_vbs_sh = 0.01/2 # Guesstimate for the radius of the vbs shaft
         r_vbs_sh_cg=np.array([0.044, 0, 0]) # FIXME: What about the direction?
         Ix_vbs = (1 / 2) * m_vbs_sh * r_vbs_sh ** 2  # moment of inertia
         Iy_vbs = (1 / 12) * m_SS * (l_vbs_l ** 2 + 3*r_vbs_sh ** 2)
         Iz_vbs = Iy_vbs
-        J_vbs_sh_cg=np.array([Ix_vbs, Iy_vbs, Iz_vbs])
+        J_vbs_sh_cg=np.diag([Ix_vbs, Iy_vbs, Iz_vbs])
         self.vbs = VariableBuoyancySystem(
             d_vbs=d_vbs,
             l_vbs_l=l_vbs_l,
@@ -341,11 +341,11 @@ class SAM:
         l_t_sh=0.3
         r_t_sh_t=np.array([0.15, 0, -0.05])
         m_t_sh=1.0
-        r_t_sh=0.005/2
+        r_t_sh=0.01/2
         Ix_t_sh = (1 / 2) * m_t_sh * r_t_sh ** 2  # moment of inertia
         Iy_t_sh = (1 / 12) * m_t_sh * (l_t_sh ** 2 + 3*r_t_sh ** 2)
         Iz_t_sh = Iy_vbs
-        J_t_sh_t=np.array([Ix_t_sh, Iy_t_sh, Iz_t_sh])
+        J_t_sh_t=np.diag([Ix_t_sh, Iy_t_sh, Iz_t_sh])
         self.thruster_shaft = ThrusterShaft(
             l_t_sh=l_t_sh,
             r_t_sh_t=r_t_sh_t,
@@ -714,7 +714,7 @@ class SAM:
                 # we assume that. But with B = W, we have the buoyancy changing with the
                 # weight.
             # NOTE: Why is SAM neutrally buoyant with 1.25*W? Shouldn't it be W=B?
-        print(f"m_total: {m_total:.3f}, W: {W:.3f}, B: {B:.3f}")
+        #print(f"m_total: {m_total:.3f}, W: {W:.3f}, B: {B:.3f}")
         #cg_mass = cg_data["mass_contributions"]
         #print(f"cg mass: {cg_mass}")
 
