@@ -12,7 +12,7 @@ eta0 = np.zeros(7)
 eta0[6] = 1.0  # Initial quaternion (no rotation) 
 nu0 = np.zeros(6)  # Zero initial velocities
 ksi0 = np.zeros(6)  # All systems start at zero position
-#ksi0[0] = 0.088/2
+ksi0[0] = 0 #0.088
 #ksi0[1] = 0.057/2
 #ksi0[2] = np.deg2rad(5)
 #ksi0[3] = np.deg2rad(5)
@@ -29,37 +29,37 @@ t_eval = np.linspace(t_span[0], t_span[1], 1000)
 vbs_pieces = [{
     "interval": (0, t_span[1]),
     "name": "constant",
-    "params": {"val": 100.0},  # No VBS acceleration
+    "params": {"val": 0.0},  # No VBS acceleration
 }]
 
 lcg_pieces = [{
     "interval": (0, t_span[1]),
     "name": "constant",
-    "params": {"val": 100.0},  # No LCG acceleration
+    "params": {"val": 0.0},  # No LCG acceleration
 }]
 
 stern_pieces = [{
     "interval": (0, t_span[1]),
     "name": "constant",
-    "params": {"val": 110.0},  # No stern acceleration
+    "params": {"val": 0.0},  # No stern acceleration
 }]
 
 rudder_pieces = [{
     "interval": (3, 10),
     "name": "constant",
-    "params": {"val": 100.0},  # No rudder acceleration
+    "params": {"val": 0.0},  # No rudder acceleration
 }]
 
 prop1_pieces = [
     {
         "interval": (0, 5),
         "name": "constant",
-        "params": {"val": 100.0},  # Constant acceleration phase
+        "params": {"val": 0.0},  # Constant acceleration phase
     },
     {
         "interval": (5, t_span[1]),
         "name": "constant",
-        "params": {"val": 100.0},  # Zero acceleration phase
+        "params": {"val": 0.0},  # Zero acceleration phase
     }
 ]
 
@@ -67,12 +67,12 @@ prop2_pieces = [
     {
         "interval": (0, 5),
         "name": "constant",
-        "params": {"val": 100.0},  # Opposite acceleration
+        "params": {"val": 0.0},  # Opposite acceleration
     },
     {
         "interval": (5, t_span[1]),
         "name": "constant",
-        "params": {"val": 100.0},  # Zero acceleration phase
+        "params": {"val": 0.0},  # Zero acceleration phase
     }
 ]
 

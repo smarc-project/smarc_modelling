@@ -34,7 +34,7 @@ def run_simulation(t_span, x0, sam):
                      lcg        longitudinal center of gravity adjustment ]
         """
         u = np.zeros(6)
-        #u[4] = 50
+        u[4] = 0
         return sam.dynamics(x, u)
 
     # Run integration
@@ -77,39 +77,49 @@ def plot_results(sol):
 
     psi_vec, theta_vec, phi_vec = quaternion_to_euler_vec(sol)
 
-    fig, axs = plt.subplots(7, 1, figsize=(12, 25))
+    fig, axs = plt.subplots(4, 3, figsize=(12, 10))
 
     # Position plots
-    axs[0].plot(sol.t, sol.y[0], label='x')
-    axs[0].plot(sol.t, sol.y[1], label='y')
-    axs[0].plot(sol.t, sol.y[2], label='z')
-    axs[0].set_ylabel('Position [m]')
-    axs[0].legend()
+    axs[0,0].plot(sol.t, sol.y[0], label='x')
+    axs[0,1].plot(sol.t, sol.y[1], label='y')
+    axs[0,2].plot(sol.t, -sol.y[2], label='z')
+    axs[0,0].set_ylabel('x Position [m]')
+    axs[0,1].set_ylabel('y Position [m]')
+    axs[0,2].set_ylabel('-z Position [m]')
+#    axs[0].legend()
 
     # Quaternion plots
-    axs[1].plot(sol.t, sol.y[3], label='q1')
-    axs[1].plot(sol.t, sol.y[4], label='q2')
-    axs[1].plot(sol.t, sol.y[5], label='q3')
-    axs[1].plot(sol.t, sol.y[6], label='q0')
-    axs[1].set_ylabel('Quaternion')
-    axs[1].legend()
+#    axs[1,0].plot(sol.t, sol.y[3], label='q1')
+#    axs[1,].plot(sol.t, sol.y[4], label='q2')
+#    axs[1].plot(sol.t, sol.y[5], label='q3')
+#    axs[1].plot(sol.t, sol.y[6], label='q0')
+#    axs[1].set_ylabel('Quaternion')
+#    axs[1].legend()
 
     # Euler plots
-    axs[2].plot(sol.t, phi_vec, label='roll')
-    axs[2].plot(sol.t, theta_vec, label='pitch')
-    axs[2].plot(sol.t, psi_vec, label='yaw')
-    axs[2].set_ylabel('RPY [rad]')
-    axs[2].legend()
+    axs[1,0].plot(sol.t, phi_vec, label='roll')
+    axs[1,1].plot(sol.t, theta_vec, label='pitch')
+    axs[1,2].plot(sol.t, psi_vec, label='yaw')
+    axs[1,0].set_ylabel('roll [rad]')
+    axs[1,1].set_ylabel('pitch [rad]')
+    axs[1,2].set_ylabel('yaw [rad]')
+#    axs[1].legend()
 
     # Velocity plots
-    axs[3].plot(sol.t, sol.y[7], label='u')
-    axs[3].plot(sol.t, sol.y[8], label='v')
-    axs[3].plot(sol.t, sol.y[9], label='w')
-    axs[3].plot(sol.t, sol.y[10], label='p')
-    axs[3].plot(sol.t, sol.y[11], label='q')
-    axs[3].plot(sol.t, sol.y[12], label='r')
-    axs[3].set_ylabel('Velocities')
-    axs[3].legend()
+    axs[2,0].plot(sol.t, sol.y[7], label='u')
+    axs[2,1].plot(sol.t, sol.y[8], label='v')
+    axs[2,2].plot(sol.t, sol.y[9], label='w')
+    axs[2,0].set_ylabel('u (x_dot)')
+    axs[2,1].set_ylabel('v (y_dot)')
+    axs[2,2].set_ylabel('w (z_dot)')
+
+    axs[3,0].plot(sol.t, sol.y[10], label='p')
+    axs[3,1].plot(sol.t, sol.y[11], label='q')
+    axs[3,2].plot(sol.t, sol.y[12], label='r')
+    axs[3,0].set_ylabel('p (roll_dot)')
+    axs[3,1].set_ylabel('q (pitch_dot)')
+    axs[3,2].set_ylabel('r (yaw_dot)')
+    #axs[3].legend()
 
 #    # ksi plots
 #    axs[4].plot(sol.t, sol.y[13], label='VBS')

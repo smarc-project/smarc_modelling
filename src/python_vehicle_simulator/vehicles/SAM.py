@@ -287,8 +287,8 @@ class SAM:
         #   futile.
         # Initialize subsystems
         l_SS=1.336
-        d_SS=0.25
-        m_SS=14.9
+        d_SS=0.125
+        m_SS=16.9
         Ix_ss = (2 / 5) * m_SS * (d_SS/2) ** 2  # moment of inertia
         Iy_ss = (1 / 5) * m_SS * ((l_SS/2) ** 2 + (d_SS/2) ** 2)
         Iz_ss = Iy_ss
@@ -306,12 +306,12 @@ class SAM:
         # All values in m
         # Now the water mass for a full VBS makes more sense
         d_vbs=0.085
-        l_vbs_l=0.088
-        h_vbs=0.01
-        l_vbs_b=0.398
-        m_vbs_sh=0.1
+        l_vbs_l=0.042
+        h_vbs=0.0125
+        l_vbs_b=0.404
+        m_vbs_sh=0.2
         r_vbs_sh = 0.01/2 # Guesstimate for the radius of the vbs shaft
-        r_vbs_sh_cg=np.array([0.044, 0, 0]) # FIXME: What about the direction?
+        r_vbs_sh_cg=np.array([0.015, 0, 0]) # FIXME: What about the direction?
         Ix_vbs = (1 / 2) * m_vbs_sh * r_vbs_sh ** 2  # moment of inertia
         Iy_vbs = (1 / 12) * m_SS * (l_vbs_l ** 2 + 3*r_vbs_sh ** 2)
         Iz_vbs = Iy_vbs
@@ -329,12 +329,12 @@ class SAM:
         # NOTE: Adjusted Values
         self.lcg = LongitudinalCenterOfGravityControl(
             l_lcg_l=0.223,
-            l_lcg_r=0.057,
-            l_lcg_b=0.618,
-            h_lcg=0.1,
-            m_lcg=2.6,
-            h_lcg_dim=0.1,
-            d_lcg=0.1
+            l_lcg_r=0.05,
+            l_lcg_b=0.608,
+            h_lcg=0.130,
+            m_lcg=3.5,
+            h_lcg_dim=0.08,
+            d_lcg=0.08
         )
 
         # NOTE: Adjusted values

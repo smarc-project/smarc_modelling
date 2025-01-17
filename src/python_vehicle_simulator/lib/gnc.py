@@ -15,6 +15,7 @@ import numpy as np
 import math
 from sympy import symbols, lambdify
 from scipy.interpolate import PchipInterpolator, CubicSpline, interp1d
+from scipy.spatial.transform import Rotation
 
 #------------------------------------------------------------------------------
 
@@ -459,8 +460,26 @@ def quaternion_to_angles(q):
 
     # Compute Euler angles
     psi = np.arctan2(2 * (q1 * q2 + q3 * q0), 1 - 2 * (q2**2 + q3**2))
-    theta = np.arcsin(2 * (q1 * q3 - q2 * q0))
+    theta = np.arcsin(np.clip(2 * (q1 * q3 - q2 * q0), -1, 1))
     phi = np.arctan2(2 * (q2 * q3 + q1 * q0), 1 - 2 * (q1**2 + q2**2))
+
+    #rot = Rotation.from_quat(q)
+    #rot_euler = rot.as_euler('zyx')
+    #psi_s, theta_s, phi_s = rot_euler
+
+    q_x, q_y, q_z, q_w = q
+
+    roll_x = np.arctan2(2 * (q_x * q_w + q_y * q_z), 1 - 2*(q_x**2 + q_y**2))
+    pitch_y = np.arcsin(2*(q_w*q_y - q_x*q_z))
+    yaw_z = np.arctan2(2*(q_w*q_z + q_x*q_y), 1-2*(q_y**2 + q_z**2))
+
+    #print(f"psi: {psi}, theta: {theta}, phi: {phi}")
+    #print(f"psi_s: {psi_s}, theta_s: {theta_s}, phi: {phi_s}")
+    #print(f"roll_x: {roll_x}, pitch_y: {pitch_y}, yaw_z: {yaw_z}")
+
+    psi = roll_x
+    theta = pitch_y
+    phi = yaw_z
 
     return psi, theta, phi
 # ------------------------------------------------------------------------------
@@ -750,6 +769,11 @@ def gvect(W,B,theta,phi,r_bg,r_bb):
     cth  = math.cos(theta)
     sphi = math.sin(phi)
     cphi = math.cos(phi)
+
+    #print(f"r_bg: {r_bg}")
+    #print(f"r_bb: {r_bb}")
+    #print(f"r_diff: {r_bg - r_bb}")
+    #print(f"sth: {sth:.3f}, cth: {cth:.3f}, sphi: {sphi}, cphi: {cphi}")
 
     g = np.array([
         (W-B) * sth,
