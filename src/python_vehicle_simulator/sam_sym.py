@@ -8,9 +8,16 @@ matplotlib.use('TkAgg')  # or 'Qt5Agg', depending on what you have installed
 
 # Initial conditions
 eta0 = np.zeros(7)
-eta0[3] = 1.0  # Initial quaternion (no rotation)
+# NOTE: Shouldn't that be eta0[6]? the normalizing factor is the last one
+eta0[6] = 1.0  # Initial quaternion (no rotation) 
 nu0 = np.zeros(6)  # Zero initial velocities
 ksi0 = np.zeros(6)  # All systems start at zero position
+ksi0[0] = 0 #0.088
+#ksi0[1] = 0.057/2
+#ksi0[2] = np.deg2rad(5)
+#ksi0[3] = np.deg2rad(5)
+#ksi0[4] = 1525
+#ksi0[5] = 1525
 ksi_dot0 = np.zeros(6)  # All rates start at zero
 x0 = np.concatenate([eta0, nu0, ksi0, ksi_dot0])
 
@@ -38,7 +45,7 @@ stern_pieces = [{
 }]
 
 rudder_pieces = [{
-    "interval": (0, t_span[1]),
+    "interval": (3, 10),
     "name": "constant",
     "params": {"val": 0.0},  # No rudder acceleration
 }]
@@ -97,6 +104,7 @@ def run_simulation(t_span, x0, sam, signal_gen):
         return sam.dynamics(t, x, signal_gen)
 
     # Run integration
+    print(f" Start simulation")
     sol = solve_ivp(
         dynamics_wrapper,
         t_span,
@@ -106,6 +114,10 @@ def run_simulation(t_span, x0, sam, signal_gen):
         rtol=1e-6,
         atol=1e-9
     )
+    if sol.status == -1:
+        print(f" Simulation failed: {sol.message}")
+    else:
+        print(f" Simulation complete!")
 
     # Extract bounded ksi_ddot from solution
     ksi_ddot_bounded = np.array([
@@ -123,7 +135,23 @@ def plot_results(sol, ksi_ddot_unbounded, ksi_ddot_bounded):
     """
     Plot simulation results.
     """
-    fig, axs = plt.subplots(5, 1, figsize=(12, 15))
+
+    def quaternion_to_euler_vec(sol):
+
+        n = len(sol.y[3])
+        psi = np.zeros(n)
+        theta = np.zeros(n)
+        phi = np.zeros(n)
+
+        for i in range(n):
+            q = [sol.y[3,i], sol.y[4,i], sol.y[5,i], sol.y[6,i]]
+            psi[i], theta[i], phi[i] = gnc.quaternion_to_angles(q)
+
+        return psi, theta, phi
+
+    psi_vec, theta_vec, phi_vec = quaternion_to_euler_vec(sol)
+
+    fig, axs = plt.subplots(7, 1, figsize=(12, 25))
 
     # Position plots
     axs[0].plot(sol.t, sol.y[0], label='x')
@@ -133,42 +161,59 @@ def plot_results(sol, ksi_ddot_unbounded, ksi_ddot_bounded):
     axs[0].legend()
 
     # Quaternion plots
-    axs[1].plot(sol.t, sol.y[3], label='q0')
-    axs[1].plot(sol.t, sol.y[4], label='q1')
-    axs[1].plot(sol.t, sol.y[5], label='q2')
-    axs[1].plot(sol.t, sol.y[6], label='q3')
+    axs[1].plot(sol.t, sol.y[3], label='q1')
+    axs[1].plot(sol.t, sol.y[4], label='q2')
+    axs[1].plot(sol.t, sol.y[5], label='q3')
+    axs[1].plot(sol.t, sol.y[6], label='q0')
     axs[1].set_ylabel('Quaternion')
     axs[1].legend()
 
-    # Velocity plots
-    axs[2].plot(sol.t, sol.y[7], label='u')
-    axs[2].plot(sol.t, sol.y[8], label='v')
-    axs[2].plot(sol.t, sol.y[9], label='w')
-    axs[2].plot(sol.t, sol.y[10], label='p')
-    axs[2].plot(sol.t, sol.y[11], label='q')
-    axs[2].plot(sol.t, sol.y[12], label='r')
-    axs[2].set_ylabel('Velocities')
+    # Euler plots
+    axs[2].plot(sol.t, phi_vec, label='roll')
+    axs[2].plot(sol.t, theta_vec, label='pitch')
+    axs[2].plot(sol.t, psi_vec, label='yaw')
+    axs[2].set_ylabel('RPY [rad]')
     axs[2].legend()
 
-    # ksi plots
-    axs[3].plot(sol.t, sol.y[13], label='VBS')
-    axs[3].plot(sol.t, sol.y[14], label='LCG')
-    axs[3].plot(sol.t, sol.y[15], label='δs')
-    axs[3].plot(sol.t, sol.y[16], label='δr')
-    axs[3].plot(sol.t, sol.y[17], label='θ1')
-    axs[3].plot(sol.t, sol.y[18], label='θ2')
-    axs[3].set_ylabel('ksi')
+    # Velocity plots
+    axs[3].plot(sol.t, sol.y[7], label='u')
+    axs[3].plot(sol.t, sol.y[8], label='v')
+    axs[3].plot(sol.t, sol.y[9], label='w')
+    axs[3].plot(sol.t, sol.y[10], label='p')
+    axs[3].plot(sol.t, sol.y[11], label='q')
+    axs[3].plot(sol.t, sol.y[12], label='r')
+    axs[3].set_ylabel('Velocities')
     axs[3].legend()
 
-    # ksi_ddot comparison
-    labels = ['VBS', 'LCG', 'δs', 'δr', 'θ1', 'θ2']
-    for i in range(6):
-        axs[4].plot(sol.t, ksi_ddot_unbounded[:, i], '--',
-                    label=f'{labels[i]} (unbounded)')
-        axs[4].plot(sol.t, ksi_ddot_bounded[:, i], '-',
-                    label=f'{labels[i]} (bounded)')
-    axs[4].set_ylabel('ksi_ddot')
+    # ksi plots
+    axs[4].plot(sol.t, sol.y[13], label='VBS')
+    axs[4].plot(sol.t, sol.y[14], label='LCG')
+    axs[4].plot(sol.t, sol.y[15], label='δs')
+    axs[4].plot(sol.t, sol.y[16], label='δr')
+    axs[4].plot(sol.t, sol.y[17], label='θ1')
+    axs[4].plot(sol.t, sol.y[18], label='θ2')
+    axs[4].set_ylabel('ksi')
     axs[4].legend()
+
+    # ksi_dot plots
+    axs[5].plot(sol.t, sol.y[19], label='VBS')
+    axs[5].plot(sol.t, sol.y[20], label='LCG')
+    axs[5].plot(sol.t, sol.y[21], label='δs')
+    axs[5].plot(sol.t, sol.y[22], label='δr')
+    axs[5].plot(sol.t, sol.y[23], label='θ1')
+    axs[5].plot(sol.t, sol.y[24], label='θ2')
+    axs[5].set_ylabel('ksi_dot')
+    axs[5].legend()
+
+    # ksi_ddot comparison
+#    labels = ['VBS', 'LCG', 'δs', 'δr', 'θ1', 'θ2']
+#    for i in range(6):
+#        axs[6].plot(sol.t, ksi_ddot_unbounded[:, i], '--',
+#                    label=f'{labels[i]} (unbounded)')
+#        axs[6].plot(sol.t, ksi_ddot_bounded[:, i], '-',
+#                    label=f'{labels[i]} (bounded)')
+#    axs[6].set_ylabel('ksi_ddot')
+#    axs[6].legend()
 
     plt.xlabel('Time [s]')
     plt.tight_layout()
