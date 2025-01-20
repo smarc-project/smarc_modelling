@@ -43,6 +43,7 @@ Methods:
     [nu,u_actual] = dynamics(eta,nu,u_actual,u_control,sampleTime ) returns
         nu[k+1] and u_actual[k+1] using Variable RK method(Possibility for other Methods). The control input is:
 
+    FIXME: That's not correct anymore
             u_control = [ delta_r   rudder angle (rad)
                          delta_s    stern plane angle (rad)
                          rpm_1      propeller 1 revolution (rpm)
@@ -82,6 +83,7 @@ import numpy as np
 import math
 from scipy.interpolate import PchipInterpolator, CubicSpline, interp1d
 from scipy.linalg import block_diag
+from sympy.functions.elementary.piecewise import piecewise_simplify
 from python_vehicle_simulator.lib.control import integralSMC
 from python_vehicle_simulator.lib.gnc import *
 
@@ -120,6 +122,9 @@ class VariableBuoyancySystem:
         -m_vbs_sh (float): Mass of the VBS shaft (kg).
         -r_vbs_sh_cg (list or np.array): Vector from the shaft center to the end boundary of the water in the VBS (m).
         -J_vbs_sh_cg (np.array): Moment of inertia of the VBS shaft around its CG (3x3 matrix).
+
+    Vectors follow Tedrake's monogram:
+    https://manipulation.csail.mit.edu/pick.html#monogram
     """
 
     def __init__(self, d_vbs, l_vbs_l, h_vbs, l_vbs_b, m_vbs_sh, r_vbs_sh_cg, J_vbs_sh_cg):
@@ -246,6 +251,9 @@ class SimpleSAM:
         nu: [u, v, w, p, q, r] - Body-fixed linear and angular velocities
         ksi: Time-varying parameters [x_vbs, x_lcg, delta_s, delta_r, rpm1, rpm2]
         ksi_dot: Time derivatives of ksi
+
+    Vectors follow Tedrake's monogram:
+    https://manipulation.csail.mit.edu/pick.html#monogram
     """
 
     def __init__(
@@ -257,7 +265,7 @@ class SimpleSAM:
         self.init_vehicle()
 
         # Constants
-        #self.r_cb = 0*np.array([0.75, 0, -0.06], float)  # Body frame offset vector
+        self.p_OC_O = np.array([-0.75, 0, 0.06], float)  # Measurement frame C in CO (O)
         self.D2R = math.pi / 180  # Degrees to radians
         self.rho_w = self.rho = 1026  # Water density (kg/m³)
         self.g = 9.81  # Gravity acceleration (m/s²)
@@ -281,11 +289,9 @@ class SimpleSAM:
         self.a = self.L / 2  # semi-axes
         self.b = self.diam / 2
 
-        #self.r_bg = 1e-6*np.array([0.75, 0, 0.05], float)  # CG w.r.t. to the CO, we recalculate that in calculate_cg
-        #self.r_bg = 0*np.array([0.75, 0, 0.05], float)  # CG w.r.t. to the CO, we recalculate that in calculate_cg
-        #self.r_bb = np.array([0*0.75, 0, -0.06], float)  # CB w.r.t. to the CO
-        self.r_bg = np.array([0., 0, 0.05], float)  # CG w.r.t. to the CO, we recalculate that in calculate_cg
-        self.r_bb = np.array([0., 0, 0], float)  # CB w.r.t. to the CO
+        self.p_OG_O = np.array([0., 0, 0.12], float)  # CG w.r.t. to the CO, we
+                                                        # recalculate that in calculate_cg
+        self.p_OB_O = np.array([0., 0, 0], float)  # CB w.r.t. to the CO
 
         # Parasitic drag coefficient CD_0, i.e. zero lift and alpha = 0
         # F_drag = 0.5 * rho * Cd * (pi * b^2)
@@ -331,8 +337,8 @@ class SimpleSAM:
         self.l_SS=1.5
         self.d_SS=0.19
         self.m_SS=14.9
-        r_ss_cg = np.array([0., 0, 0.06])
-        self.r_ss_cg = r_ss_cg
+        p_SSgC_O = np.array([-0.75, 0, 0.]) 
+        self.p_SSgC_O = p_SSgC_O
 #        self.solid_structure = SolidStructure(
 #            l_SS=1.5,
 #            d_SS=0.19,
@@ -348,6 +354,7 @@ class SimpleSAM:
         # NOTE: Adjusted values
         # All values in m
         # Now the water mass for a full VBS makes more sense
+        self.p_OVbs_O = np.array([-0.5, 0, 0.1]) # Center of mass VBS w.r.t CO. can be calculated as sum later
         self.vbs = VariableBuoyancySystem(
             d_vbs=0.085,
             l_vbs_l=0.045,
@@ -433,22 +440,8 @@ class SimpleSAM:
         self.calculate_g()
         self.calculate_tau(nu, u)
 
-        #self.Minv = np.eye(6)
-        #self.tau = np.zeros(6)
-        #self.C = np.zeros((6,6))
-        #self.D = np.zeros((6,6))
-
-        np.set_printoptions(precision=3)
-        #print(f"M: {self.M}")
-        #print(f"MA: {self.MA}")
-        #print(f"MRB: {self.MRB}")
-        #print(f"Minv: {self.Minv}")
-        #print(f"nu_r: {self.nu_r}")
-        #print(f"g_vec: {self.g_vec}")
-
         nu_dot = self.Minv @ (self.tau - np.matmul(self.C,self.nu_r) - np.matmul(self.D,self.nu_r) - self.g_vec)
 
-        #print(f"nu_dot: {nu_dot}")
         eta_dot = self.eta_dynamics(eta, nu)
 
         x_dot = np.concatenate([eta_dot, nu_dot])
@@ -485,6 +478,7 @@ class SimpleSAM:
         self.r_vbs = 0.0425 # Radius of the VBS
         self.x_vbs = self.calculate_vbs_position(u_control) 
         self.m_vbs = self.rho_w * np.pi * self.r_vbs ** 2 * self.x_vbs
+        self.m = self.m_dry + self.m_vbs
 
 
     def calculate_cg(self, x, u):
@@ -493,66 +487,56 @@ class SimpleSAM:
         """
 
         # FIXME: To be replaced with the actual calculation
-        #self.r_bg = np.array([0.75, 0, 0.06], float)  # Current center of gravity
+        p_OG_O_current = np.array([0.004, 0, 0.12], float)
+        self.p_OG_O = (self.m_dry/self.m) * p_OG_O_current + (self.m_vbs/self.m) * self.p_OVbs_O
+
+        print(f"vbs cg: {(self.m_vbs/self.m) * self.p_OVbs_O}")
+
+        print(f"p_OG_O: {self.p_OG_O}")
 
     def update_inertias(self, x,u):
         """
         Update inertias based on VBS and LCG
         """
 
-        self.m = self.m_dry + self.m_vbs
         # Solid structure
         # Moment of inertia of a solid elipsoid
         # https://en.wikipedia.org/wiki/List_of_moments_of_inertia
         # with b = c.
-        # NOTE: m is m_dry
         Ix = (2 / 5) * self.m_dry * self.b ** 2  # moment of inertia
         Iy = (1 / 5) * self.m_dry * (self.a ** 2 + self.b ** 2)
         Iz = Iy
 
+        p_SSgO_O = self.p_SSgC_O - self.p_OC_O
+
         J_ss_cg = np.diag([Ix, Iy, Iz]) # In center of gravity
-        #S2_r_ss_cg = skew_symmetric(self.r_ss_cg) @ skew_symmetric(self.r_ss_cg)
-        J_ss_co = J_ss_cg# - self.m_dry * S2_r_ss_cg
+        S2_p_SSgC_O = skew_symmetric(p_SSgO_O) @ skew_symmetric(p_SSgO_O)
+        J_ss_co = J_ss_cg - self.m_dry * S2_p_SSgC_O
 
         # VBS
-#        self.r_vbs = 0.0425 # Radius of the VBS
-#        x_vbs = self.calculate_vbs_position(u) 
-#        self.m_vbs = self.rho_w * np.pi * self.r_vbs ** 2 * x_vbs
-#        self.r_vbs_cg = np.array([-0.398, 0, 0.0125]) + np.array([self.x_vbs, 0, 0])# Vector for cg of the vbs to CO
-#        
-#
-#        # Moment of inertia of a solid cylinder
-#        Ix_vbs = (1/2) * self.m_vbs * self.r_vbs**2
-#        Iy_vbs = (1/12) * self.m_vbs * (3*self.r_vbs**2 + self.x_vbs**2)
-#        Iz_vbs = Iy_vbs
-#
-#        J_vbs_cg = np.diag([Ix_vbs, Iy_vbs, Iz_vbs])
-#        S2_r_vbs_cg = skew_symmetric(self.r_vbs_cg) @ skew_symmetric(self.r_vbs_cg)
-#        J_vbs_co = J_vbs_cg - self.m_vbs * S2_r_vbs_cg
+        # Moment of inertia of a solid cylinder
+        Ix_vbs = (1/2) * self.m_vbs * self.r_vbs**2
+        Iy_vbs = (1/12) * self.m_vbs * (3*self.r_vbs**2 + self.x_vbs**2)
+        Iz_vbs = Iy_vbs
+
+        J_vbs_cg = np.diag([Ix_vbs, Iy_vbs, Iz_vbs])
+        S2_r_vbs_cg = skew_symmetric(self.p_OVbs_O) @ skew_symmetric(self.p_OVbs_O)
+        J_vbs_co = J_vbs_cg - self.m_vbs * S2_r_vbs_cg
 
         # FIXME: To be replaced with the actual calculation
-        self.J_total = J_ss_co# + J_vbs_co
+        self.J_total = J_ss_co + J_vbs_co
 
     def calculate_M(self, x, u):
 
-        # Extract vehicle parameters
-        rho = self.rho_w  # Density of water
-        d_vbs = self.vbs.d_vbs  # Diameter of the VBS
-        l_vbs_b = self.vbs.l_vbs_b  # Offset length of VBS
-
-        # Extract control inputs
-        x_vbs = self.calculate_vbs_position(u)
-
         # Rigid-body mass matrix expressed in CO
-        m_water = self.m_vbs# (rho * np.pi * d_vbs ** 2 * x_vbs) / 4 
-        self.m = m_water + self.m_dry
+        self.m = self.m_vbs + self.m_dry
         m_diag = np.diag([self.m, self.m, self.m])
 
         # FIXME: This needs to be adjusted
         #   - In which frame do we compute J_total?
         #   - Does the r_bg correspond to the correct vector?
         MRB_CG = block_diag(m_diag, self.J_total)
-        H_rg = Hmtrx(self.r_bg)
+        H_rg = Hmtrx(self.p_OG_O)
         self.MRB = H_rg.T @ MRB_CG @ H_rg  # MRB expressed in the CO
 
         # Added moment of inertia in roll: A44 = r44 * Ix
@@ -603,9 +587,9 @@ class SimpleSAM:
         Calculate damping
         """
         # Natural frequencies in roll and pitch
-        self.w_roll = math.sqrt(self.W * (self.r_bg[2] - self.r_bb[2]) /
+        self.w_roll = math.sqrt(self.W * (self.p_OG_O[2] - self.p_OB_O[2]) /
                                 self.M[3][3])
-        self.w_pitch = math.sqrt(self.W * (self.r_bg[2] - self.r_bb[2]) /
+        self.w_pitch = math.sqrt(self.W * (self.p_OG_O[2] - self.p_OB_O[2]) /
                                  self.M[4][4])
         # Damping
         self.D = np.diag([
@@ -625,7 +609,7 @@ class SimpleSAM:
         """
         self.W = self.m * self.g
 
-        self.g_vec = gvect(self.W, self.B, self.theta, self.phi, self.r_bg, self.r_bb)
+        self.g_vec = gvect(self.W, self.B, self.theta, self.phi, self.p_OG_O, self.p_OB_O)
 
     def calculate_tau(self, x, u):
         """

@@ -37,7 +37,7 @@ def run_simulation(t_span, x0, sam):
         u: control inputs as [x_vbs, x_lcg, delta_s, delta_r, rpm1, rpm2]
         """
         u = np.zeros(6)
-        u[0] = 0
+        u[0] = 50
         return sam.dynamics(x, u)
 
     # Run integration
@@ -112,11 +112,11 @@ def plot_results(sol):
 
     # Euler plots
     axs[1,0].plot(sol.t, np.rad2deg(phi_vec), label='roll')
-    axs[1,1].plot(sol.t, theta_vec, label='pitch')
-    axs[1,2].plot(sol.t, psi_vec, label='yaw')
-    axs[1,0].set_ylabel('roll [rad]')
-    axs[1,1].set_ylabel('pitch [rad]')
-    axs[1,2].set_ylabel('yaw [rad]')
+    axs[1,1].plot(sol.t, np.rad2deg(theta_vec), label='pitch')
+    axs[1,2].plot(sol.t, np.rad2deg(psi_vec), label='yaw')
+    axs[1,0].set_ylabel('roll [deg]')
+    axs[1,1].set_ylabel('pitch [deg]')
+    axs[1,2].set_ylabel('yaw [deg]')
 #    axs[1].legend()
 
     # Velocity plots
