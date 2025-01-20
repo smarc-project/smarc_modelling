@@ -257,7 +257,7 @@ class SimpleSAM:
         self.init_vehicle()
 
         # Constants
-        self.r_cb = np.array([0.75, 0, -0.06], float)  # Body frame offset vector
+        #self.r_cb = 0*np.array([0.75, 0, -0.06], float)  # Body frame offset vector
         self.D2R = math.pi / 180  # Degrees to radians
         self.rho_w = self.rho = 1026  # Water density (kg/m³)
         self.g = 9.81  # Gravity acceleration (m/s²)
@@ -268,8 +268,8 @@ class SimpleSAM:
 
         # Initialize state vectors
         self.nu = np.zeros(6)  # [u, v, w, p, q, r]
-        self.eta = np.zeros(7)  # [x, y, z, q1, q2, q3, q0]
-        self.eta[6] = 1.0  # Initialize quaternion to identity rotation
+        self.eta = np.zeros(6)  # [x, y, z, q1, q2, q3, q0]
+        #self.eta[6] = 1.0  # Initialize quaternion to identity rotation
 
         # Initialize the AUV model
         self.name = ("SAM")
@@ -282,13 +282,15 @@ class SimpleSAM:
         self.b = self.diam / 2
 
         #self.r_bg = 1e-6*np.array([0.75, 0, 0.05], float)  # CG w.r.t. to the CO, we recalculate that in calculate_cg
-        self.r_bg = np.array([0.75, 0, 0.05], float)  # CG w.r.t. to the CO, we recalculate that in calculate_cg
-        self.r_bb = np.array([0.75, 0, -0.06], float)  # CB w.r.t. to the CO
+        #self.r_bg = 0*np.array([0.75, 0, 0.05], float)  # CG w.r.t. to the CO, we recalculate that in calculate_cg
+        #self.r_bb = np.array([0*0.75, 0, -0.06], float)  # CB w.r.t. to the CO
+        self.r_bg = np.array([0., 0, 0.05], float)  # CG w.r.t. to the CO, we recalculate that in calculate_cg
+        self.r_bb = np.array([0., 0, 0], float)  # CB w.r.t. to the CO
 
         # Parasitic drag coefficient CD_0, i.e. zero lift and alpha = 0
         # F_drag = 0.5 * rho * Cd * (pi * b^2)
         # F_drag = 0.5 * rho * CD_0 * S
-        Cd = 0.42  # from Allen et al. (2000)
+        Cd = 0.42  # from Allen et al. (2000) # NOTE: Do we know this value? Do we need to estimate it?
         self.CD_0 = Cd * math.pi * self.b ** 2 / self.S
 
         # Rigid-body mass matrix expressed in CO
@@ -299,6 +301,9 @@ class SimpleSAM:
         self.m = self.m_dry + self.m_vbs
         self.J_total = np.zeros((3,3)) 
         self.MRB = np.zeros((6,6)) 
+        self.MA = np.zeros((6,6)) 
+        self.M = np.zeros((6,6)) 
+        self.Minv = np.zeros((6,6)) 
 
         # Weight and buoyancy
         self.W = self.m * self.g
@@ -326,7 +331,7 @@ class SimpleSAM:
         self.l_SS=1.5
         self.d_SS=0.19
         self.m_SS=14.9
-        r_ss_cg = np.array([0.75, 0, 0.06])
+        r_ss_cg = np.array([0., 0, 0.06])
         self.r_ss_cg = r_ss_cg
 #        self.solid_structure = SolidStructure(
 #            l_SS=1.5,
@@ -433,10 +438,17 @@ class SimpleSAM:
         #self.C = np.zeros((6,6))
         #self.D = np.zeros((6,6))
 
-        print(f"tau: {self.tau}")
+        np.set_printoptions(precision=3)
+        #print(f"M: {self.M}")
+        #print(f"MA: {self.MA}")
+        #print(f"MRB: {self.MRB}")
+        #print(f"Minv: {self.Minv}")
+        #print(f"nu_r: {self.nu_r}")
+        #print(f"g_vec: {self.g_vec}")
 
         nu_dot = self.Minv @ (self.tau - np.matmul(self.C,self.nu_r) - np.matmul(self.D,self.nu_r) - self.g_vec)
 
+        #print(f"nu_dot: {nu_dot}")
         eta_dot = self.eta_dynamics(eta, nu)
 
         x_dot = np.concatenate([eta_dot, nu_dot])
@@ -499,24 +511,24 @@ class SimpleSAM:
         Iz = Iy
 
         J_ss_cg = np.diag([Ix, Iy, Iz]) # In center of gravity
-        S2_r_ss_cg = skew_symmetric(self.r_ss_cg) @ skew_symmetric(self.r_ss_cg)
-        J_ss_co = J_ss_cg - self.m_dry * S2_r_ss_cg
+        #S2_r_ss_cg = skew_symmetric(self.r_ss_cg) @ skew_symmetric(self.r_ss_cg)
+        J_ss_co = J_ss_cg# - self.m_dry * S2_r_ss_cg
 
         # VBS
 #        self.r_vbs = 0.0425 # Radius of the VBS
 #        x_vbs = self.calculate_vbs_position(u) 
 #        self.m_vbs = self.rho_w * np.pi * self.r_vbs ** 2 * x_vbs
-        self.r_vbs_cg = np.array([-0.398, 0, 0.0125]) + np.array([self.x_vbs, 0, 0])# Vector for cg of the vbs to CO
-        
-
-        # Moment of inertia of a solid cylinder
-        Ix_vbs = (1/2) * self.m_vbs * self.r_vbs**2
-        Iy_vbs = (1/12) * self.m_vbs * (3*self.r_vbs**2 + self.x_vbs**2)
-        Iz_vbs = Iy_vbs
-
-        J_vbs_cg = np.diag([Ix_vbs, Iy_vbs, Iz_vbs])
-        S2_r_vbs_cg = skew_symmetric(self.r_vbs_cg) @ skew_symmetric(self.r_vbs_cg)
-        J_vbs_co = J_vbs_cg - self.m_vbs * S2_r_vbs_cg
+#        self.r_vbs_cg = np.array([-0.398, 0, 0.0125]) + np.array([self.x_vbs, 0, 0])# Vector for cg of the vbs to CO
+#        
+#
+#        # Moment of inertia of a solid cylinder
+#        Ix_vbs = (1/2) * self.m_vbs * self.r_vbs**2
+#        Iy_vbs = (1/12) * self.m_vbs * (3*self.r_vbs**2 + self.x_vbs**2)
+#        Iz_vbs = Iy_vbs
+#
+#        J_vbs_cg = np.diag([Ix_vbs, Iy_vbs, Iz_vbs])
+#        S2_r_vbs_cg = skew_symmetric(self.r_vbs_cg) @ skew_symmetric(self.r_vbs_cg)
+#        J_vbs_co = J_vbs_cg - self.m_vbs * S2_r_vbs_cg
 
         # FIXME: To be replaced with the actual calculation
         self.J_total = J_ss_co# + J_vbs_co
@@ -612,10 +624,6 @@ class SimpleSAM:
         Calculate gravity vector
         """
         self.W = self.m * self.g
-        #print(f"W: {self.W}, B: {self.B}")
-#        print(f"r_bg: {self.r_bg}")
-#        print(f"r_bb: {self.r_bb}")
-#        print(f"r_diff: {self.r_bg - self.r_bb}")
 
         self.g_vec = gvect(self.W, self.B, self.theta, self.phi, self.r_bg, self.r_bb)
 
@@ -623,15 +631,21 @@ class SimpleSAM:
         """
         All external forces
         """
-        # FIXME: forceLiftDrag takes forever to compute.
+        if u[4] == 0:
+            no_x = 0
+        else:
+            no_x = 1
 
         tau_liftdrag = forceLiftDrag(self.diam, self.S, self.CD_0, self.alpha, self.U_r)
         tau_crossflow = crossFlowDrag(self.L, self.diam, self.diam, self.nu_r)
         tau_prop = self.calculate_propeller_force(x, u)
 
-        #tau_liftdrag = np.zeros(6)
-        #tau_crossflow = np.zeros(6)
-        #tau_prop = np.zeros(6)
+        # NOTE:
+        # Lift/Drag is calculated for an AUV that behaves like a torpedo
+        # When we use the vbs to dive, we have a velocity and an angle of attack
+        # but don't experience any motion in x direction. That's why we have to 
+        # set this to zero depending on the RPM
+        tau_liftdrag[0] *= no_x
 
         self.tau = tau_liftdrag + tau_crossflow + tau_prop
 
@@ -644,14 +658,14 @@ class SimpleSAM:
         """
         delta_s = u[2]
         delta_r = u[3]
-        n_rpm = u[4:]
+        n_rpm = u[4]
 
         # Compute propeller forces
         C_T2C = calculate_dcm(order=[2, 3], angles=[delta_s, delta_r])
 
         D_prop = 0.14
         t_prop = 0.1
-        n_rps = n_rpm[0] / 60   # NOTE: This assumes that rpm is the third entry
+        n_rps = n_rpm / 60   # NOTE: This assumes that rpm is the third entry
         Va = 0.944 * self.U
 
         KT_0 = 0.4566
@@ -661,26 +675,26 @@ class SimpleSAM:
         Ja_max = 0.6632
 
         # Prop Omid
-#        tau_prop = np.zeros(6)
-#        for i in range(len(n_rpm)):
-#            if n_rps[i] > 0:
-#                X_prop_i = self.rho * (D_prop ** 4) * (
-#                        KT_0 * abs(n_rps[i]) * n_rps[i] +
-#                        (KT_max - KT_0) / Ja_max * (Va / D_prop) * abs(n_rps[i])
-#                )
-#                K_prop_i = self.rho * (D_prop ** 5) * (
-#                        KQ_0 * abs(n_rps[i]) * n_rps[i] +
-#                        (KQ_max - KQ_0) / Ja_max * (Va / D_prop) * abs(n_rps[i])
-#                )
-#            else:
-#                X_prop_i = self.rho * (D_prop ** 4) * KT_0 * abs(n_rps[i]) * n_rps[i]
-#                K_prop_i = self.rho * (D_prop ** 5) * KQ_0 * abs(n_rps[i]) * n_rps[i]
-#
-#            F_prop_b = C_T2C @ np.array([X_prop_i, 0, 0])
-#            r_prop_i = C_T2C @ self.propellers.r_t_p_sh[i] - self.r_cb
-#            M_prop_i = np.cross(r_prop_i, F_prop_b) + np.array([K_prop_i, 0, 0])
-#            tau_prop_i = np.concatenate([F_prop_b, M_prop_i])
-#            tau_prop += tau_prop_i
+        #tau_prop = np.zeros(6)
+        #for i in range(len(n_rpm)):
+        #    if n_rps[i] > 0:
+        #        X_prop_i = self.rho * (D_prop ** 4) * (
+        #                KT_0 * abs(n_rps[i]) * n_rps[i] +
+        #                (KT_max - KT_0) / Ja_max * (Va / D_prop) * abs(n_rps[i])
+        #        )
+        #        K_prop_i = self.rho * (D_prop ** 5) * (
+        #                KQ_0 * abs(n_rps[i]) * n_rps[i] +
+        #                (KQ_max - KQ_0) / Ja_max * (Va / D_prop) * abs(n_rps[i])
+        #        )
+        #    else:
+        #        X_prop_i = self.rho * (D_prop ** 4) * KT_0 * abs(n_rps[i]) * n_rps[i]
+        #        K_prop_i = self.rho * (D_prop ** 5) * KQ_0 * abs(n_rps[i]) * n_rps[i]
+
+        #    F_prop_b = C_T2C @ np.array([X_prop_i, 0, 0])
+        #    r_prop_i = C_T2C @ self.propellers.r_t_p_sh[i] - self.r_cb
+        #    M_prop_i = np.cross(r_prop_i, F_prop_b) + np.array([K_prop_i, 0, 0])
+        #    tau_prop_i = np.concatenate([F_prop_b, M_prop_i])
+        #    tau_prop += tau_prop_i
 
         # Prop Fossen
         if n_rps > 0:   # forward thrust
@@ -707,7 +721,7 @@ class SimpleSAM:
             0
             ], float)
 
-        print(f"rpm: {u}")
+#        print(f"rpm: {u}")
 
         return tau_prop
 

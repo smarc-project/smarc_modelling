@@ -14,11 +14,19 @@ nu0 = np.zeros(6)  # Zero initial velocities
 x0 = np.concatenate([eta0, nu0])
 
 # Simulation timespan
-t_span = (0, 20)  # 20 seconds simulation
-t_eval = np.linspace(t_span[0], t_span[1], 1000)
+t_span = (0, 10)  # 20 seconds simulation
+t_eval = np.linspace(t_span[0], t_span[1], 500)
 
 # Create SAM instance
 sam = SimpleSAM()
+
+class Sol():
+
+    def __init__(self, t, data) -> None:
+        self.t = t
+        self.y = data
+
+
 
 def run_simulation(t_span, x0, sam):
     """
@@ -29,25 +37,35 @@ def run_simulation(t_span, x0, sam):
         u: control inputs as [x_vbs, x_lcg, delta_s, delta_r, rpm1, rpm2]
         """
         u = np.zeros(6)
-        u[0] = 100
+        u[0] = 0
         return sam.dynamics(x, u)
 
     # Run integration
     print(f" Start simulation")
-    sol = solve_ivp(
-        dynamics_wrapper,
-        t_span,
-        x0,
-        method='RK45',
-        t_eval=t_eval,
-        rtol=1e-6,
-        atol=1e-9
-    )
-    if sol.status == -1:
-        print(f" Simulation failed: {sol.message}")
-    else:
-        print(f" Simulation complete!")
 
+    data = np.empty((12, 500))
+    data[:,0] = x0
+
+    # Euler forward integration
+    for i in range(500-1):
+        data[:,i+1] = data[:,i] + dynamics_wrapper(0, data[:,i]) * (10/500)
+    sol = Sol(t_eval,data)
+    print(f" Simulation complete!")
+
+    # RK 45 leads to numerical instabilities when setting the cb on top of the cg
+#    sol = solve_ivp(
+#        dynamics_wrapper,
+#        t_span,
+#        x0,
+#        method='RK45',
+#        t_eval=t_eval,
+#        rtol=1e-6,
+#        atol=1e-9
+#    )
+#    if sol.status == -1:
+#        print(f" Simulation failed: {sol.message}")
+#    else:
+#        print(f" Simulation complete!")
 
     return sol
 
@@ -93,7 +111,7 @@ def plot_results(sol):
 #    axs[1].legend()
 
     # Euler plots
-    axs[1,0].plot(sol.t, phi_vec, label='roll')
+    axs[1,0].plot(sol.t, np.rad2deg(phi_vec), label='roll')
     axs[1,1].plot(sol.t, theta_vec, label='pitch')
     axs[1,2].plot(sol.t, psi_vec, label='yaw')
     axs[1,0].set_ylabel('roll [rad]')
