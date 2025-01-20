@@ -26,15 +26,10 @@ def run_simulation(t_span, x0, sam):
     """
     def dynamics_wrapper(t, x):
         """
-        u_control = [ delta_r   rudder angle (rad)
-                     delta_s    stern plane angle (rad)
-                     rpm_1      propeller 1 revolution (rpm)
-                     rpm_2      propeller 2 revolution (rpm)
-                     vbs        variable buoyancy system control
-                     lcg        longitudinal center of gravity adjustment ]
+        u: control inputs as [x_vbs, x_lcg, delta_s, delta_r, rpm1, rpm2]
         """
         u = np.zeros(6)
-        u[4] = 50
+        u[0] = 100
         return sam.dynamics(x, u)
 
     # Run integration
@@ -77,8 +72,6 @@ def plot_results(sol):
 
     #psi_vec, theta_vec, phi_vec = quaternion_to_euler_vec(sol)
     psi_vec, theta_vec, phi_vec = sol.y[3,:], sol.y[4,:], sol.y[5,:] 
-
-    print(f"size y: {sol.y.shape}")
 
     fig, axs = plt.subplots(4, 3, figsize=(12, 10))
 

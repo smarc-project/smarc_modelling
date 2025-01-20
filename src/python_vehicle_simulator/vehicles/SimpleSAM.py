@@ -402,6 +402,8 @@ class SimpleSAM:
             state_vector: Combined state vector [eta, nu, ksi, ksi_dot]
             signal_generator: MultiVariablePiecewiseSignal object for ksi_ddot signals
 
+            u: control inputs as [x_vbs, x_lcg, delta_s, delta_r, rpm1, rpm2]
+
         Returns:
             state_vector_dot: Time derivative of complete state vector
         """
@@ -431,7 +433,7 @@ class SimpleSAM:
         #self.C = np.zeros((6,6))
         #self.D = np.zeros((6,6))
 
-        print(f"g_vect: {self.g_vec}")
+        print(f"tau: {self.tau}")
 
         nu_dot = self.Minv @ (self.tau - np.matmul(self.C,self.nu_r) - np.matmul(self.D,self.nu_r) - self.g_vec)
 
@@ -440,7 +442,6 @@ class SimpleSAM:
         x_dot = np.concatenate([eta_dot, nu_dot])
 
         return x_dot
-
 
 
     def calculate_system_state(self, x, eta, u_control):
@@ -493,8 +494,8 @@ class SimpleSAM:
         # https://en.wikipedia.org/wiki/List_of_moments_of_inertia
         # with b = c.
         # NOTE: m is m_dry
-        Ix = (2 / 5) * self.m * self.b ** 2  # moment of inertia
-        Iy = (1 / 5) * self.m * (self.a ** 2 + self.b ** 2)
+        Ix = (2 / 5) * self.m_dry * self.b ** 2  # moment of inertia
+        Iy = (1 / 5) * self.m_dry * (self.a ** 2 + self.b ** 2)
         Iz = Iy
 
         J_ss_cg = np.diag([Ix, Iy, Iz]) # In center of gravity
@@ -611,7 +612,7 @@ class SimpleSAM:
         Calculate gravity vector
         """
         self.W = self.m * self.g
-        print(f"W: {self.W}, B: {self.B}")
+        #print(f"W: {self.W}, B: {self.B}")
 #        print(f"r_bg: {self.r_bg}")
 #        print(f"r_bb: {self.r_bb}")
 #        print(f"r_diff: {self.r_bg - self.r_bb}")
@@ -624,11 +625,11 @@ class SimpleSAM:
         """
         # FIXME: forceLiftDrag takes forever to compute.
 
-        #tau_liftdrag = forceLiftDrag(self.diam, self.S, self.CD_0, self.alpha, self.U_r)
+        tau_liftdrag = forceLiftDrag(self.diam, self.S, self.CD_0, self.alpha, self.U_r)
         tau_crossflow = crossFlowDrag(self.L, self.diam, self.diam, self.nu_r)
         tau_prop = self.calculate_propeller_force(x, u)
 
-        tau_liftdrag = np.zeros(6)
+        #tau_liftdrag = np.zeros(6)
         #tau_crossflow = np.zeros(6)
         #tau_prop = np.zeros(6)
 
@@ -639,6 +640,7 @@ class SimpleSAM:
     def calculate_propeller_force(self, x, u):
         """
         Calculate force and torque of the propellers
+        u: control inputs as [x_vbs, x_lcg, delta_s, delta_r, rpm1, rpm2]
         """
         delta_s = u[2]
         delta_r = u[3]
@@ -649,7 +651,7 @@ class SimpleSAM:
 
         D_prop = 0.14
         t_prop = 0.1
-        n_rps = n_rpm / 60   # NOTE: This assumes that rpm is the third entry
+        n_rps = n_rpm[0] / 60   # NOTE: This assumes that rpm is the third entry
         Va = 0.944 * self.U
 
         KT_0 = 0.4566
@@ -658,26 +660,54 @@ class SimpleSAM:
         KQ_max = 0.0312
         Ja_max = 0.6632
 
-        tau_prop = np.zeros(6)
-        for i in range(len(n_rpm)):
-            if n_rps[i] > 0:
-                X_prop_i = self.rho * (D_prop ** 4) * (
-                        KT_0 * abs(n_rps[i]) * n_rps[i] +
-                        (KT_max - KT_0) / Ja_max * (Va / D_prop) * abs(n_rps[i])
-                )
-                K_prop_i = self.rho * (D_prop ** 5) * (
-                        KQ_0 * abs(n_rps[i]) * n_rps[i] +
-                        (KQ_max - KQ_0) / Ja_max * (Va / D_prop) * abs(n_rps[i])
-                )
-            else:
-                X_prop_i = self.rho * (D_prop ** 4) * KT_0 * abs(n_rps[i]) * n_rps[i]
-                K_prop_i = self.rho * (D_prop ** 5) * KQ_0 * abs(n_rps[i]) * n_rps[i]
+        # Prop Omid
+#        tau_prop = np.zeros(6)
+#        for i in range(len(n_rpm)):
+#            if n_rps[i] > 0:
+#                X_prop_i = self.rho * (D_prop ** 4) * (
+#                        KT_0 * abs(n_rps[i]) * n_rps[i] +
+#                        (KT_max - KT_0) / Ja_max * (Va / D_prop) * abs(n_rps[i])
+#                )
+#                K_prop_i = self.rho * (D_prop ** 5) * (
+#                        KQ_0 * abs(n_rps[i]) * n_rps[i] +
+#                        (KQ_max - KQ_0) / Ja_max * (Va / D_prop) * abs(n_rps[i])
+#                )
+#            else:
+#                X_prop_i = self.rho * (D_prop ** 4) * KT_0 * abs(n_rps[i]) * n_rps[i]
+#                K_prop_i = self.rho * (D_prop ** 5) * KQ_0 * abs(n_rps[i]) * n_rps[i]
+#
+#            F_prop_b = C_T2C @ np.array([X_prop_i, 0, 0])
+#            r_prop_i = C_T2C @ self.propellers.r_t_p_sh[i] - self.r_cb
+#            M_prop_i = np.cross(r_prop_i, F_prop_b) + np.array([K_prop_i, 0, 0])
+#            tau_prop_i = np.concatenate([F_prop_b, M_prop_i])
+#            tau_prop += tau_prop_i
 
-            F_prop_b = C_T2C @ np.array([X_prop_i, 0, 0])
-            r_prop_i = C_T2C @ self.propellers.r_t_p_sh[i] - self.r_cb
-            M_prop_i = np.cross(r_prop_i, F_prop_b) + np.array([K_prop_i, 0, 0])
-            tau_prop_i = np.concatenate([F_prop_b, M_prop_i])
-            tau_prop += tau_prop_i
+        # Prop Fossen
+        if n_rps > 0:   # forward thrust
+
+            X_prop = self.rho * pow(D_prop,4) * ( 
+                KT_0 * abs(n_rps) * n_rps + (KT_max-KT_0)/Ja_max * 
+                (Va/D_prop) * abs(n_rps) )        
+            K_prop = self.rho * pow(D_prop,5) * (
+                KQ_0 * abs(n_rps) * n_rps + (KQ_max-KQ_0)/Ja_max * 
+                (Va/D_prop) * abs(n_rps) )           
+            
+        else:    # reverse thrust (braking)
+        
+            X_prop = self.rho * pow(D_prop,4) * KT_0 * abs(n_rps) * n_rps 
+            K_prop = self.rho * pow(D_prop,5) * KQ_0 * abs(n_rps) * n_rps 
+
+        # Generalized force vector
+        tau_prop = np.array([
+            (1-t_prop) * X_prop,
+            0, 
+            0,
+            K_prop / 10,   # scaled down by a factor of 10 to match exp. results
+            0, 
+            0
+            ], float)
+
+        print(f"rpm: {u}")
 
         return tau_prop
 
@@ -686,8 +716,9 @@ class SimpleSAM:
         """
         Control input is scaled between 0 and 100. This converts it into the actual position
         s.t. we can calculate the amount of water in the VBS.
+        u: control inputs as [x_vbs, x_lcg, delta_s, delta_r, rpm1, rpm2]
         """
-        x_vbs = (u[4]/100) * self.vbs.l_vbs_l
+        x_vbs = (u[0]/100) * self.vbs.l_vbs_l
         return x_vbs
 
     def eta_dynamics(self, eta, nu):
