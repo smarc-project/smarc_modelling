@@ -490,9 +490,8 @@ class SimpleSAM:
         p_OG_O_current = np.array([0.004, 0, 0.12], float)
         self.p_OG_O = (self.m_dry/self.m) * p_OG_O_current + (self.m_vbs/self.m) * self.p_OVbs_O
 
-        print(f"vbs cg: {(self.m_vbs/self.m) * self.p_OVbs_O}")
-
-        print(f"p_OG_O: {self.p_OG_O}")
+#        print(f"vbs cg: {(self.m_vbs/self.m) * self.p_OVbs_O}")
+#        print(f"p_OG_O: {self.p_OG_O}")
 
     def update_inertias(self, x,u):
         """
@@ -614,22 +613,14 @@ class SimpleSAM:
     def calculate_tau(self, x, u):
         """
         All external forces
-        """
-        if u[4] == 0:
-            no_x = 0
-        else:
-            no_x = 1
 
-        tau_liftdrag = forceLiftDrag(self.diam, self.S, self.CD_0, self.alpha, self.U_r)
+        Note: for forceLiftDrag, we use nu instead of U_r since SAM behaves
+              like an ROV when we dive statically.
+        """
+        tau_liftdrag = forceLiftDrag(self.diam, self.S, self.CD_0, self.alpha, self.nu)
         tau_crossflow = crossFlowDrag(self.L, self.diam, self.diam, self.nu_r)
         tau_prop = self.calculate_propeller_force(x, u)
 
-        # NOTE:
-        # Lift/Drag is calculated for an AUV that behaves like a torpedo
-        # When we use the vbs to dive, we have a velocity and an angle of attack
-        # but don't experience any motion in x direction. That's why we have to 
-        # set this to zero depending on the RPM
-        tau_liftdrag[0] *= no_x
 
         self.tau = tau_liftdrag + tau_crossflow + tau_prop
 

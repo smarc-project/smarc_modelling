@@ -37,7 +37,7 @@ def run_simulation(t_span, x0, sam):
         u: control inputs as [x_vbs, x_lcg, delta_s, delta_r, rpm1, rpm2]
         """
         u = np.zeros(6)
-        u[0] = 50
+        u[0] = 100
         return sam.dynamics(x, u)
 
     # Run integration
