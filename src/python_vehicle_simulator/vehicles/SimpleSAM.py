@@ -409,8 +409,13 @@ class SimpleSAM:
         # FIXME: everything right now in the body frame (eq. 8.2)
         #   But we also need everything in the global frame (eq. 8.1)
 
-        eta = x[0:7]
-        nu = x[7:13]
+        # For quaternions
+        #eta = x[0:7]
+        #nu = x[7:13]
+
+        # For Euler angles
+        eta = x[0:6]
+        nu = x[6:12]
 
         self.calculate_system_state(nu, eta, u)
         self.calculate_cg(nu, u)
@@ -444,8 +449,10 @@ class SimpleSAM:
         """
         nu = x
         # Extract Euler angles
-        q = eta[3:7]
-        self.phi, self.theta, self.psi = quaternion_to_angles(q) # NOTE: the function uses quaternions as q1, q2, q3, q0
+        #q = eta[3:7]
+        #self.phi, self.theta, self.psi = quaternion_to_angles(q) # NOTE: the function uses quaternions as q1, q2, q3, q0
+
+        self.phi, self.theta, self.psi = eta[3:6] 
 
         # Relative velocities due to current
         u, v, w, p, q, r = nu
@@ -695,26 +702,32 @@ class SimpleSAM:
             eta_dot: [ẋ, ẏ, ż, q̇0, q̇1, q̇2, q̇3]
         """
         # Extract position and quaternion
-        pos = eta[0:3]
-        q = eta[3:7]  # [q1, q2, q3, q0] where q0 is scalar part
+        #pos = eta[0:3]
+        #q = eta[3:7]  # [q1, q2, q3, q0] where q0 is scalar part
 
-        # Convert quaternion to DCM for position kinematics
-        C = quaternion_to_dcm(q)
+        ## Convert quaternion to DCM for position kinematics
+        #C = quaternion_to_dcm(q)
 
-        # Position dynamics: ṗ = C * v
-        pos_dot = C @ nu[0:3]
+        ## Position dynamics: ṗ = C * v
+        #pos_dot = C @ nu[0:3]
 
-        # Quaternion dynamics: q̇ = 1/2 * Ω * q where Ω is the quaternion kinematic matrix
-        omega = nu[3:6]  # Angular velocity
-        Omega = np.array([
-            [0, -omega[0], -omega[1], -omega[2]],
-            [omega[0], 0, omega[2], -omega[1]],
-            [omega[1], -omega[2], 0, omega[0]],
-            [omega[2], omega[1], -omega[0], 0]
-        ])
-        q_dot = 0.5 * Omega @ q
+        ## Quaternion dynamics: q̇ = 1/2 * Ω * q where Ω is the quaternion kinematic matrix
+        #omega = nu[3:6]  # Angular velocity
+        #Omega = np.array([
+        #    [0, -omega[0], -omega[1], -omega[2]],
+        #    [omega[0], 0, omega[2], -omega[1]],
+        #    [omega[1], -omega[2], 0, omega[0]],
+        #    [omega[2], omega[1], -omega[0], 0]
+        #])
+        #q_dot = 0.5 * Omega @ q
 
-        return np.concatenate([pos_dot, q_dot])
+        #return np.concatenate([pos_dot, q_dot])
+
+        # For Euler angles
+        p_dot   = np.matmul( Rzyx(eta[3], eta[4], eta[5]), nu[0:3] )
+        v_dot   = np.matmul( Tzyx(eta[3], eta[4]), nu[3:6] )
+
+        return np.concatenate([p_dot, v_dot])
 
 ##############################################################################
 #

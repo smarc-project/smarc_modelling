@@ -8,8 +8,8 @@ import matplotlib
 matplotlib.use('TkAgg')  # or 'Qt5Agg', depending on what you have installed
 
 # Initial conditions
-eta0 = np.zeros(7)
-eta0[6] = 1.0  # Initial quaternion (no rotation) 
+eta0 = np.zeros(6)
+#eta0[6] = 1.0  # Initial quaternion (no rotation) 
 nu0 = np.zeros(6)  # Zero initial velocities
 x0 = np.concatenate([eta0, nu0])
 
@@ -34,7 +34,7 @@ def run_simulation(t_span, x0, sam):
                      lcg        longitudinal center of gravity adjustment ]
         """
         u = np.zeros(6)
-        u[4] = 0
+        u[4] = 50
         return sam.dynamics(x, u)
 
     # Run integration
@@ -75,7 +75,10 @@ def plot_results(sol):
 
         return psi, theta, phi
 
-    psi_vec, theta_vec, phi_vec = quaternion_to_euler_vec(sol)
+    #psi_vec, theta_vec, phi_vec = quaternion_to_euler_vec(sol)
+    psi_vec, theta_vec, phi_vec = sol.y[3,:], sol.y[4,:], sol.y[5,:] 
+
+    print(f"size y: {sol.y.shape}")
 
     fig, axs = plt.subplots(4, 3, figsize=(12, 10))
 
@@ -106,16 +109,16 @@ def plot_results(sol):
 #    axs[1].legend()
 
     # Velocity plots
-    axs[2,0].plot(sol.t, sol.y[7], label='u')
-    axs[2,1].plot(sol.t, sol.y[8], label='v')
-    axs[2,2].plot(sol.t, sol.y[9], label='w')
+    axs[2,0].plot(sol.t, sol.y[6], label='u')
+    axs[2,1].plot(sol.t, sol.y[7], label='v')
+    axs[2,2].plot(sol.t, sol.y[8], label='w')
     axs[2,0].set_ylabel('u (x_dot)')
     axs[2,1].set_ylabel('v (y_dot)')
     axs[2,2].set_ylabel('w (z_dot)')
 
-    axs[3,0].plot(sol.t, sol.y[10], label='p')
-    axs[3,1].plot(sol.t, sol.y[11], label='q')
-    axs[3,2].plot(sol.t, sol.y[12], label='r')
+    axs[3,0].plot(sol.t, sol.y[9], label='p')
+    axs[3,1].plot(sol.t, sol.y[10], label='q')
+    axs[3,2].plot(sol.t, sol.y[11], label='r')
     axs[3,0].set_ylabel('p (roll_dot)')
     axs[3,1].set_ylabel('q (pitch_dot)')
     axs[3,2].set_ylabel('r (yaw_dot)')
