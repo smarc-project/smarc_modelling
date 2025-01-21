@@ -716,12 +716,19 @@ def forceLiftDrag(b,S,CD_0,alpha,U_r):
 
     # transform from FLOW axes to BODY axes using angle of attack
     tau_liftdrag = np.array([
-        math.cos(alpha) * (-F_drag) - math.sin(alpha) * (-F_lift),
+        math.cos(alpha) * (-F_drag[0]) - math.sin(alpha) * (-F_lift[0]),
         0,
-        math.sin(alpha) * (-F_drag) + math.cos(alpha) * (-F_lift),
+        math.sin(alpha) * (-F_drag[2]) + math.cos(alpha) * (-F_lift[2]),
         0,
         0,
         0 ])
+    #tau_liftdrag = np.array([
+    #    math.cos(alpha) * (-F_drag) - math.sin(alpha) * (-F_lift),
+    #    0,
+    #    math.sin(alpha) * (-F_drag) + math.cos(alpha) * (-F_lift),
+    #    0,
+    #    0,
+    #    0 ])
 
     return tau_liftdrag
     
