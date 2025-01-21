@@ -442,11 +442,24 @@ class SimpleSAM:
         self.calculate_g()
         self.calculate_tau(nu, u)
 
+        #self.Minv = np.eye(6)
+        #self.C = np.zeros((6,6))
+        #self.D = np.zeros((6,6))
+
         nu_dot = self.Minv @ (self.tau - np.matmul(self.C,self.nu_r) - np.matmul(self.D,self.nu_r) - self.g_vec)
 
         eta_dot = self.eta_dynamics(eta, nu)
 
         x_dot = np.concatenate([eta_dot, nu_dot])
+
+
+        np.set_printoptions(precision=1)
+        #print(f"tau: {self.tau}")
+        #print(f"nu_dot: {nu_dot}")
+        #print(f"M: {self.M}")
+        #print(f"MRB: {self.MRB}")
+        #print(f"MA: {self.MA}")
+        #print(f"Minv: {self.Minv}")
 
         return x_dot
 
@@ -549,12 +562,16 @@ class SimpleSAM:
         # Rigid-body mass matrix expressed in CO
         m_diag = np.diag([self.m, self.m, self.m])
 
-        # FIXME: This needs to be adjusted
-        #   - In which frame do we compute J_total?
-        #   - Does the r_bg correspond to the correct vector?
         MRB_CG = block_diag(m_diag, self.J_total)
-        H_rg = Hmtrx(self.p_OG_O)
-        self.MRB = H_rg.T @ MRB_CG @ H_rg  # MRB expressed in the CO
+        # NOTE: We calculate J_total already in the CO,
+        #   That's why we don't use the additional transformation below,
+        #   but set MRB_CG = MRB. Not quite right with the masses, but
+        #   close enough.
+
+        #H_rg = Hmtrx(self.p_OG_O)
+        #self.MRB = H_rg.T @ MRB_CG @ H_rg  # MRB expressed in the CO
+
+        self.MRB = MRB_CG
 
         # Added moment of inertia in roll: A44 = r44 * Ix
         r44 = 0.3
@@ -636,8 +653,12 @@ class SimpleSAM:
               like an ROV when we dive statically.
         """
         tau_liftdrag = forceLiftDrag(self.diam, self.S, self.CD_0, self.alpha, self.nu)
+        #tau_liftdrag = forceLiftDrag(self.diam, self.S, self.CD_0, self.alpha, self.U_r)
         tau_crossflow = crossFlowDrag(self.L, self.diam, self.diam, self.nu_r)
         tau_prop = self.calculate_propeller_force(x, u)
+
+        #tau_liftdrag = np.zeros(6)
+        #tau_crossflow = np.zeros(6)
 
         self.tau = tau_liftdrag + tau_crossflow + tau_prop
 
@@ -668,6 +689,7 @@ class SimpleSAM:
         # Prop Omid
         #tau_prop = np.zeros(6)
         #for i in range(len(n_rpm)):
+
         #    if n_rps[i] > 0:
         #        X_prop_i = self.rho * (D_prop ** 4) * (
         #                KT_0 * abs(n_rps[i]) * n_rps[i] +
@@ -680,16 +702,15 @@ class SimpleSAM:
         #    else:
         #        X_prop_i = self.rho * (D_prop ** 4) * KT_0 * abs(n_rps[i]) * n_rps[i]
         #        K_prop_i = self.rho * (D_prop ** 5) * KQ_0 * abs(n_rps[i]) * n_rps[i]
-
+        #
         #    F_prop_b = C_T2C @ np.array([X_prop_i, 0, 0])
-        #    r_prop_i = C_T2C @ self.propellers.r_t_p_sh[i] - self.r_cb
+        #    r_prop_i = C_T2C @ self.propellers.r_t_p_sh[i] - self.p_OC_O
         #    M_prop_i = np.cross(r_prop_i, F_prop_b) + np.array([K_prop_i, 0, 0])
         #    tau_prop_i = np.concatenate([F_prop_b, M_prop_i])
         #    tau_prop += tau_prop_i
-
+        #
         # Prop Fossen
         if n_rps > 0:   # forward thrust
-
             X_prop = self.rho * pow(D_prop,4) * ( 
                 KT_0 * abs(n_rps) * n_rps + (KT_max-KT_0)/Ja_max * 
                 (Va/D_prop) * abs(n_rps) )        
@@ -701,7 +722,7 @@ class SimpleSAM:
         
             X_prop = self.rho * pow(D_prop,4) * KT_0 * abs(n_rps) * n_rps 
             K_prop = self.rho * pow(D_prop,5) * KQ_0 * abs(n_rps) * n_rps 
-
+        
         # Generalized force vector
         tau_prop = np.array([
             (1-t_prop) * X_prop,

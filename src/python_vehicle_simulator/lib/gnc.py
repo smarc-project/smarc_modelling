@@ -722,6 +722,13 @@ def forceLiftDrag(b,S,CD_0,alpha,U_r):
         0,
         0,
         0 ])
+    #tau_liftdrag = np.array([
+    #    math.cos(alpha) * (-F_drag) - math.sin(alpha) * (-F_lift),
+    #    0,
+    #    math.sin(alpha) * (-F_drag) + math.cos(alpha) * (-F_lift),
+    #    0,
+    #    0,
+    #    0 ])
 
     return tau_liftdrag
     

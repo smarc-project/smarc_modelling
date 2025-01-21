@@ -5,6 +5,7 @@ from python_vehicle_simulator.lib import *
 #from python_vehicle_simulator.vehicles.SAM import SAM
 from python_vehicle_simulator.vehicles.SimpleSAM import SimpleSAM
 import matplotlib
+import mpl_toolkits.mplot3d.axes3d as p3
 matplotlib.use('TkAgg')  # or 'Qt5Agg', depending on what you have installed
 
 # Initial conditions
@@ -37,8 +38,10 @@ def run_simulation(t_span, x0, sam):
         u: control inputs as [x_vbs, x_lcg, delta_s, delta_r, rpm1, rpm2]
         """
         u = np.zeros(6)
-        u[0] = 50
+        u[0] = 0
         u[1] = 100
+        u[4] = 1500
+        u[5] = u[4]
         return sam.dynamics(x, u)
 
     # Run integration
@@ -170,7 +173,34 @@ def plot_results(sol):
     plt.tight_layout()
     plt.show()
 
+def plot_trajectory(sol):
+
+    data = np.array([sol.y[0], sol.y[1], -sol.y[2]])
+
+    fig = plt.figure(2,figsize=(10,10), dpi=dpiValue)
+    ax = p3.Axes3D(fig, auto_add_to_figure=False)
+    fig.add_axes(ax) 
+    
+    # Line/trajectory plot
+    line = plt.plot(data[0], data[1], data[2], lw=2, c='b')[0] 
+
+    ax.set_xlabel('X / East')
+    ax.set_ylabel('Y / North')
+    ax.set_zlabel('Z / Down')
+
+    # Plot 2D surface for z = 0
+    [x_min, x_max] = ax.get_xlim()
+    [y_min, y_max] = ax.get_ylim()
+    x_grid = np.arange(x_min-20, x_max+20)
+    y_grid = np.arange(y_min-20, y_max+20)
+    [xx, yy] = np.meshgrid(x_grid, y_grid)
+    zz = 0 * xx
+    ax.plot_surface(xx, yy, zz, alpha=0.3)
+
+    plt.show()
+
 
 # Run simulation and plot results
 sol = run_simulation(t_span, x0, sam)
 plot_results(sol)
+#plot_trajectory(sol)
