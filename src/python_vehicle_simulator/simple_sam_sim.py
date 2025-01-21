@@ -15,8 +15,9 @@ nu0 = np.zeros(6)  # Zero initial velocities
 x0 = np.concatenate([eta0, nu0])
 
 # Simulation timespan
-t_span = (0, 10)  # 20 seconds simulation
-t_eval = np.linspace(t_span[0], t_span[1], 500)
+n_sim = 1000
+t_span = (0, 20)  # 20 seconds simulation
+t_eval = np.linspace(t_span[0], t_span[1], n_sim)
 
 # Create SAM instance
 sam = SimpleSAM()
@@ -38,21 +39,23 @@ def run_simulation(t_span, x0, sam):
         u: control inputs as [x_vbs, x_lcg, delta_s, delta_r, rpm1, rpm2]
         """
         u = np.zeros(6)
-        u[0] = 0
-        u[1] = 100
-        u[4] = 1500
-        u[5] = u[4]
+        u[0] = 50        # VBS
+        u[1] = 50      # LCG
+#        u[2] = 100
+#        u[3] = 100
+#        u[4] = 1500     # RPM 1
+#        u[5] = u[4]     # RPM 2
         return sam.dynamics(x, u)
 
     # Run integration
     print(f" Start simulation")
 
-    data = np.empty((12, 500))
+    data = np.empty((12, n_sim))
     data[:,0] = x0
 
     # Euler forward integration
-    for i in range(500-1):
-        data[:,i+1] = data[:,i] + dynamics_wrapper(0, data[:,i]) * (10/500)
+    for i in range(n_sim-1):
+        data[:,i+1] = data[:,i] + dynamics_wrapper(0, data[:,i]) * (t_span[1]/n_sim)
     sol = Sol(t_eval,data)
     print(f" Simulation complete!")
 
@@ -171,22 +174,47 @@ def plot_results(sol):
 
     plt.xlabel('Time [s]')
     plt.tight_layout()
-    plt.show()
 
-def plot_trajectory(sol):
-
-    data = np.array([sol.y[0], sol.y[1], -sol.y[2]])
-
-    fig = plt.figure(2,figsize=(10,10), dpi=dpiValue)
+def plot_trajectory(sol, numDataPoints, filename, FPS):
+    
+    # State vectors
+    x = sol.y[0]
+    y = sol.y[1]
+    z = sol.y[2]
+    
+    # down-sampling the xyz data points
+    N = y[::len(x) // numDataPoints];
+    E = x[::len(x) // numDataPoints];
+    D = z[::len(x) // numDataPoints];
+    
+    # Animation function
+    def anim_function(num, dataSet, line):
+        
+        line.set_data(dataSet[0:2, :num])    
+        line.set_3d_properties(dataSet[2, :num])    
+        ax.view_init(elev=10.0, azim=-120.0)
+        
+        return line
+    
+    dataSet = np.array([N, E, -D])      # Down is negative z
+    
+    # Attaching 3D axis to the figure
+    fig = plt.figure(2,figsize=(7,7))
     ax = p3.Axes3D(fig, auto_add_to_figure=False)
     fig.add_axes(ax) 
     
     # Line/trajectory plot
-    line = plt.plot(data[0], data[1], data[2], lw=2, c='b')[0] 
+    line = plt.plot(dataSet[0], dataSet[1], dataSet[2], lw=2, c='b')[0] 
 
+    # Setting the axes properties
     ax.set_xlabel('X / East')
     ax.set_ylabel('Y / North')
-    ax.set_zlabel('Z / Down')
+    ax.set_zlim3d([-20, 3])                   # default depth = -100 m
+    
+    #if np.amax(z) > 100.0:
+    #    ax.set_zlim3d([-np.amax(z), 20])
+        
+    ax.set_zlabel('-Z / Down')
 
     # Plot 2D surface for z = 0
     [x_min, x_max] = ax.get_xlim()
@@ -196,11 +224,25 @@ def plot_trajectory(sol):
     [xx, yy] = np.meshgrid(x_grid, y_grid)
     zz = 0 * xx
     ax.plot_surface(xx, yy, zz, alpha=0.3)
-
-    plt.show()
+                    
+    # Title of plot
+    ax.set_title('North-East-Down')
+    
+#    # Create the animation object
+#    ani = animation.FuncAnimation(fig, 
+#                         anim_function, 
+#                         frames=numDataPoints, 
+#                         fargs=(dataSet,line),
+#                         interval=200, 
+#                         blit=False,
+#                         repeat=True)
+#    
+#    # Save the 3D animation as a gif file
+#    ani.save(filename, writer=animation.PillowWriter(fps=FPS))  
 
 
 # Run simulation and plot results
 sol = run_simulation(t_span, x0, sam)
 plot_results(sol)
-#plot_trajectory(sol)
+#plot_trajectory(sol, n_sim, "3d.gif", 10)
+plt.show()

@@ -261,14 +261,14 @@ class SimpleSAM:
             V_current=0,
             beta_current=0,
     ):
-        # Initialize Subsystems:
-        self.init_vehicle()
-
         # Constants
         self.p_OC_O = np.array([-0.75, 0, 0.06], float)  # Measurement frame C in CO (O)
         self.D2R = math.pi / 180  # Degrees to radians
         self.rho_w = self.rho = 1026  # Water density (kg/m³)
         self.g = 9.81  # Gravity acceleration (m/s²)
+
+        # Initialize Subsystems:
+        self.init_vehicle()
 
         # Reference values and current
         self.V_c = V_current  # Current water speed
@@ -336,8 +336,9 @@ class SimpleSAM:
         self.l_SS=1.5
         self.d_SS=0.19
         self.m_ss=14.9
-        p_SSgC_O = np.array([-0.75, 0, 0.]) 
-        self.p_SSgC_O = p_SSgC_O
+        p_CSSg_O = np.array([0.74, 0, 0.06]) 
+        self.p_CSSg_O = p_CSSg_O
+        self.p_OSsg_O = self.p_OC_O + self.p_CSSg_O
 #        self.solid_structure = SolidStructure(
 #            l_SS=1.5,
 #            d_SS=0.19,
@@ -353,7 +354,8 @@ class SimpleSAM:
         # NOTE: Adjusted values
         # All values in m
         # Now the water mass for a full VBS makes more sense
-        self.p_OVbs_O = np.array([-0.5, 0, 0.1]) # Center of mass VBS w.r.t CO. can be calculated as sum later
+        p_CVbs_O = np.array([0.404, 0, 0.0125]) 
+        self.p_OVbs_O = self.p_OC_O + p_CVbs_O # FIXME: Check this how it goes into the CG calculation of the VBS. It changes with x_vbs, so you might want to adjust it as well.
         self.vbs = VariableBuoyancySystem(
             d_vbs=0.085,
             l_vbs_l=0.045,
@@ -365,9 +367,10 @@ class SimpleSAM:
         )
 
         self.m_lcg = 2.6
-        self.p_OLcgPos_O = np.array([0.1, 0, 0.025])
+        self.l_lcg_l = 0.223
+        p_CLcgpos_O = np.array([0.608+self.l_lcg_l/2, 0, 0.130]) # "Beginning" of the LCG in C frame. Mass moves from here
+        self.p_OLcgPos_O = self.p_OC_O + p_CLcgpos_O
         self.h_lcg_dim = 0.08
-        self.l_lcg_l = 0.2
         # NOTE: Adjusted Values
         self.lcg = LongitudinalCenterOfGravityControl(
             l_lcg_l=0.2,
@@ -421,9 +424,6 @@ class SimpleSAM:
         Returns:
             state_vector_dot: Time derivative of complete state vector
         """
-
-        # FIXME: everything right now in the body frame (eq. 8.2)
-        #   But we also need everything in the global frame (eq. 8.1)
 
         # For quaternions
         #eta = x[0:7]
@@ -494,7 +494,6 @@ class SimpleSAM:
         self.p_OLcg_O = self.calculate_lcg_position(u_control)
 
         # Update mass
-        self.r_vbs = 0.0425 # Radius of the VBS
         self.m_vbs = self.rho_w * np.pi * self.r_vbs ** 2 * self.x_vbs
         self.m = self.m_ss + self.m_vbs + self.m_lcg
 
@@ -503,15 +502,10 @@ class SimpleSAM:
         """
         Compute the center of gravity based on VBS and LCG position
         """
-
-        # FIXME: To be replaced with the actual calculation
-        p_OG_O_current = np.array([-0.03, 0, 0.12], float) # CG of solid structure w.r.t. CO
-        self.p_OG_O = (self.m_ss/self.m) * p_OG_O_current \
+        self.p_OG_O = (self.m_ss/self.m) * self.p_OSsg_O \
                     + (self.m_vbs/self.m) * self.p_OVbs_O \
                     + (self.m_lcg/self.m) * self.p_OLcg_O
 
-#        print(f"vbs cg: {(self.m_vbs/self.m) * self.p_OVbs_O}")
-#        print(f"p_OG_O: {self.p_OG_O}")
 
     def update_inertias(self, x,u):
         """
@@ -529,11 +523,9 @@ class SimpleSAM:
         Iy = (1 / 5) * self.m_ss * (self.a ** 2 + self.b ** 2)
         Iz = Iy
 
-        p_SSgO_O = self.p_SSgC_O - self.p_OC_O
-
         J_ss_cg = np.diag([Ix, Iy, Iz]) # In center of gravity
-        S2_p_SSgC_O = skew_symmetric(p_SSgO_O) @ skew_symmetric(p_SSgO_O)
-        J_ss_co = J_ss_cg - self.m_ss * S2_p_SSgC_O
+        S2_p_OSsg_O = skew_symmetric(self.p_OSsg_O) @ skew_symmetric(self.p_OSsg_O)
+        J_ss_co = J_ss_cg - self.m_ss * S2_p_OSsg_O
 
         # VBS
         # Moment of inertia of a solid cylinder
@@ -657,9 +649,6 @@ class SimpleSAM:
         tau_crossflow = crossFlowDrag(self.L, self.diam, self.diam, self.nu_r)
         tau_prop = self.calculate_propeller_force(x, u)
 
-        #tau_liftdrag = np.zeros(6)
-        #tau_crossflow = np.zeros(6)
-
         self.tau = tau_liftdrag + tau_crossflow + tau_prop
 
 
@@ -670,7 +659,7 @@ class SimpleSAM:
         """
         delta_s = u[2]
         delta_r = u[3]
-        n_rpm = u[4]
+        n_rpm = u[4:]
 
         # Compute propeller forces
         C_T2C = calculate_dcm(order=[2, 3], angles=[delta_s, delta_r])
@@ -687,51 +676,51 @@ class SimpleSAM:
         Ja_max = 0.6632
 
         # Prop Omid
-        #tau_prop = np.zeros(6)
-        #for i in range(len(n_rpm)):
+        tau_prop = np.zeros(6)
+        for i in range(len(n_rpm)):
 
-        #    if n_rps[i] > 0:
-        #        X_prop_i = self.rho * (D_prop ** 4) * (
-        #                KT_0 * abs(n_rps[i]) * n_rps[i] +
-        #                (KT_max - KT_0) / Ja_max * (Va / D_prop) * abs(n_rps[i])
-        #        )
-        #        K_prop_i = self.rho * (D_prop ** 5) * (
-        #                KQ_0 * abs(n_rps[i]) * n_rps[i] +
-        #                (KQ_max - KQ_0) / Ja_max * (Va / D_prop) * abs(n_rps[i])
-        #        )
-        #    else:
-        #        X_prop_i = self.rho * (D_prop ** 4) * KT_0 * abs(n_rps[i]) * n_rps[i]
-        #        K_prop_i = self.rho * (D_prop ** 5) * KQ_0 * abs(n_rps[i]) * n_rps[i]
-        #
-        #    F_prop_b = C_T2C @ np.array([X_prop_i, 0, 0])
-        #    r_prop_i = C_T2C @ self.propellers.r_t_p_sh[i] - self.p_OC_O
-        #    M_prop_i = np.cross(r_prop_i, F_prop_b) + np.array([K_prop_i, 0, 0])
-        #    tau_prop_i = np.concatenate([F_prop_b, M_prop_i])
-        #    tau_prop += tau_prop_i
-        #
+            if n_rps[i] > 0:
+                X_prop_i = self.rho * (D_prop ** 4) * (
+                        KT_0 * abs(n_rps[i]) * n_rps[i] +
+                        (KT_max - KT_0) / Ja_max * (Va / D_prop) * abs(n_rps[i])
+                )
+                K_prop_i = self.rho * (D_prop ** 5) * (
+                        KQ_0 * abs(n_rps[i]) * n_rps[i] +
+                        (KQ_max - KQ_0) / Ja_max * (Va / D_prop) * abs(n_rps[i])
+                )
+            else:
+                X_prop_i = self.rho * (D_prop ** 4) * KT_0 * abs(n_rps[i]) * n_rps[i]
+                K_prop_i = self.rho * (D_prop ** 5) * KQ_0 * abs(n_rps[i]) * n_rps[i]
+        
+            F_prop_b = C_T2C @ np.array([X_prop_i, 0, 0])
+            r_prop_i = C_T2C @ self.propellers.r_t_p_sh[i] - self.p_OC_O
+            M_prop_i = np.cross(r_prop_i, F_prop_b) + np.array([K_prop_i, 0, 0])
+            tau_prop_i = np.concatenate([F_prop_b, M_prop_i])
+            tau_prop += tau_prop_i
+        
         # Prop Fossen
-        if n_rps > 0:   # forward thrust
-            X_prop = self.rho * pow(D_prop,4) * ( 
-                KT_0 * abs(n_rps) * n_rps + (KT_max-KT_0)/Ja_max * 
-                (Va/D_prop) * abs(n_rps) )        
-            K_prop = self.rho * pow(D_prop,5) * (
-                KQ_0 * abs(n_rps) * n_rps + (KQ_max-KQ_0)/Ja_max * 
-                (Va/D_prop) * abs(n_rps) )           
-            
-        else:    # reverse thrust (braking)
-        
-            X_prop = self.rho * pow(D_prop,4) * KT_0 * abs(n_rps) * n_rps 
-            K_prop = self.rho * pow(D_prop,5) * KQ_0 * abs(n_rps) * n_rps 
-        
-        # Generalized force vector
-        tau_prop = np.array([
-            (1-t_prop) * X_prop,
-            0, 
-            0,
-            K_prop / 10,   # scaled down by a factor of 10 to match exp. results
-            0, 
-            0
-            ], float)
+        #if n_rps > 0:   # forward thrust
+        #    X_prop = self.rho * pow(D_prop,4) * ( 
+        #        KT_0 * abs(n_rps) * n_rps + (KT_max-KT_0)/Ja_max * 
+        #        (Va/D_prop) * abs(n_rps) )        
+        #    K_prop = self.rho * pow(D_prop,5) * (
+        #        KQ_0 * abs(n_rps) * n_rps + (KQ_max-KQ_0)/Ja_max * 
+        #        (Va/D_prop) * abs(n_rps) )           
+        #    
+        #else:    # reverse thrust (braking)
+        #
+        #    X_prop = self.rho * pow(D_prop,4) * KT_0 * abs(n_rps) * n_rps 
+        #    K_prop = self.rho * pow(D_prop,5) * KQ_0 * abs(n_rps) * n_rps 
+        #
+        ## Generalized force vector
+        #tau_prop = np.array([
+        #    (1-t_prop) * X_prop,
+        #    0, 
+        #    0,
+        #    K_prop / 10,   # scaled down by a factor of 10 to match exp. results
+        #    0, 
+        #    0
+        #    ], float)
 
 #        print(f"rpm: {u}")
 
