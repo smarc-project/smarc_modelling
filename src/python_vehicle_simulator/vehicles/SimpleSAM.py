@@ -141,7 +141,7 @@ class VariableBuoyancySystem:
         self.x_vbs_min = 0  # Minimum VBS position (m)
         self.x_vbs_max = l_vbs_l  # Maximum VBS position (m)
         self.x_vbs_dot_min = -0.1  # Maximum retraction speed (m/s)
-        self.x_vbs_dot_max = 0.1  # Maximum extension speed (m/s)
+        self.x_vbs_dot_max = 10 # FIXME: This is an estimate. Need to adjust, since the speed is given in mm/s, but we control on percentages right now. Maximum extension speed (m/s)
 
 
 class LongitudinalCenterOfGravityControl:
@@ -172,7 +172,7 @@ class LongitudinalCenterOfGravityControl:
         self.x_lcg_min = 0  # Minimum LCG position (m)
         self.x_lcg_max = l_lcg_r  # Maximum LCG position (m)
         self.x_lcg_dot_min = -0.1  # Maximum retraction speed (m/s)
-        self.x_lcg_dot_max = 0.1  # Maximum extension speed (m/s)
+        self.x_lcg_dot_max = 15  # FIXME: This is an estimate. Need to adjust, since the speed is given in mm/s, but we control on percentages right now. Maximum extension speed (m/s)
 
 #
 #class ThrusterShaft:
@@ -237,7 +237,7 @@ class Propellers:
 
 
 # Class Vehicle
-class SimpleSAM:
+class SimpleSAM():
     """
     SAM()
         Integrates all subsystems of the Small and Affordable Maritime AUV.
@@ -258,9 +258,12 @@ class SimpleSAM:
 
     def __init__(
             self,
+            dt=0.02,
             V_current=0,
             beta_current=0,
     ):
+        self.dt = dt # Sim time step, necessary for evaluation of the actuator dynamics
+
         # Constants
         self.p_OC_O = np.array([-0.75, 0, 0.06], float)  # Measurement frame C in CO (O)
         self.D2R = math.pi / 180  # Degrees to radians
@@ -277,6 +280,7 @@ class SimpleSAM:
         # Initialize state vectors
         self.nu = np.zeros(6)  # [u, v, w, p, q, r]
         self.eta = np.zeros(6)  # [x, y, z, q1, q2, q3, q0]
+        self.xi = np.zeros(6)   # [vbs, lcg, ds, dr, rpm1, rpm2]
         #self.eta[6] = 1.0  # Initialize quaternion to identity rotation
 
         # Initialize the AUV model
@@ -410,7 +414,7 @@ class SimpleSAM:
 
 
 
-    def dynamics(self, x, u):
+    def dynamics(self, x, u_ref):
         """
         Main dynamics function for integrating the complete AUV state.
 
@@ -432,6 +436,7 @@ class SimpleSAM:
         # For Euler angles
         eta = x[0:6]
         nu = x[6:12]
+        u = x[12:18]
 
         self.calculate_system_state(nu, eta, u)
         self.calculate_cg(nu, u)
@@ -450,8 +455,9 @@ class SimpleSAM:
 
         eta_dot = self.eta_dynamics(eta, nu)
 
-        x_dot = np.concatenate([eta_dot, nu_dot])
+        u_dot = self.actuator_dynamics(u, u_ref)
 
+        x_dot = np.concatenate([eta_dot, nu_dot, u_dot])
 
         np.set_printoptions(precision=1)
         #print(f"tau: {self.tau}")
@@ -460,6 +466,7 @@ class SimpleSAM:
         #print(f"MRB: {self.MRB}")
         #print(f"MA: {self.MA}")
         #print(f"Minv: {self.Minv}")
+        print(f"u: {u}")
 
         return x_dot
 
@@ -785,9 +792,23 @@ class SimpleSAM:
 
         return np.concatenate([p_dot, v_dot])
 
+    def actuator_dynamics(self, u_cur, u_ref):
+
+        u_dot = np.zeros(6)
+
+        u_dot = (u_ref - u_cur)/self.dt
+
+        if np.abs(u_dot[0]) > self.vbs.x_vbs_dot_max:
+            u_dot[0] = self.vbs.x_vbs_dot_max * np.sign(u_dot[0])
+        if np.abs(u_dot[1]) > self.lcg.x_lcg_dot_max:
+            u_dot[1] = self.lcg.x_lcg_dot_max * np.sign(u_dot[1])
+
+        return u_dot
+
+
+
 ##############################################################################
-#
-# OMIDS MODEL
+## OMIDS MODEL
 #
 #    def calculate_vbs(self, ksi, ksi_dot, ksi_ddot):
 #        """

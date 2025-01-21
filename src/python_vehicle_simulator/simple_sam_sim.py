@@ -12,15 +12,17 @@ matplotlib.use('TkAgg')  # or 'Qt5Agg', depending on what you have installed
 eta0 = np.zeros(6)
 #eta0[6] = 1.0  # Initial quaternion (no rotation) 
 nu0 = np.zeros(6)  # Zero initial velocities
-x0 = np.concatenate([eta0, nu0])
+u0 = np.zeros(6)
+x0 = np.concatenate([eta0, nu0, u0])
 
 # Simulation timespan
 n_sim = 1000
 t_span = (0, 20)  # 20 seconds simulation
 t_eval = np.linspace(t_span[0], t_span[1], n_sim)
+dt = t_span[1]/n_sim
 
 # Create SAM instance
-sam = SimpleSAM()
+sam = SimpleSAM(dt)
 
 class Sol():
 
@@ -50,7 +52,7 @@ def run_simulation(t_span, x0, sam):
     # Run integration
     print(f" Start simulation")
 
-    data = np.empty((12, n_sim))
+    data = np.empty((len(x0), n_sim))
     data[:,0] = x0
 
     # Euler forward integration
@@ -98,7 +100,7 @@ def plot_results(sol):
     #psi_vec, theta_vec, phi_vec = quaternion_to_euler_vec(sol)
     psi_vec, theta_vec, phi_vec = sol.y[3,:], sol.y[4,:], sol.y[5,:] 
 
-    fig, axs = plt.subplots(4, 3, figsize=(12, 10))
+    fig, axs = plt.subplots(6, 3, figsize=(12, 10))
 
     # Position plots
     axs[0,0].plot(sol.t, sol.y[0], label='x')
@@ -140,6 +142,20 @@ def plot_results(sol):
     axs[3,0].set_ylabel('p (roll_dot)')
     axs[3,1].set_ylabel('q (pitch_dot)')
     axs[3,2].set_ylabel('r (yaw_dot)')
+
+    axs[4,0].plot(sol.t, sol.y[12], label='vbs')
+    axs[4,1].plot(sol.t, sol.y[13], label='lcg')
+    axs[4,2].plot(sol.t, sol.y[14], label='dr')
+    axs[4,0].set_ylabel('u_vbs')
+    axs[4,1].set_ylabel('u_lcg')
+    axs[4,2].set_ylabel('u_dr')
+
+    axs[5,0].plot(sol.t, sol.y[15], label='ds')
+    axs[5,1].plot(sol.t, sol.y[16], label='rpm1')
+    axs[5,2].plot(sol.t, sol.y[17], label='rpm2')
+    axs[5,0].set_ylabel('ds')
+    axs[5,1].set_ylabel('rpm1')
+    axs[5,2].set_ylabel('rpm2')
     #axs[3].legend()
 
 #    # ksi plots
