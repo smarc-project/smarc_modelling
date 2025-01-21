@@ -39,12 +39,12 @@ def run_simulation(t_span, x0, sam):
         u: control inputs as [x_vbs, x_lcg, delta_s, delta_r, rpm1, rpm2]
         """
         u = np.zeros(6)
-        u[0] = 50        # VBS
-        u[1] = 50      # LCG
-#        u[2] = 100
-#        u[3] = 100
-#        u[4] = 1500     # RPM 1
-#        u[5] = u[4]     # RPM 2
+        u[0] = 100        # VBS
+        u[1] = 100 # LCG
+        u[2] = np.deg2rad(7)    # Vertical
+        u[3] = np.deg2rad(7)   # Horizontal
+        u[4] = 1000     # RPM 1
+        u[5] = u[4]     # RPM 2
         return sam.dynamics(x, u)
 
     # Run integration
