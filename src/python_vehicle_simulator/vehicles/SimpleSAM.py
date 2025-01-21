@@ -793,6 +793,13 @@ class SimpleSAM():
         return np.concatenate([p_dot, v_dot])
 
     def actuator_dynamics(self, u_cur, u_ref):
+        """
+        Compute the actuator dynamics.
+        delta_X and rpmX are assumed to be instantaneous
+
+        u: control inputs as [x_vbs, x_lcg, delta_s, delta_r, rpm1, rpm2]
+
+        """
 
         u_dot = np.zeros(6)
 

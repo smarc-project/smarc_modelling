@@ -41,7 +41,7 @@ def run_simulation(t_span, x0, sam):
         u: control inputs as [x_vbs, x_lcg, delta_s, delta_r, rpm1, rpm2]
         """
         u = np.zeros(6)
-        u[0] = 100        # VBS
+        u[0] = 100*np.sin((i/(20/0.02))*(3*np.pi/4))        # VBS/
         u[1] = 100 # LCG
         u[2] = np.deg2rad(7)    # Vertical
         u[3] = np.deg2rad(7)   # Horizontal
@@ -57,7 +57,7 @@ def run_simulation(t_span, x0, sam):
 
     # Euler forward integration
     for i in range(n_sim-1):
-        data[:,i+1] = data[:,i] + dynamics_wrapper(0, data[:,i]) * (t_span[1]/n_sim)
+        data[:,i+1] = data[:,i] + dynamics_wrapper(i, data[:,i]) * (t_span[1]/n_sim)
     sol = Sol(t_eval,data)
     print(f" Simulation complete!")
 
