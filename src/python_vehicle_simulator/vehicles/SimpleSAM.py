@@ -143,37 +143,37 @@ class VariableBuoyancySystem:
         self.x_vbs_dot_min = -0.1  # Maximum retraction speed (m/s)
         self.x_vbs_dot_max = 0.1  # Maximum extension speed (m/s)
 
-#
-#class LongitudinalCenterOfGravityControl:
-#    """
-#    Represents the Longitudinal Center of Gravity Control (LCG) of the SAM AUV.
-#
-#    Attributes:
-#        l_lcg_l: Length of the LCG structure along the x-axis (m).
-#        l_lcg_r: Maximum position of the LCG in the x-direction (m).
-#        l_lcg_b: Additional offset length along the x-axis (m).
-#        h_lcg: Vertical offset of the CG along the z-axis relative to the central frame (m).
-#        m_lcg: Mass of the LCG (kg).
-#        h_lcg_dim: Height of the LCG structure (m).
-#        d_lcg: Width of the LCG structure (m).
-#    """
-#
-#    def __init__(self, l_lcg_l, l_lcg_r, l_lcg_b, h_lcg, m_lcg, h_lcg_dim, d_lcg):
-#        # Physical parameters
-#        self.l_lcg_l = l_lcg_l  # Length of LCG structure (m)
-#        self.l_lcg_r = l_lcg_r  # Maximum x-direction position (m)
-#        self.l_lcg_b = l_lcg_b  # Additional x-axis offset (m)
-#        self.h_lcg = h_lcg  # Vertical CG offset (m)
-#        self.m_lcg = m_lcg  # Mass of LCG (kg)
-#        self.h_lcg_dim = h_lcg_dim  # Height of LCG structure (m)
-#        self.d_lcg = d_lcg  # Width of LCG structure (m)
-#
-#        # Motion bounds
-#        self.x_lcg_min = 0  # Minimum LCG position (m)
-#        self.x_lcg_max = l_lcg_r  # Maximum LCG position (m)
-#        self.x_lcg_dot_min = -0.1  # Maximum retraction speed (m/s)
-#        self.x_lcg_dot_max = 0.1  # Maximum extension speed (m/s)
-#
+
+class LongitudinalCenterOfGravityControl:
+    """
+    Represents the Longitudinal Center of Gravity Control (LCG) of the SAM AUV.
+
+    Attributes:
+        l_lcg_l: Length of the LCG structure along the x-axis (m).
+        l_lcg_r: Maximum position of the LCG in the x-direction (m).
+        l_lcg_b: Additional offset length along the x-axis (m).
+        h_lcg: Vertical offset of the CG along the z-axis relative to the central frame (m).
+        m_lcg: Mass of the LCG (kg).
+        h_lcg_dim: Height of the LCG structure (m).
+        d_lcg: Width of the LCG structure (m).
+    """
+
+    def __init__(self, l_lcg_l, l_lcg_r, l_lcg_b, h_lcg, m_lcg, h_lcg_dim, d_lcg):
+        # Physical parameters
+        self.l_lcg_l = l_lcg_l  # Length of LCG structure (m)
+        self.l_lcg_r = l_lcg_r  # Maximum x-direction position (m)
+        self.l_lcg_b = l_lcg_b  # Additional x-axis offset (m)
+        self.h_lcg = h_lcg  # Vertical CG offset (m)
+        self.m_lcg = m_lcg  # Mass of LCG (kg)
+        self.h_lcg_dim = h_lcg_dim  # Height of LCG structure (m)
+        self.d_lcg = d_lcg  # Width of LCG structure (m)
+
+        # Motion bounds
+        self.x_lcg_min = 0  # Minimum LCG position (m)
+        self.x_lcg_max = l_lcg_r  # Maximum LCG position (m)
+        self.x_lcg_dot_min = -0.1  # Maximum retraction speed (m/s)
+        self.x_lcg_dot_max = 0.1  # Maximum extension speed (m/s)
+
 #
 #class ThrusterShaft:
 #    """
@@ -366,16 +366,17 @@ class SimpleSAM:
         )
 
         self.m_lcg = 2.6
-#        # NOTE: Adjusted Values
-#        self.lcg = LongitudinalCenterOfGravityControl(
-#            l_lcg_l=0, #0.2,
-#            l_lcg_r=0, #0.06,
-#            l_lcg_b=0, #1.0,
-#            h_lcg=0, #0.1,
-#            m_lcg=0, #2.6,
-#            h_lcg_dim=0, #0.1,
-#            d_lcg=0 #0.1
-#        )
+        self.p_OLcgPos_O = np.array([0.1, 0, 0.025])
+        # NOTE: Adjusted Values
+        self.lcg = LongitudinalCenterOfGravityControl(
+            l_lcg_l=0.2,
+            l_lcg_r=0, #0.06,
+            l_lcg_b=0, #1.0,
+            h_lcg=0, #0.1,
+            m_lcg=self.m_lcg,
+            h_lcg_dim=0, #0.1,
+            d_lcg=0 #0.1
+        )
 #
 #        # NOTE: Adjusted values
 #        self.thruster_shaft = ThrusterShaft(
@@ -474,9 +475,12 @@ class SimpleSAM:
         if abs(self.nu_r[0]) > 1e-6:
             self.alpha = math.atan2(self.nu_r[2], self.nu_r[0])
 
+        # Update actuators
+        self.x_vbs = self.calculate_vbs_position(u_control) 
+        self.p_OLcg_O = self.calculate_lcg_position(u_control)
+
         # Update mass
         self.r_vbs = 0.0425 # Radius of the VBS
-        self.x_vbs = self.calculate_vbs_position(u_control) 
         self.m_vbs = self.rho_w * np.pi * self.r_vbs ** 2 * self.x_vbs
         self.m = self.m_dry + self.m_vbs
 
@@ -487,8 +491,10 @@ class SimpleSAM:
         """
 
         # FIXME: To be replaced with the actual calculation
-        p_OG_O_current = np.array([0.004, 0, 0.12], float)
-        self.p_OG_O = (self.m_dry/self.m) * p_OG_O_current + (self.m_vbs/self.m) * self.p_OVbs_O
+        p_OG_O_current = np.array([-0.025, 0, 0.12], float) # CG of solid structure w.r.t. CO
+        self.p_OG_O = (self.m_dry/self.m) * p_OG_O_current \
+                    + (self.m_vbs/self.m) * self.p_OVbs_O \
+                    + (self.m_lcg/self.m) * self.p_OLcg_O
 
 #        print(f"vbs cg: {(self.m_vbs/self.m) * self.p_OVbs_O}")
 #        print(f"p_OG_O: {self.p_OG_O}")
@@ -621,9 +627,7 @@ class SimpleSAM:
         tau_crossflow = crossFlowDrag(self.L, self.diam, self.diam, self.nu_r)
         tau_prop = self.calculate_propeller_force(x, u)
 
-
         self.tau = tau_liftdrag + tau_crossflow + tau_prop
-
 
 
     def calculate_propeller_force(self, x, u):
@@ -709,6 +713,16 @@ class SimpleSAM:
         """
         x_vbs = (u[0]/100) * self.vbs.l_vbs_l
         return x_vbs
+
+    def calculate_lcg_position(self, u):
+
+
+
+        p_LcgPos_LcgO = np.array([(u[1]/100) * self.lcg.l_lcg_l, # Position of the LCG w.r.t fixed LCG point
+                                 0, 0])
+        p_OLcg_O = self.p_OLcgPos_O + p_LcgPos_LcgO
+
+        return p_OLcg_O
 
     def eta_dynamics(self, eta, nu):
         """
