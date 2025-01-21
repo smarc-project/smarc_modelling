@@ -300,11 +300,10 @@ class SimpleSAM:
         self.CD_0 = Cd * math.pi * self.b ** 2 / self.S
 
         # Rigid-body mass matrix expressed in CO
-        self.m_dry = self.m_SS + self.m_lcg 
         self.x_vbs = 0.0
         self.r_vbs = 0.0425 # Radius of the VBS
         self.m_vbs = self.rho_w * np.pi * self.r_vbs ** 2 * 0.0225
-        self.m = self.m_dry + self.m_vbs
+        self.m = self.m_ss + self.m_vbs + self.m_lcg
         self.J_total = np.zeros((3,3)) 
         self.MRB = np.zeros((6,6)) 
         self.MA = np.zeros((6,6)) 
@@ -313,7 +312,7 @@ class SimpleSAM:
 
         # Weight and buoyancy
         self.W = self.m * self.g
-        self.B = self.W # + 0.15 * self.g # NOTE: initializing the buoyancy force now with the dry weight + half the VBS filled.
+        self.B = self.W # NOTE: Init buoyancy as dry mass + half the VBS
 
         # Mass matrix including added mass
         self.M = np.zeros((6,6)) #self.MRB + self.MA
@@ -336,7 +335,7 @@ class SimpleSAM:
 #        # Initialize subsystems
         self.l_SS=1.5
         self.d_SS=0.19
-        self.m_SS=14.9
+        self.m_ss=14.9
         p_SSgC_O = np.array([-0.75, 0, 0.]) 
         self.p_SSgC_O = p_SSgC_O
 #        self.solid_structure = SolidStructure(
@@ -367,6 +366,8 @@ class SimpleSAM:
 
         self.m_lcg = 2.6
         self.p_OLcgPos_O = np.array([0.1, 0, 0.025])
+        self.h_lcg_dim = 0.08
+        self.l_lcg_l = 0.2
         # NOTE: Adjusted Values
         self.lcg = LongitudinalCenterOfGravityControl(
             l_lcg_l=0.2,
@@ -374,7 +375,7 @@ class SimpleSAM:
             l_lcg_b=0, #1.0,
             h_lcg=0, #0.1,
             m_lcg=self.m_lcg,
-            h_lcg_dim=0, #0.1,
+            h_lcg_dim=self.h_lcg_dim, #0.1,
             d_lcg=0 #0.1
         )
 #
@@ -482,7 +483,7 @@ class SimpleSAM:
         # Update mass
         self.r_vbs = 0.0425 # Radius of the VBS
         self.m_vbs = self.rho_w * np.pi * self.r_vbs ** 2 * self.x_vbs
-        self.m = self.m_dry + self.m_vbs
+        self.m = self.m_ss + self.m_vbs + self.m_lcg
 
 
     def calculate_cg(self, x, u):
@@ -491,8 +492,8 @@ class SimpleSAM:
         """
 
         # FIXME: To be replaced with the actual calculation
-        p_OG_O_current = np.array([-0.025, 0, 0.12], float) # CG of solid structure w.r.t. CO
-        self.p_OG_O = (self.m_dry/self.m) * p_OG_O_current \
+        p_OG_O_current = np.array([-0.03, 0, 0.12], float) # CG of solid structure w.r.t. CO
+        self.p_OG_O = (self.m_ss/self.m) * p_OG_O_current \
                     + (self.m_vbs/self.m) * self.p_OVbs_O \
                     + (self.m_lcg/self.m) * self.p_OLcg_O
 
@@ -502,21 +503,24 @@ class SimpleSAM:
     def update_inertias(self, x,u):
         """
         Update inertias based on VBS and LCG
+        Note: The propellers add more torque rather than momentum by moving.
+            The exception would be steering, but that's complex and will change
+            in the next iteration of SAM.
         """
 
         # Solid structure
         # Moment of inertia of a solid elipsoid
         # https://en.wikipedia.org/wiki/List_of_moments_of_inertia
         # with b = c.
-        Ix = (2 / 5) * self.m_dry * self.b ** 2  # moment of inertia
-        Iy = (1 / 5) * self.m_dry * (self.a ** 2 + self.b ** 2)
+        Ix = (2 / 5) * self.m_ss * self.b ** 2  # moment of inertia
+        Iy = (1 / 5) * self.m_ss * (self.a ** 2 + self.b ** 2)
         Iz = Iy
 
         p_SSgO_O = self.p_SSgC_O - self.p_OC_O
 
         J_ss_cg = np.diag([Ix, Iy, Iz]) # In center of gravity
         S2_p_SSgC_O = skew_symmetric(p_SSgO_O) @ skew_symmetric(p_SSgO_O)
-        J_ss_co = J_ss_cg - self.m_dry * S2_p_SSgC_O
+        J_ss_co = J_ss_cg - self.m_ss * S2_p_SSgC_O
 
         # VBS
         # Moment of inertia of a solid cylinder
@@ -528,13 +532,21 @@ class SimpleSAM:
         S2_r_vbs_cg = skew_symmetric(self.p_OVbs_O) @ skew_symmetric(self.p_OVbs_O)
         J_vbs_co = J_vbs_cg - self.m_vbs * S2_r_vbs_cg
 
-        # FIXME: To be replaced with the actual calculation
-        self.J_total = J_ss_co + J_vbs_co
+        # LCG
+        # Moment of inertia of a solid cylinder
+        Ix_lcg = (1/2) * self.m_lcg * (self.h_lcg_dim/2)**2
+        Iy_lcg = (1/12) * self.m_lcg* (3*(self.h_lcg_dim/2)**2 + self.l_lcg_l**2)
+        Iz_lcg = Iy_lcg
+
+        J_lcg_cg = np.diag([Ix_lcg, Iy_lcg, Iz_lcg])
+        S2_r_lcg_cg = skew_symmetric(self.p_OLcg_O) @ skew_symmetric(self.p_OLcg_O)
+        J_lcg_co = J_lcg_cg - self.m_lcg * S2_r_lcg_cg
+
+        self.J_total = J_ss_co + J_vbs_co + J_lcg_co
 
     def calculate_M(self, x, u):
 
         # Rigid-body mass matrix expressed in CO
-        self.m = self.m_vbs + self.m_dry
         m_diag = np.diag([self.m, self.m, self.m])
 
         # FIXME: This needs to be adjusted
