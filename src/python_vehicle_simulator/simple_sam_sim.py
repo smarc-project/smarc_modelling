@@ -13,11 +13,13 @@ eta0 = np.zeros(6)
 #eta0[6] = 1.0  # Initial quaternion (no rotation) 
 nu0 = np.zeros(6)  # Zero initial velocities
 u0 = np.zeros(6)
+u0[0] = 50
+u0[1] = 50
 x0 = np.concatenate([eta0, nu0, u0])
 
 # Simulation timespan
-n_sim = 1000
-t_span = (0, 20)  # 20 seconds simulation
+n_sim = 300
+t_span = (0, 10)  # 20 seconds simulation
 t_eval = np.linspace(t_span[0], t_span[1], n_sim)
 dt = t_span[1]/n_sim
 
@@ -41,10 +43,10 @@ def run_simulation(t_span, x0, sam):
         u: control inputs as [x_vbs, x_lcg, delta_s, delta_r, rpm1, rpm2]
         """
         u = np.zeros(6)
-        u[0] = 100*np.sin((i/(20/0.02))*(3*np.pi/4))        # VBS/
-        u[1] = 100 # LCG
-        u[2] = np.deg2rad(7)    # Vertical
-        u[3] = np.deg2rad(7)   # Horizontal
+        u[0] = 50#*np.sin((i/(20/0.02))*(3*np.pi/4))        # VBS/
+        u[1] = 50 # LCG
+        #u[2] = np.deg2rad(7)    # Vertical (stern)
+        u[3] = -np.deg2rad(7)   # Horizontal (rudder)
         u[4] = 1000     # RPM 1
         u[5] = u[4]     # RPM 2
         return sam.dynamics(x, u)
@@ -57,6 +59,7 @@ def run_simulation(t_span, x0, sam):
 
     # Euler forward integration
     for i in range(n_sim-1):
+        data[5,i] = ((data[5,i] + np.pi)% (2*np.pi)) - np.pi
         data[:,i+1] = data[:,i] + dynamics_wrapper(i, data[:,i]) * (t_span[1]/n_sim)
     sol = Sol(t_eval,data)
     print(f" Simulation complete!")
@@ -98,13 +101,13 @@ def plot_results(sol):
         return psi, theta, phi
 
     #psi_vec, theta_vec, phi_vec = quaternion_to_euler_vec(sol)
-    psi_vec, theta_vec, phi_vec = sol.y[3,:], sol.y[4,:], sol.y[5,:] 
+    phi_vec, theta_vec, psi_vec = sol.y[3,:], sol.y[4,:], sol.y[5,:] 
 
     fig, axs = plt.subplots(6, 3, figsize=(12, 10))
 
     # Position plots
-    axs[0,0].plot(sol.t, sol.y[0], label='x')
-    axs[0,1].plot(sol.t, sol.y[1], label='y')
+    axs[0,0].plot(sol.t, sol.y[1], label='x')
+    axs[0,1].plot(sol.t, sol.y[0], label='y')
     axs[0,2].plot(sol.t, -sol.y[2], label='z')
     axs[0,0].set_ylabel('x Position [m]')
     axs[0,1].set_ylabel('y Position [m]')
@@ -260,5 +263,5 @@ def plot_trajectory(sol, numDataPoints, filename, FPS):
 # Run simulation and plot results
 sol = run_simulation(t_span, x0, sam)
 plot_results(sol)
-#plot_trajectory(sol, n_sim, "3d.gif", 10)
+plot_trajectory(sol, n_sim, "3d.gif", 10)
 plt.show()
