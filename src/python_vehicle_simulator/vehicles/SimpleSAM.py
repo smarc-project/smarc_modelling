@@ -443,9 +443,8 @@ class SimpleSAM():
         # NOTE: Not pretty, but does the job for now
         #   Can be refactored into the actuator dynamics by having these
         #   checks there.
-        # FIXME:
-        #u = self.bound_actuators(u)
-        #u_ref = self.bound_actuators(u_ref)
+        u = self.bound_actuators(u)
+        u_ref = self.bound_actuators(u_ref)
 
         self.calculate_system_state(nu, eta, u)
         self.calculate_cg(nu, u)
@@ -456,19 +455,9 @@ class SimpleSAM():
         self.calculate_g()
         self.calculate_tau(nu, u)
 
-        #self.C = np.zeros((6,6))
-        #self.D = np.zeros((6,6))
-        #self.Minv = np.eye(6)
-
         nu_dot = self.Minv @ (self.tau - np.matmul(self.C,self.nu_r) - np.matmul(self.D,self.nu_r) - self.g_vec)
-
-        #np.set_printoptions(precision=1)
-        #print(f"tau: {self.tau}")
-
         eta_dot = self.eta_dynamics(eta, nu)
-
         u_dot = self.actuator_dynamics(u, u_ref)
-
         x_dot = np.concatenate([eta_dot, nu_dot, u_dot])
 
         return x_dot
@@ -477,7 +466,7 @@ class SimpleSAM():
         """
         Enforce actuation limits on each actuator.
         """
-        u_bound = u.copy()
+        u_bound = np.copy(u)
 
         # FIXME: We control based on percentages right now.
         #   If we want to send something different, we have to adjust here.
@@ -493,7 +482,7 @@ class SimpleSAM():
         elif u[1] < 0:
             u_bound[1] = 0
         else:
-            u_bound = u[1]
+            u_bound[1] = u[1]
 
         return u_bound
 
@@ -646,6 +635,9 @@ class SimpleSAM():
         """
         Calculate damping
         """
+        # FIXME: All parameters are best guesses right now. They need to be
+        # properly identified.
+
         # Damping matrix based on Bhat 2021
         # Parameters from smarc_advanced_controllers mpc_inverted_pendulum...
         # Damping coefficients
@@ -664,24 +656,23 @@ class SimpleSAM():
         self.D = np.zeros((6,6))
 
         # Nonlinear damping
-        self.D[0,0] = Xuu * np.abs(x[0])
-        self.D[1,1] = Yvv * np.abs(x[1])
-        self.D[2,2] = Zww * np.abs(x[2])
-        self.D[3,3] = Kpp * np.abs(x[3])
-        self.D[4,4] = Mqq * np.abs(x[4])
-        self.D[5,5] = Nrr * np.abs(x[5])
+        self.D[0,0] = Xuu * np.abs(self.nu_r[0])
+        self.D[1,1] = Yvv * np.abs(self.nu_r[1])
+        self.D[2,2] = Zww * np.abs(self.nu_r[2])
+        self.D[3,3] = Kpp * np.abs(self.nu_r[3])
+        self.D[4,4] = Mqq * np.abs(self.nu_r[4])
+        self.D[5,5] = Nrr * np.abs(self.nu_r[5])
 
         # Cross couplings
-        self.D[4,0] = Xuu * np.abs(x[0]) * z_cp
-        self.D[5,0] = -Xuu * np.abs(x[0]) * y_cp
-        self.D[3,1] = -z_cp * Yvv * np.abs(x[1])
-        self.D[5,1] = x_cp * Yvv * np.abs(x[1])
-        self.D[3,2] = y_cp * Zww * np.abs(x[2])
-        self.D[4,2] = -x_cp * Zww * np.abs(x[2])
+        self.D[4,0] = z_cp * Xuu * np.abs(self.nu_r[0])
+        self.D[5,0] = -y_cp * Xuu * np.abs(self.nu_r[0])
+        self.D[3,1] = -z_cp * Yvv * np.abs(self.nu_r[1])
+        self.D[5,1] = x_cp * Yvv * np.abs(self.nu_r[1])
+        self.D[3,2] = y_cp * Zww * np.abs(self.nu_r[2])
+        self.D[4,2] = -x_cp * Zww * np.abs(self.nu_r[2])
 
-
-        
         # Fossen's remus100 damping matrix
+        # Doesn't include the cross-couplings, as seen above
         ## Natural frequencies in roll and pitch
         #self.w_roll = math.sqrt(self.W * (self.p_OG_O[2] - self.p_OB_O[2]) /
         #                        self.M[3][3])
@@ -715,24 +706,17 @@ class SimpleSAM():
               like an ROV when we dive statically.
         """
         tau_liftdrag = forceLiftDrag(self.diam, self.S, self.CD_0, self.alpha, self.nu)
-        #tau_liftdrag = forceLiftDrag(self.diam, self.S, self.CD_0, self.alpha, self.U_r)
         tau_crossflow = crossFlowDrag(self.L, self.diam, self.diam, self.nu_r)
         tau_prop = self.calculate_propeller_force(x, u)
 
-        np.set_printoptions(precision=3)
-        #print(f"tau_lift: {tau_liftdrag}")
-        #print(f"tau_cross: {tau_crossflow}")
-        #print(f"tau_prop: {tau_prop}")
-
+        # NOTE: We updated the damping to include the cross-couplings. That's
+        # why we set liftdrag and crossflow to zero. Further investigation is
+        # needed if that's correct or not. The current behaviour matches SAM
+        # fairly well.
         tau_liftdrag = np.zeros(6)
         tau_crossflow = np.zeros(6)
 
-
         self.tau = tau_liftdrag + tau_crossflow + tau_prop
-
-        #print(f"tau: {self.tau}")
-
-        print(f"tau: {self.tau[5]:.6f}, tau_cf: {tau_crossflow[5]:.6f}, tau_prop: {tau_prop[5]:.6f}")
 
 
     def calculate_propeller_force(self, x, u):
