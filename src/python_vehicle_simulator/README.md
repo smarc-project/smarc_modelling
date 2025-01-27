@@ -68,9 +68,9 @@ returns
 \dot{x} = f(x, u_{\text{ref}}),
 ```
 where $$x = \[\eta, \nu, u_{\text{current}}\]^T$$. Subsequently, we have
-$$\dot{x} = \[\dot{\eta}, \dot{\nu}, \dot{u_{\text{current}}}\]^T$$. We
+$\dot{x} = \[\dot{\eta}, \dot{\nu}, \dot{u_{\text{current}}}\]^T$. We
 calculate $$\dot{\eta}$$ in the eta\_dynamics function and
-$$\dot{u_{\text{current}}}$$ in the actuator\_dynamics. $$\dot{\nu}$$ follows
+$\dot{u_{\text{current}}}$ in the actuator\_dynamics. $\dot{\nu}$ follows
 from eq. 8.2 as
 ```math
 \dot{\nu} = M^{-1}\left(\tau - C(\nu_r)\nu_r - D(\nu_r)\nu_r - g(\eta)\right).
