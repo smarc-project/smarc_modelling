@@ -25,7 +25,12 @@ wrapper to interface with SimpleSAM.
 If you want to write your own controller, take charge and provide an input u in
 the dynamics wrapper. This is also how you would interact with the model if you
 want to use it in e.g. a MPC scheme. Then you can write your own integration
-method or use what your optimization sovler provides.
+method or use what your optimization sovler provides, just call it with 
+```python
+sam = SimpleSAM(dt)
+sam.dynamics(x,u)
+```
+where `x` is the appropriate state space vector and `u` your desired control input.
 
 ### Plots
 
@@ -68,9 +73,9 @@ returns
 \dot{x} = f(x, u_{\text{ref}}),
 ```
 where $x = \[\eta, \nu, u_{\text{current}}\]^T$. Subsequently, we have
-$\dot{x} = \[\dot{\eta}, \dot{\nu}, \dot{u}_{\text{current}}\]^T$. We
+$\dot{x} = \[\dot{\eta}, \dot{\nu}, \dot{u}\_{\text{current}}\]^T$. We
 calculate $\dot{\eta}$ in the eta\_dynamics function and
-$\dot{u}_{\text{current}}$ in the actuator\_dynamics. $\dot{\nu}$ follows
+$\dot{u}\_{\text{current}}$ in the actuator\_dynamics. $\dot{\nu}$ follows
 from eq. 8.2 as
 ```math
 \dot{\nu} = M^{-1}\left(\tau - C(\nu_r)\nu_r - D(\nu_r)\nu_r - g(\eta)\right).
