@@ -4,7 +4,7 @@
 Fossen's python vehicle simulator.
 
 ## Running Things:
-To run the simulator, call `simple\_sam\_sim.py`. It instantiates a SimpleSAM
+To run the simulator, call `simple_sam_sim.py`. It instantiates a SimpleSAM
 object. 
 
 ### Set Initial Conditions
@@ -50,9 +50,9 @@ M\dot{\nu_r} + C(\nu_r)&\nu_r + D(\nu_r)\nu_r + g(\eta) = \tau
 \end{align}
 ```
 
-The model outputs `x\_dot`, where `x` is the state vector as defined above.
-Furthermore, the model takes `u\_ref`, a desired control input that is provided
-to the actuator\_dynamics that calculate the actual actuator input to take the
+The model outputs `x_dot`, where `x` is the state vector as defined above.
+Furthermore, the model takes `u_ref`, a desired control input that is provided
+to the `actuator_dynamics` that calculate the actual actuator input to take the
 VBS and LCG dynamics into account as well.
 
 ### \_\_init\_\_
