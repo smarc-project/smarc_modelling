@@ -15,7 +15,7 @@ import numpy as np
 import math
 from sympy import symbols, lambdify
 from scipy.interpolate import PchipInterpolator, CubicSpline, interp1d
-from scipy.spatial.transform import Rotation
+from scipy.spatial.transform import Rotation as R
 
 #------------------------------------------------------------------------------
 
@@ -239,107 +239,6 @@ def Rzyx(phi,theta,psi):
 #------------------------------------------------------------------------------
 
 
-
-
-
-# ------------------------------------------------------------------------------
-def dcm_to_quaternion(dcm):
-    """
-    Convert a Direction Cosine Matrix (DCM) to a quaternion, with the real part as the last element.
-
-    Parameters:
-    dcm (numpy.ndarray): A 3x3 direction cosine matrix representing the rotation.
-
-    Returns:
-    numpy.ndarray: A 4-element array representing the quaternion [q1, q2, q3, q0],
-                   where q0 is the real (scalar) part.
-    """
-    # Ensure the input is a 3x3 matrix
-    if dcm.shape != (3, 3):
-        raise ValueError("DCM must be a 3x3 matrix")
-
-    # Calculate the trace of the matrix
-    trace = np.trace(dcm)
-
-    # Initialize the quaternion array
-    quaternion = np.zeros(4)
-
-    # Calculate the quaternion components based on the trace
-    if trace > 0:
-        # When the trace is positive, calculate the scalar part q0 (real) first
-        s = np.sqrt(trace + 1.0) * 2  # s = 4 * q0
-        quaternion[3] = 0.25 * s  # q0 is the real part, stored as the last element
-        quaternion[0] = -(dcm[2, 1] - dcm[1, 2]) / s
-        quaternion[1] = -(dcm[0, 2] - dcm[2, 0]) / s
-        quaternion[2] = -(dcm[1, 0] - dcm[0, 1]) / s
-    elif (dcm[0, 0] > dcm[1, 1]) and (dcm[0, 0] > dcm[2, 2]):
-        # If the element at (0,0) is the largest on the diagonal
-        s = np.sqrt(1.0 + dcm[0, 0] - dcm[1, 1] - dcm[2, 2]) * 2  # s = 4 * q1
-        quaternion[3] = -(dcm[2, 1] - dcm[1, 2]) / s
-        quaternion[0] = 0.25 * s
-        quaternion[1] = (dcm[0, 1] + dcm[1, 0]) / s
-        quaternion[2] = (dcm[0, 2] + dcm[2, 0]) / s
-    elif dcm[1, 1] > dcm[2, 2]:
-        # If the element at (1,1) is the largest on the diagonal
-        s = np.sqrt(1.0 + dcm[1, 1] - dcm[0, 0] - dcm[2, 2]) * 2  # s = 4 * q2
-        quaternion[3] = -(dcm[0, 2] - dcm[2, 0]) / s
-        quaternion[0] = (dcm[0, 1] + dcm[1, 0]) / s
-        quaternion[1] = 0.25 * s
-        quaternion[2] = (dcm[1, 2] + dcm[2, 1]) / s
-    else:
-        # If the element at (2,2) is the largest on the diagonal
-        s = np.sqrt(1.0 + dcm[2, 2] - dcm[0, 0] - dcm[1, 1]) * 2  # s = 4 * q3
-        quaternion[3] = -(dcm[1, 0] - dcm[0, 1]) / s
-        quaternion[0] = (dcm[0, 2] + dcm[2, 0]) / s
-        quaternion[1] = (dcm[1, 2] + dcm[2, 1]) / s
-        quaternion[2] = 0.25 * s
-
-    # Normalize the quaternion to ensure it's a unit quaternion
-    quaternion /= np.linalg.norm(quaternion)
-
-    return quaternion
-# ------------------------------------------------------------------------------
-
-
-# ------------------------------------------------------------------------------
-def quat_to_dcm_closed_form(q):
-    """
-    Converts a quaternion [q1, q2, q3, q0] to a Direction Cosine Matrix (DCM)
-    using the closed-form expression.
-
-    Parameters:
-        q (list or numpy array): Quaternion [q1, q2, q3, q0], where q1, q2, q3
-                                 are the vector components and q0 is the scalar part.
-
-    Returns:
-        numpy array: 3x3 Direction Cosine Matrix (DCM)
-    """
-    # Extract quaternion components
-    q1, q2, q3, q0 = q
-
-    # Construct the vector part and scalar part
-    q_vec = np.array([q1, q2, q3])
-    q0_squared = q0 ** 2
-
-    # Identity matrix
-    I = np.identity(3)
-
-    # Outer product of the vector part
-    qqT = np.outer(q_vec, q_vec)
-
-    # Skew-symmetric matrix of the vector part
-    q_cross = Smtrx(q_vec)
-
-    # Compute the DCM using the closed-form expression
-    DCM = (2 * q0_squared - 1) * I + 2 * qqT - 2 * q0 * q_cross
-
-    return DCM
-
-# ------------------------------------------------------------------------------
-
-
-
-
 # ------------------------------------------------------------------------------
 
 def quaternion_to_dcm(q):
@@ -354,91 +253,23 @@ def quaternion_to_dcm(q):
     Returns:
         numpy array: 3x3 Direction Cosine Matrix (DCM)
     """
-    q1, q2, q3, q0 = q
+    # FIXME: Replace with scipy rotation
+    #q1, q2, q3, q0 = q
 
-    # Compute the elements of the DCM
-    dcm = np.array([
-        [1 - 2 * (q2**2 + q3**2), 2 * (q1 * q2 - q3 * q0), 2 * (q1 * q3 + q2 * q0)],
-        [2 * (q1 * q2 + q3 * q0), 1 - 2 * (q1**2 + q3**2), 2 * (q2 * q3 - q1 * q0)],
-        [2 * (q1 * q3 - q2 * q0), 2 * (q2 * q3 + q1 * q0), 1 - 2 * (q1**2 + q2**2)]
-    ])
+    ## Compute the elements of the DCM
+    #dcm = np.array([
+    #    [1 - 2 * (q2**2 + q3**2), 2 * (q1 * q2 - q3 * q0), 2 * (q1 * q3 + q2 * q0)],
+    #    [2 * (q1 * q2 + q3 * q0), 1 - 2 * (q1**2 + q3**2), 2 * (q2 * q3 - q1 * q0)],
+    #    [2 * (q1 * q3 - q2 * q0), 2 * (q2 * q3 + q1 * q0), 1 - 2 * (q1**2 + q2**2)]
+    #])
+
+    # Scipy implementation same as Fossens quaternion implementation
+    rot = R.from_quat(q, scalar_first=True)
+    dcm = rot.as_matrix()
+
+    #print(f"DCM comp: {dcm-dcm_s}")
 
     return dcm
-# ------------------------------------------------------------------------------
-
-
-
-
-# ------------------------------------------------------------------------------
-
-def euler_to_quaternion(v, theta):
-    """
-    Converts an Euler vector and angle to a quaternion.
-
-    Parameters:
-        v (list or numpy array): The Euler vector [vx, vy, vz], representing the axis of rotation.
-        theta (float): The rotation angle in radians.
-
-    Returns:
-        numpy array: A quaternion [q1, q2, q3, q0], where q1, q2, q3 are the vector components
-                     and q0 is the scalar part (real term).
-    """
-    # Normalize the Euler vector to ensure it's a unit vector
-    v = np.array(v)
-    v_norm = np.linalg.norm(v)
-    if v_norm == 0:
-        raise ValueError("The Euler vector cannot be zero.")
-    v = v / v_norm
-
-    # Calculate the quaternion components
-    q_vector = v * np.sin(theta / 2)
-    q_real = np.cos(theta / 2)
-
-    # Combine vector and real parts into a quaternion
-    quaternion = np.array([q_vector[0], q_vector[1], q_vector[2], q_real])
-    return quaternion
-
-# ------------------------------------------------------------------------------
-
-
-
-
-
-# ------------------------------------------------------------------------------
-def quaternion_to_euler(q):
-    """
-    Converts a quaternion to an Euler vector and angle.
-
-    Parameters:
-        q (list or numpy array): A quaternion [q1, q2, q3, q0], where q1, q2, q3 are the vector
-                                 components and q0 is the scalar part (real term).
-
-    Returns:
-        tuple: A tuple containing the Euler vector [vx, vy, vz] and the rotation angle (in radians).
-    """
-    # Extract the quaternion components
-    q1, q2, q3, q0 = q
-    quaternion_norm = np.linalg.norm([q1, q2, q3, q0])
-    if quaternion_norm == 0:
-        raise ValueError("The quaternion cannot be zero.")
-    # Normalize the quaternion to ensure it's a unit quaternion
-    q1, q2, q3, q0 = q1 / quaternion_norm, q2 / quaternion_norm, q3 / quaternion_norm, q0 / quaternion_norm
-
-    # Compute the rotation angle
-    theta = 2 * np.arccos(q0)
-
-    # Calculate the sine of half the angle
-    sin_half_theta = np.sqrt(1 - q0 ** 2)
-
-    # Avoid division by zero by checking if sin_half_theta is very small
-    if sin_half_theta < 1e-6:
-        # The angle is close to zero, so any unit vector can be considered
-        v = [1, 0, 0]  # Default to the x-axis if there's no rotation
-    else:
-        # Calculate the Euler vector
-        v = [q1 / sin_half_theta, q2 / sin_half_theta, q3 / sin_half_theta]
-
-    return v, theta
 # ------------------------------------------------------------------------------
 
 
@@ -454,32 +285,37 @@ def quaternion_to_angles(q):
         q (list or numpy array): Quaternion [q1, q2, q3, q0]
 
     Returns:
-        tuple: Euler angles (phi, theta, psi) in radians
+        tuple: Euler angles (phi, theta, psi) in radians, that is phi=roll, theta=pitch, psi=yaw)
     """
-    q1, q2, q3, q0 = q
+    #q1, q2, q3, q0 = q
 
     # Compute Euler angles
-    psi = np.arctan2(2 * (q1 * q2 + q3 * q0), 1 - 2 * (q2**2 + q3**2))
-    theta = np.arcsin(np.clip(2 * (q1 * q3 - q2 * q0), -1, 1))
-    phi = np.arctan2(2 * (q2 * q3 + q1 * q0), 1 - 2 * (q1**2 + q2**2))
+    #psi = np.arctan2(2 * (q1 * q2 + q3 * q0), 1 - 2 * (q2**2 + q3**2))
+    #theta = np.arcsin(np.clip(2 * (q1 * q3 - q2 * q0), -1, 1))
+    #phi = np.arctan2(2 * (q2 * q3 + q1 * q0), 1 - 2 * (q1**2 + q2**2))
 
-    #rot = Rotation.from_quat(q)
-    #rot_euler = rot.as_euler('zyx')
+    rot = R.from_quat(q, scalar_first=True)
+    rot_euler = rot.as_euler('xyz')
     #psi_s, theta_s, phi_s = rot_euler
+    phi_s, theta_s, psi_s = rot_euler
 
-    q_x, q_y, q_z, q_w = q
+    #q_x, q_y, q_z, q_w = q
 
-    roll_x = np.arctan2(2 * (q_x * q_w + q_y * q_z), 1 - 2*(q_x**2 + q_y**2))
-    pitch_y = np.arcsin(2*(q_w*q_y - q_x*q_z))
-    yaw_z = np.arctan2(2*(q_w*q_z + q_x*q_y), 1-2*(q_y**2 + q_z**2))
+    #roll_x = np.arctan2(2 * (q_x * q_w + q_y * q_z), 1 - 2*(q_x**2 + q_y**2))
+    #pitch_y = np.arcsin(2*(q_w*q_y - q_x*q_z))
+    #yaw_z = np.arctan2(2*(q_w*q_z + q_x*q_y), 1-2*(q_y**2 + q_z**2))
 
-    #print(f"psi: {psi}, theta: {theta}, phi: {phi}")
-    #print(f"psi_s: {psi_s}, theta_s: {theta_s}, phi: {phi_s}")
-    #print(f"roll_x: {roll_x}, pitch_y: {pitch_y}, yaw_z: {yaw_z}")
+    #print(f"psi: {psi:.3f}, theta: {theta:.3f}, phi: {phi:.3f}")
+    #print(f"psi_s: {psi_s:.3f}, theta_s: {theta_s:.3f}, phi: {phi_s:.3f}")
+    #print(f"roll_x: {roll_x:.3f}, pitch_y: {pitch_y:.3f}, yaw_z: {yaw_z:.3f}")
 
-    psi = roll_x
-    theta = pitch_y
-    phi = yaw_z
+    #psi = roll_x
+    #theta = pitch_y
+    #phi = yaw_z
+
+    psi = psi_s
+    theta = theta_s
+    phi = phi_s
 
     return psi, theta, phi
 # ------------------------------------------------------------------------------
