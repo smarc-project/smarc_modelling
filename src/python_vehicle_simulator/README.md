@@ -35,8 +35,10 @@ trajectory which can be animated.
 
 The dynamics are based on Fossen 2021, ch. 8, eq. 8.1, 8.2.
 ```math
-\dot{\eta} = J_k(\eta)(\nu_r + \nu_c)\\
-M\dot{\nu_r} + C(\nu_r)\nu_r + D(\nu_r)\nu_r + g(\eta) = \tau
+\begin{align}
+\dot{\eta} &= J_k(\eta)(\nu_r + \nu_c) \\
+M\dot{\nu_r} + C(\nu_r)\nu_r + D(\nu_r)\nu_r + g(\eta) &= \tau
+\end{align}
 ```
 
 ### \_\_init\_\_
