@@ -5,6 +5,7 @@ from python_vehicle_simulator.lib import *
 #from python_vehicle_simulator.vehicles.SAM import SAM
 from python_vehicle_simulator.vehicles.SimpleSAM import SimpleSAM
 import matplotlib
+import matplotlib.pyplot as plt
 import mpl_toolkits.mplot3d.axes3d as p3
 matplotlib.use('TkAgg')  # or 'Qt5Agg', depending on what you have installed
 
