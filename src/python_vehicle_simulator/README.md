@@ -10,9 +10,9 @@ object.
 ### Set Initial Conditions
 
 Initial conditions are set in the beginning:
-    - eta0: provide \[x, y, z, q0, q1, q2, q3\], the pose in the world frame
-    - nu0: provide \[u, v, w, q, p, r\], the velocities in the body frame
-    - u0: provide \[vbs, lcg, ds, dr, rpm1, rpm2\], the control inputs for SAM. 
+- eta0: provide \[x, y, z, q0, q1, q2, q3\], the pose in the world frame
+- nu0: provide \[u, v, w, q, p, r\], the velocities in the body frame
+- u0: provide \[vbs, lcg, ds, dr, rpm1, rpm2\], the control inputs for SAM. 
 Note that SAM is neutral with vbs = 50 and lcg = 50.
 
 ### Simulate
@@ -37,7 +37,7 @@ The dynamics are based on Fossen 2021, ch. 8, eq. 8.1, 8.2.
 ```math
 \begin{align}
 \dot{\eta} &= J_k(\eta)(\nu_r + \nu_c) \\
-M\dot{\nu_r} + C(\nu_r)\nu_r + D(\nu_r)\nu_r + g(\eta) &= \tau
+M\dot{\nu_r} + C(\nu_r)&\nu_r + D(\nu_r)\nu_r + g(\eta) = \tau
 \end{align}
 ```
 
