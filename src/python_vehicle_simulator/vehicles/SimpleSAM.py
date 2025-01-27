@@ -9,7 +9,7 @@ SAM.py:
    The SAM AUV is controlled using counter-rotating propellers, a thrust vectoring system, a variable buoyancy system (VBS),
    and adjustable battery packs for center of gravity (c.g.) control. It is equipped with sensors such as IMU, DVL, GPS, and sonar.
 
-   The length of the AUV is 1.5 m, the cylinder diameter is 19 cm, and the mass of the vehicle is 31.9 kg.
+   The length of the AUV is 1.5 m, the cylinder diameter is 19 cm, and the mass of the vehicle is 17 kg.
    It has a maximum speed of 2.5 m/s, which is obtained when the propellers run at 1525 rpm in zero currents.
    SAM was developed by the Swedish Maritime Robotics Center and is underactuated, meaning it has fewer control inputs than
    degrees of freedom. The control system uses both static and dynamic actuation for different maneuvers.
@@ -29,14 +29,6 @@ SAM.py:
 
    SAM()
        Step input for tail rudder, stern plane, and propeller revolutions.
-
-   SAM('depthHeadingAutopilot',z_d,psi_d,rpm_1,rpm_2,V_c,beta_c)
-        z_d:    desired depth (m), positive downwards
-        psi_d:  desired yaw angle (deg)
-        rpm_1:  desired propeller revolution for propeller 1 (rpm)
-        rpm_2:  desired propeller revolution for propeller 2 (rpm)
-        V_c:    current speed (m/s)
-        beta_c: current direction (deg)
 
 Methods:
 
@@ -58,12 +50,6 @@ Methods:
         - **vbs**: Variable buoyancy system control, which adjusts buoyancy to control depth.
         - **lcg**: Longitudinal center of gravity adjustment by moving the battery pack to control pitch.
 
-    u = depthHeadingAutopilot(eta,nu,sampleTime)
-        Simultaneous control of depth and heading using PID and Sliding Mode Controllers (SMC).
-        The propeller RPMs are given as step commands, while thrust vectoring and c.g. control are used for precision adjustments.
-
-    u = stepInput(t) generates tail rudder, stern planes, and RPM step inputs for both propellers.
-
 References:
 
     Bhat, S., Panteli, C., Stenius, I., & Dimarogonas, D. V. (2023). Nonlinear model predictive control for hydrobatic AUVs:
@@ -77,14 +63,10 @@ Author:     Omid Mirzaeedodangeh
 
 Refactored: David Doerner
 """
-import sys
 
 import numpy as np
 import math
-from scipy.interpolate import PchipInterpolator, CubicSpline, interp1d
 from scipy.linalg import block_diag
-from sympy.functions.elementary.piecewise import piecewise_simplify
-from python_vehicle_simulator.lib.control import integralSMC
 from python_vehicle_simulator.lib.gnc import *
 
 
@@ -141,7 +123,7 @@ class VariableBuoyancySystem:
         self.x_vbs_min = 0  # Minimum VBS position (m)
         self.x_vbs_max = l_vbs_l  # Maximum VBS position (m)
         self.x_vbs_dot_min = -0.1  # Maximum retraction speed (m/s)
-        self.x_vbs_dot_max = 0.1  # Maximum extension speed (m/s)
+        self.x_vbs_dot_max = 10 # FIXME: This is an estimate. Need to adjust, since the speed is given in mm/s, but we control on percentages right now. Maximum extension speed (m/s)
 
 
 class LongitudinalCenterOfGravityControl:
@@ -172,7 +154,7 @@ class LongitudinalCenterOfGravityControl:
         self.x_lcg_min = 0  # Minimum LCG position (m)
         self.x_lcg_max = l_lcg_r  # Maximum LCG position (m)
         self.x_lcg_dot_min = -0.1  # Maximum retraction speed (m/s)
-        self.x_lcg_dot_max = 0.1  # Maximum extension speed (m/s)
+        self.x_lcg_dot_max = 15  # FIXME: This is an estimate. Need to adjust, since the speed is given in mm/s, but we control on percentages right now. Maximum extension speed (m/s)
 
 #
 #class ThrusterShaft:
@@ -237,7 +219,7 @@ class Propellers:
 
 
 # Class Vehicle
-class SimpleSAM:
+class SimpleSAM():
     """
     SAM()
         Integrates all subsystems of the Small and Affordable Maritime AUV.
@@ -258,9 +240,12 @@ class SimpleSAM:
 
     def __init__(
             self,
+            dt=0.02,
             V_current=0,
             beta_current=0,
     ):
+        self.dt = dt # Sim time step, necessary for evaluation of the actuator dynamics
+
         # Constants
         self.p_OC_O = np.array([-0.75, 0, 0.06], float)  # Measurement frame C in CO (O)
         self.D2R = math.pi / 180  # Degrees to radians
@@ -276,8 +261,8 @@ class SimpleSAM:
 
         # Initialize state vectors
         self.nu = np.zeros(6)  # [u, v, w, p, q, r]
-        self.eta = np.zeros(6)  # [x, y, z, q1, q2, q3, q0]
-        #self.eta[6] = 1.0  # Initialize quaternion to identity rotation
+        self.eta = np.zeros(7)  # [x, y, z, q0, q1, q2, q3]
+        self.eta[3] = 1.0
 
         # Initialize the AUV model
         self.name = ("SAM")
@@ -285,19 +270,12 @@ class SimpleSAM:
         self.diam = self.d_SS  # cylinder diameter (m)
 
         # Hydrodynamics (Fossen 2021, Section 8.4.2)
-        self.S = 0.7 * self.L * self.diam  # S = 70% of rectangle L * diam
         self.a = self.L / 2  # semi-axes
         self.b = self.diam / 2
 
         self.p_OG_O = np.array([0., 0, 0.12], float)  # CG w.r.t. to the CO, we
                                                         # recalculate that in calculate_cg
         self.p_OB_O = np.array([0., 0, 0], float)  # CB w.r.t. to the CO
-
-        # Parasitic drag coefficient CD_0, i.e. zero lift and alpha = 0
-        # F_drag = 0.5 * rho * Cd * (pi * b^2)
-        # F_drag = 0.5 * rho * CD_0 * S
-        Cd = 0.42  # from Allen et al. (2000) # NOTE: Do we know this value? Do we need to estimate it?
-        self.CD_0 = Cd * math.pi * self.b ** 2 / self.S
 
         # Rigid-body mass matrix expressed in CO
         self.x_vbs = 0.0
@@ -318,20 +296,12 @@ class SimpleSAM:
         self.M = np.zeros((6,6)) #self.MRB + self.MA
         self.Minv = np.zeros((6,6)) #np.linalg.inv(self.M)
 
-        # Natural frequencies in roll and pitch
-        self.w_roll = 0.0 
-        self.w_pitch = 0.0 
-
-        # Low-speed linear damping matrix parameters
-        self.T_surge = 20  # time constant in surge (s)
-        self.T_sway = 20  # time constant in sway (s)
-        self.T_heave = self.T_sway  # equal for for a cylinder-shaped AUV
-        self.zeta_roll = 0.3  # relative damping ratio in roll
-        self.zeta_pitch = 0.8  # relative damping ratio in pitch
-        self.T_yaw = 1  # time constant in yaw (s)
-
 
     def init_vehicle(self):
+        """
+        Initialize all subsystems based on their respective parameters
+        """
+
 #        # Initialize subsystems
         self.l_SS=1.5
         self.d_SS=0.19
@@ -399,8 +369,8 @@ class SimpleSAM:
                 np.zeros(3) #np.array([0.075, 0, -0.03])
             ],
             r_t_p_sh=[
-                np.zeros(3), #np.array([0.3, 0, 0]),
-                np.zeros(3) #np.array([0.4, 0, 0])
+                np.array([0.03, 0, 0]),
+                np.array([0.04, 0, 0])
             ],
             J_t_p=[
                 np.zeros((3,3)), #np.array([[0.3, 0, 0], [0, 0.4, 0], [0, 0, 0.5]]),
@@ -410,7 +380,7 @@ class SimpleSAM:
 
 
 
-    def dynamics(self, x, u):
+    def dynamics(self, x, u_ref):
         """
         Main dynamics function for integrating the complete AUV state.
 
@@ -424,44 +394,55 @@ class SimpleSAM:
         Returns:
             state_vector_dot: Time derivative of complete state vector
         """
+        eta = x[0:7]
+        nu = x[7:13]
+        u = x[13:19]
 
-        # For quaternions
-        #eta = x[0:7]
-        #nu = x[7:13]
-
-        # For Euler angles
-        eta = x[0:6]
-        nu = x[6:12]
+        u = self.bound_actuators(u)
+        u_ref = self.bound_actuators(u_ref)
 
         self.calculate_system_state(nu, eta, u)
-        self.calculate_cg(nu, u)
-        self.update_inertias(nu, u)
-        self.calculate_M(nu, u)
-        self.calculate_C(nu, u)
-        self.calculate_D(nu, u)
+        self.calculate_cg()
+        self.update_inertias()
+        self.calculate_M()
+        self.calculate_C()
+        self.calculate_D()
         self.calculate_g()
-        self.calculate_tau(nu, u)
-
-        #self.Minv = np.eye(6)
-        #self.C = np.zeros((6,6))
-        #self.D = np.zeros((6,6))
+        self.calculate_tau(u)
 
         nu_dot = self.Minv @ (self.tau - np.matmul(self.C,self.nu_r) - np.matmul(self.D,self.nu_r) - self.g_vec)
-
         eta_dot = self.eta_dynamics(eta, nu)
-
-        x_dot = np.concatenate([eta_dot, nu_dot])
-
-
-        np.set_printoptions(precision=1)
-        #print(f"tau: {self.tau}")
-        #print(f"nu_dot: {nu_dot}")
-        #print(f"M: {self.M}")
-        #print(f"MRB: {self.MRB}")
-        #print(f"MA: {self.MA}")
-        #print(f"Minv: {self.Minv}")
+        u_dot = self.actuator_dynamics(u, u_ref)
+        x_dot = np.concatenate([eta_dot, nu_dot, u_dot])
 
         return x_dot
+
+    def bound_actuators(self, u):
+        """
+        Enforce actuation limits on each actuator.
+        """
+        u_bound = np.copy(u)
+
+        # NOTE: We control based on percentages right now.
+        #   If we want to send something different, we have to adjust here.
+        if u[0] > 100: #self.vbs.x_vbs_max:
+            u_bound[0] = 100 #self.vbs.x_vbs_max
+        elif u[0] < 0: #self.vbs.x_vbs_min:
+            u_bound[0] = 0 #self.vbs.x_vbs_min
+        else:
+            u_bound[0] = u[0]
+
+        if u[1] > 100:
+            u_bound[1] = 100
+        elif u[1] < 0:
+            u_bound[1] = 0
+        else:
+            u_bound[1] = u[1]
+
+        # FIXME: Add the remaining actuator limits
+        # FIXME: call them as variable
+
+        return u_bound
 
 
     def calculate_system_state(self, x, eta, u_control):
@@ -469,14 +450,14 @@ class SimpleSAM:
         Extract speeds etc. based on state and control inputs
         """
         nu = x
-        # Extract Euler angles
-        #q = eta[3:7]
-        #self.phi, self.theta, self.psi = quaternion_to_angles(q) # NOTE: the function uses quaternions as q1, q2, q3, q0
 
-        self.phi, self.theta, self.psi = eta[3:6] 
+        # Extract Euler angles
+        quat = eta[3:7]
+        quat = quat/np.linalg.norm(quat)
+        self.psi, self.theta, self.phi = quaternion_to_angles(quat) 
 
         # Relative velocities due to current
-        u, v, w, p, q, r = nu
+        u, v, w, _, _, _ = nu
         u_c = self.V_c * math.cos(self.beta_c - self.psi)
         v_c = self.V_c * math.sin(self.beta_c - self.psi)
         self.nu_c = np.array([u_c, v_c, 0, 0, 0, 0], float)
@@ -498,7 +479,7 @@ class SimpleSAM:
         self.m = self.m_ss + self.m_vbs + self.m_lcg
 
 
-    def calculate_cg(self, x, u):
+    def calculate_cg(self):
         """
         Compute the center of gravity based on VBS and LCG position
         """
@@ -507,7 +488,7 @@ class SimpleSAM:
                     + (self.m_lcg/self.m) * self.p_OLcg_O
 
 
-    def update_inertias(self, x,u):
+    def update_inertias(self):
         """
         Update inertias based on VBS and LCG
         Note: The propellers add more torque rather than momentum by moving.
@@ -549,21 +530,18 @@ class SimpleSAM:
 
         self.J_total = J_ss_co + J_vbs_co + J_lcg_co
 
-    def calculate_M(self, x, u):
+
+    def calculate_M(self):
+        """
+        Calculated the mass matrix M
+        """
 
         # Rigid-body mass matrix expressed in CO
         m_diag = np.diag([self.m, self.m, self.m])
 
-        MRB_CG = block_diag(m_diag, self.J_total)
-        # NOTE: We calculate J_total already in the CO,
-        #   That's why we don't use the additional transformation below,
-        #   but set MRB_CG = MRB. Not quite right with the masses, but
-        #   close enough.
-
-        #H_rg = Hmtrx(self.p_OG_O)
-        #self.MRB = H_rg.T @ MRB_CG @ H_rg  # MRB expressed in the CO
-
-        self.MRB = MRB_CG
+        # Rigid-body mass matrix with total inertia in CO
+        MRB_CO = block_diag(m_diag, self.J_total)
+        self.MRB = MRB_CO
 
         # Added moment of inertia in roll: A44 = r44 * Ix
         r44 = 0.3
@@ -581,22 +559,25 @@ class SimpleSAM:
                 (2 - e ** 2) * (2 * e ** 2 - (2 - e ** 2) * (beta_0 - alpha_0)))
 
         # Added mass system matrix expressed in the CO
-        self.MA = np.diag([self.m * k1, self.m * k2, self.m * k2, MA_44, k_prime * self.J_total[1,1], k_prime * self.J_total[1,1]])
+        self.MA = np.diag([self.m * k1,
+                           self.m * k2,
+                           self.m * k2,
+                           MA_44,
+                           k_prime * self.J_total[1,1],
+                           k_prime * self.J_total[1,1]])
 
         # Mass matrix including added mass
         self.M = self.MRB + self.MA
-
         self.Minv = np.linalg.inv(self.M)
 
 
-    def calculate_C(self, x, u):
+    def calculate_C(self):
         """
         Calculate Corriolis Matrix
         """
         CRB = m2c(self.MRB, self.nu_r)
         CA = m2c(self.MA, self.nu_r)
 
-        # Zero certain CA terms if originally done so
         CA[4, 0] = 0
         CA[0, 4] = 0
         CA[4, 2] = 0
@@ -608,54 +589,73 @@ class SimpleSAM:
 
         self.C = CRB + CA
 
-    def calculate_D(self, x, u):
+    def calculate_D(self):
         """
         Calculate damping
         """
-        # Natural frequencies in roll and pitch
-        self.w_roll = math.sqrt(self.W * (self.p_OG_O[2] - self.p_OB_O[2]) /
-                                self.M[3][3])
-        self.w_pitch = math.sqrt(self.W * (self.p_OG_O[2] - self.p_OB_O[2]) /
-                                 self.M[4][4])
-        # Damping
-        self.D = np.diag([
-            self.M[0, 0] / self.T_surge,
-            self.M[1, 1] / self.T_sway,
-            self.M[2, 2] / self.T_heave,
-            self.M[3, 3] * 2 * self.zeta_roll * self.w_roll,
-            self.M[4, 4] * 2 * self.zeta_pitch * self.w_pitch,
-            self.M[5, 5] / self.T_yaw
-        ])
-        self.D[0, 0] *= math.exp(-3 * self.U_r)
-        self.D[1, 1] *= math.exp(-3 * self.U_r)
+        # Damping matrix based on Bhat 2021
+        # Parameters from smarc_advanced_controllers mpc_inverted_pendulum...
+        # NOTE: These need to be identified properly
+        # Damping coefficients
+        Xuu = 3 #100     # x-damping
+        Yvv = 50    # y-damping
+        Zww = 50    # z-damping
+        Kpp = 40    # Roll damping
+        Mqq = 200    # Pitch damping
+        Nrr = 10    # Yaw damping
+
+        # Center of effort -> where the thrust force acts?
+        x_cp = 0.1
+        y_cp = 0
+        z_cp = 0
+
+        self.D = np.zeros((6,6))
+
+        # Nonlinear damping
+        self.D[0,0] = Xuu * np.abs(self.nu_r[0])
+        self.D[1,1] = Yvv * np.abs(self.nu_r[1])
+        self.D[2,2] = Zww * np.abs(self.nu_r[2])
+        self.D[3,3] = Kpp * np.abs(self.nu_r[3])
+        self.D[4,4] = Mqq * np.abs(self.nu_r[4])
+        self.D[5,5] = Nrr * np.abs(self.nu_r[5])
+
+        # Cross couplings
+        self.D[4,0] = z_cp * Xuu * np.abs(self.nu_r[0])
+        self.D[5,0] = -y_cp * Xuu * np.abs(self.nu_r[0])
+        self.D[3,1] = -z_cp * Yvv * np.abs(self.nu_r[1])
+        self.D[5,1] = x_cp * Yvv * np.abs(self.nu_r[1])
+        self.D[3,2] = y_cp * Zww * np.abs(self.nu_r[2])
+        self.D[4,2] = -x_cp * Zww * np.abs(self.nu_r[2])
 
     def calculate_g(self):
         """
         Calculate gravity vector
         """
         self.W = self.m * self.g
-
         self.g_vec = gvect(self.W, self.B, self.theta, self.phi, self.p_OG_O, self.p_OB_O)
 
-    def calculate_tau(self, x, u):
+
+    def calculate_tau(self, u):
         """
         All external forces
 
-        Note: for forceLiftDrag, we use nu instead of U_r since SAM behaves
-              like an ROV when we dive statically.
+        Note: We use a non-diagonal damping matrix, that takes forceLiftDrag
+            and the crossFlowDrag, i.e. the cross-couplings in the damping already
+            into account. If you use a diagonal matrix, you have to add these
+            forces here, as shown in the commented code below:
+
+            tau_liftdrag = forceLiftDrag(self.diam, self.S, self.CD_0, self.alpha, self.nu)
+            tau_crossflow = crossFlowDrag(self.L, self.diam, self.diam, self.nu_r)
         """
-        tau_liftdrag = forceLiftDrag(self.diam, self.S, self.CD_0, self.alpha, self.nu)
-        #tau_liftdrag = forceLiftDrag(self.diam, self.S, self.CD_0, self.alpha, self.U_r)
-        tau_crossflow = crossFlowDrag(self.L, self.diam, self.diam, self.nu_r)
-        tau_prop = self.calculate_propeller_force(x, u)
-
-        self.tau = tau_liftdrag + tau_crossflow + tau_prop
+        tau_prop = self.calculate_propeller_force(u)
+        self.tau = tau_prop
 
 
-    def calculate_propeller_force(self, x, u):
+    def calculate_propeller_force(self, u):
         """
         Calculate force and torque of the propellers
         u: control inputs as [x_vbs, x_lcg, delta_s, delta_r, rpm1, rpm2]
+        Azimuth Thrusters: Fossen 2021, ch.9.4.2
         """
         delta_s = u[2]
         delta_r = u[3]
@@ -665,8 +665,7 @@ class SimpleSAM:
         C_T2C = calculate_dcm(order=[2, 3], angles=[delta_s, delta_r])
 
         D_prop = 0.14
-        t_prop = 0.1
-        n_rps = n_rpm / 60   # NOTE: This assumes that rpm is the third entry
+        n_rps = n_rpm / 60   
         Va = 0.944 * self.U
 
         KT_0 = 0.4566
@@ -675,54 +674,27 @@ class SimpleSAM:
         KQ_max = 0.0312
         Ja_max = 0.6632
 
-        # Prop Omid
         tau_prop = np.zeros(6)
         for i in range(len(n_rpm)):
-
             if n_rps[i] > 0:
-                X_prop_i = self.rho * (D_prop ** 4) * (
-                        KT_0 * abs(n_rps[i]) * n_rps[i] +
-                        (KT_max - KT_0) / Ja_max * (Va / D_prop) * abs(n_rps[i])
-                )
-                K_prop_i = self.rho * (D_prop ** 5) * (
+                X_prop_i = self.rho*(D_prop**4)*(
+                        KT_0*abs(n_rps[i])*n_rps[i] +
+                        (KT_max-KT_0)/Ja_max * (Va/D_prop) * abs(n_rps[i]))
+                K_prop_i = self.rho * (D_prop**5) * (
                         KQ_0 * abs(n_rps[i]) * n_rps[i] +
-                        (KQ_max - KQ_0) / Ja_max * (Va / D_prop) * abs(n_rps[i])
-                )
+                        (KQ_max-KQ_0)/Ja_max * (Va/D_prop) * abs(n_rps[i]))
             else:
                 X_prop_i = self.rho * (D_prop ** 4) * KT_0 * abs(n_rps[i]) * n_rps[i]
                 K_prop_i = self.rho * (D_prop ** 5) * KQ_0 * abs(n_rps[i]) * n_rps[i]
-        
+
             F_prop_b = C_T2C @ np.array([X_prop_i, 0, 0])
             r_prop_i = C_T2C @ self.propellers.r_t_p_sh[i] - self.p_OC_O
-            M_prop_i = np.cross(r_prop_i, F_prop_b) + np.array([K_prop_i, 0, 0])
+            M_prop_i = np.cross(r_prop_i, F_prop_b) \
+                        + np.array([(-1)**i * K_prop_i, 0, 0])  # the -1 is because we have counter rotating
+                                    # propellers that are supposed to cancel out the propeller induced
+                                    # momentum
             tau_prop_i = np.concatenate([F_prop_b, M_prop_i])
             tau_prop += tau_prop_i
-        
-        # Prop Fossen
-        #if n_rps > 0:   # forward thrust
-        #    X_prop = self.rho * pow(D_prop,4) * ( 
-        #        KT_0 * abs(n_rps) * n_rps + (KT_max-KT_0)/Ja_max * 
-        #        (Va/D_prop) * abs(n_rps) )        
-        #    K_prop = self.rho * pow(D_prop,5) * (
-        #        KQ_0 * abs(n_rps) * n_rps + (KQ_max-KQ_0)/Ja_max * 
-        #        (Va/D_prop) * abs(n_rps) )           
-        #    
-        #else:    # reverse thrust (braking)
-        #
-        #    X_prop = self.rho * pow(D_prop,4) * KT_0 * abs(n_rps) * n_rps 
-        #    K_prop = self.rho * pow(D_prop,5) * KQ_0 * abs(n_rps) * n_rps 
-        #
-        ## Generalized force vector
-        #tau_prop = np.array([
-        #    (1-t_prop) * X_prop,
-        #    0, 
-        #    0,
-        #    K_prop / 10,   # scaled down by a factor of 10 to match exp. results
-        #    0, 
-        #    0
-        #    ], float)
-
-#        print(f"rpm: {u}")
 
         return tau_prop
 
@@ -736,9 +708,13 @@ class SimpleSAM:
         x_vbs = (u[0]/100) * self.vbs.l_vbs_l
         return x_vbs
 
+
     def calculate_lcg_position(self, u):
-
-
+        """
+        Calculate the position of the LCG based on control input. The control
+        input is scaled between 0 and 100. This function converts it to the
+        actual physical location.
+        """
 
         p_LcgPos_LcgO = np.array([(u[1]/100) * self.lcg.l_lcg_l, # Position of the LCG w.r.t fixed LCG point
                                  0, 0])
@@ -751,769 +727,57 @@ class SimpleSAM:
         Computes the time derivative of position and quaternion orientation.
 
         Args:
-            eta: [x, y, z, q1, q2, q3, q0] - Position and quaternion
+            eta: [x, y, z, q0, q1, q2, q3] - Position and quaternion
             nu: [u, v, w, p, q, r] - Body-fixed velocities
 
         Returns:
             eta_dot: [ẋ, ẏ, ż, q̇0, q̇1, q̇2, q̇3]
         """
         # Extract position and quaternion
-        #pos = eta[0:3]
-        #q = eta[3:7]  # [q1, q2, q3, q0] where q0 is scalar part
+        q = eta[3:7]  # [q0, q1, q2, q3] where q0 is scalar part
 
-        ## Convert quaternion to DCM for position kinematics
-        #C = quaternion_to_dcm(q)
+        q = q/np.linalg.norm(q)
 
-        ## Position dynamics: ṗ = C * v
-        #pos_dot = C @ nu[0:3]
+        # Convert quaternion to DCM for position kinematics
+        C = quaternion_to_dcm(q)
 
-        ## Quaternion dynamics: q̇ = 1/2 * Ω * q where Ω is the quaternion kinematic matrix
-        #omega = nu[3:6]  # Angular velocity
-        #Omega = np.array([
-        #    [0, -omega[0], -omega[1], -omega[2]],
-        #    [omega[0], 0, omega[2], -omega[1]],
-        #    [omega[1], -omega[2], 0, omega[0]],
-        #    [omega[2], omega[1], -omega[0], 0]
-        #])
-        #q_dot = 0.5 * Omega @ q
+        # Position dynamics: ṗ = C * v
+        pos_dot = C @ nu[0:3]
 
-        #return np.concatenate([pos_dot, q_dot])
+        om = nu[3:6]  # Angular velocity
+        gamma = 100
 
-        # For Euler angles
-        p_dot   = np.matmul( Rzyx(eta[3], eta[4], eta[5]), nu[0:3] )
-        v_dot   = np.matmul( Tzyx(eta[3], eta[4]), nu[3:6] )
+        ## From Fossen 2021, eq. 2.78:
+        q0, q1, q2, q3 = q
+        T_q_n_b = 0.5 * np.array([
+                                 [-q1, -q2, -q3],
+                                 [q0, -q3, q2],
+                                 [q3, q0, -q1],
+                                 [-q2, q1, q0]
+                                 ])
+        q_dot = T_q_n_b @ om + gamma/2 * (1 - q.T.dot(q)) * q
 
-        return np.concatenate([p_dot, v_dot])
+        return np.concatenate([pos_dot, q_dot])
 
-##############################################################################
-#
-# OMIDS MODEL
-#
-#    def calculate_vbs(self, ksi, ksi_dot, ksi_ddot):
-#        """
-#        Calculates the VBS contribution to the moment of inertia and its derivative, including additional terms.
-#
-#        Args:
-#          ksi (list): Vector of time-varying parameters:
-#            - ksi[0] (float): x_vbs, position of the VBS (m).
-#            - ksi[1] (float): x_lcg, position of the LCG (m).
-#            - ksi[2] (float): delta_e, stern plane angle (rad).
-#            - ksi[3] (float): delta_r, rudder angle (rad).
-#            - ksi[4:] (list): theta_rpm_i, angles of rotation of each propeller \( i \) (list of floats).
-#
-#          ksi_dot (list): First derivatives of time-varying parameters:
-#            - ksi_dot[0] (float): x_dot_vbs, velocity of the VBS (m/s).
-#            - ksi_dot[1] (float): x_dot_lcg, velocity of the LCG (m/s).
-#            - ksi_dot[2] (float): delta_e_dot, rate of change of stern plane angle (rad/s).
-#            - ksi_dot[3] (float): delta_r_dot, rate of change of rudder angle (rad/s).
-#            - ksi_dot[4:] (list): theta_dot_rpm_i, rates of change of propeller angles (rad/s).
-#
-#          ksi_ddot (list): Second derivatives of time-varying parameters:
-#            - ksi_ddot[0] (float): x_ddot_vbs, Acceleration of the VBS (m/s^2).
-#            - ksi_ddot[1] (float): x_dot_lcg, Acceleration of the LCG (m/s^2).
-#            - ksi_ddot[2] (float): delta_e_ddot, Acceleration of stern plane angle (rad/s^2).
-#            - ksi_ddot[3] (float): delta_r_ddot, Acceleration of rudder angle (rad/s^2).
-#            - ksi_ddot[4:] (list): theta_ddot_rpm_i, Acceleration of propeller angles (rad/s^2).
-#
-#        Returns:
-#            dict: A dictionary containing: SI Units (Kg, m ,s)
-#                - J_vbs_total (np.array): Total moment of inertia for VBS in the body frame. (3x3 matrix)
-#                - J_dot_vbs_total (np.array): Time derivative of the total moment of inertia for VBS in the body frame. (3x3 matrix)
-#                - J_vbs_shaft (np.array): Total moment of inertia for VBS in the body frame. (3x3 matrix)
-#                - J_dot_vbs_shaft (np.array): Time derivative of the total moment of inertia for VBS in the body frame. (3x3 matrix)
-#                - J_vbs_water (np.array): Total moment of inertia for VBS in the body frame. (3x3 matrix)
-#                - J_dot_vbs_water (np.array): Time derivative of the water moment of inertia for VBS in the body frame. (3x3 matrix)
-#                - m_vbs_w (float): Mass of VBS water.
-#                - m_dot_vbs_w (float): Derivative of VBS water mass.
-#                - m_ddot_vbs_w (float): Second derivative of VBS water mass.
-#                - r_vbs_sh (np.array): CG position of the VBS shaft in Central frame. (3x1 vector)
-#                - r_vbs_w (np.array): CG position of the VBS water in Central frame. (3x1 vector)
-#                - r_dot_vbs_sh (np.array): Velocity of the VBS shaft CG in body frame. (3x1 vector)
-#                - r_dot_vbs_w (np.array): Velocity of the VBS water CG in body frame. (3x1 vector)
-#                - r_ddot_vbs_sh (np.array): Acceleration of the VBS shaft CG in body frame. (3x1 vector)
-#                - r_ddot_vbs_w (np.array): Acceleration of the VBS water CG in body frame. (3x1 vector)
-#                - h_add_vbs (np.array): Added angular momentum. (3x1 vector)
-#                - h_add_vbs_dot (np.array): Derivative of the added angular momentum. (3x1 vector)
-#        """
-#        # Extract time-varying parameter for VBS
-#        x_vbs = ksi[0]
-#        x_dot_vbs = ksi_dot[0]
-#        x_ddot_vbs = ksi_ddot[0]
-#
-#        # Extract VBS parameters from the SAM class
-#        rho = self.rho_w  # Density of water
-#        d_vbs = self.vbs.d_vbs  # Diameter of the VBS
-#        l_vbs_b = self.vbs.l_vbs_b  # Offset length of VBS
-#        h_vbs = self.vbs.h_vbs  # Vertical offset of VBS CG
-#        m_vbs_sh = self.vbs.m_vbs_sh  # Shaft mass
-#        J_vbs_sh_cg = self.vbs.J_vbs_sh_cg  # Shaft moment of inertia
-#        r_cb = self.r_cb  # Central body vector from SAM class
-#        r_vbs_sh_cg = np.array(self.vbs.r_vbs_sh_cg)  # Shaft CG position from SAM class
-#
-#        # --- Mass of VBS Water ---
-#        m_vbs_w = (rho * np.pi * d_vbs ** 2 * x_vbs) / 4 
-#        m_dot_vbs_w = (rho * np.pi * d_vbs ** 2 * x_dot_vbs) / 4
-#        m_ddot_vbs_w = (rho * np.pi * d_vbs ** 2 * x_ddot_vbs) / 4
-#
-#        # --- Inertia of VBS Water around its CG ---
-#        J1 = 0
-#        J2 = J3 = (1 / 12) * m_vbs_w * ((3 / 4) * d_vbs ** 2 + x_vbs ** 2)
-#        J_vbs_w_CG = np.diag([J1, J2, J3])
-#
-#        # --- CG Position of VBS Shaft in Central Frame ---
-#        r_vbs_sh = np.array([x_vbs, 0, h_vbs]) + r_vbs_sh_cg
-#        r_vbs_w = np.array([x_vbs / 2 + l_vbs_b, 0, h_vbs])
-#
-#        # --- CG Velocities ---
-#        r_dot_vbs_sh = np.array([x_dot_vbs, 0, 0])  # Shaft velocity
-#        r_dot_vbs_w = np.array([x_dot_vbs, 0, 0])  # Water velocity
-#
-#        # --- CG Accelerations ---
-#        r_ddot_vbs_sh = np.array([x_ddot_vbs, 0, 0])  # Shaft acceleration
-#        r_ddot_vbs_w = np.array([x_ddot_vbs, 0, 0])  # Water acceleration
-#
-#        # --- Shaft Moment of Inertia ---
-#        S2_diff_sh = skew_symmetric(r_vbs_sh - r_cb) @ skew_symmetric(r_vbs_sh - r_cb)
-#        J_vbs_sh_B = J_vbs_sh_cg - m_vbs_sh * S2_diff_sh
-#
-#        # --- Shaft Derivative ---
-#        D_S2_sh = dot_skew_squared(r_vbs_sh - r_cb, r_dot_vbs_sh)
-#        J_dot_vbs_sh_B = -m_vbs_sh * D_S2_sh
-#
-#        # --- Water Moment of Inertia ---
-#        S2_diff_w = skew_symmetric(r_vbs_w - r_cb) @ skew_symmetric(r_vbs_w - r_cb)
-#        J_vbs_w_B = J_vbs_w_CG - m_vbs_w * S2_diff_w
-#
-#        # --- Water Derivative ---
-#        J_dot_vbs_w_CG = np.diag([
-#            0,
-#            (1 / 12) * m_dot_vbs_w * ((3 / 4) * d_vbs ** 2 + x_vbs ** 2) + (1 / 6) * m_vbs_w * x_vbs * x_dot_vbs,
-#            (1 / 12) * m_dot_vbs_w * ((3 / 4) * d_vbs ** 2 + x_vbs ** 2) + (1 / 6) * m_vbs_w * x_vbs * x_dot_vbs
-#        ])
-#        D_S2_w = dot_skew_squared(r_vbs_w - r_cb, r_dot_vbs_w)
-#        J_dot_vbs_w_B = J_dot_vbs_w_CG - m_dot_vbs_w * S2_diff_w - m_vbs_w * D_S2_w
-#
-#        # --- Total Moment of Inertia and Derivative ---
-#        J_vbs_total = J_vbs_sh_B + J_vbs_w_B
-#        J_dot_vbs_total = J_dot_vbs_sh_B + J_dot_vbs_w_B
-#
-#        # --- Cross Product Term ---
-#        h_add_vbs = (
-#                m_vbs_sh * np.cross(r_vbs_sh - r_cb, r_dot_vbs_sh)
-#                + m_vbs_w * np.cross(r_vbs_w - r_cb, r_dot_vbs_w)
-#        )
-#
-#        # --- Derivative of Cross Product Term ---
-#        h_dot_add_vbs = (
-#                m_vbs_sh * np.cross(r_vbs_sh - r_cb, r_ddot_vbs_sh)
-#                + m_dot_vbs_w * np.cross(r_vbs_w - r_cb, r_dot_vbs_w)
-#                + m_vbs_w * np.cross(r_vbs_w - r_cb, r_ddot_vbs_w)
-#        )
-#
-#        return dict(J_vbs_total=J_vbs_total,
-#                    J_dot_vbs_total=J_dot_vbs_total,
-#                    J_vbs_shaft=J_vbs_sh_B,
-#                    J_dot_vbs_shaft=J_vbs_sh_B,
-#                    J_vbs_water=J_dot_vbs_w_B,
-#                    J_dot_vbs_water=J_dot_vbs_sh_B,
-#                    m_vbs_w=m_vbs_w,
-#                    m_dot_vbs_w=m_dot_vbs_w,
-#                    m_ddot_vbs_w=m_ddot_vbs_w,
-#                    r_vbs_sh=r_vbs_sh,
-#                    r_vbs_w=r_vbs_w,
-#                    r_dot_vbs_sh=r_dot_vbs_sh,
-#                    r_dot_vbs_w=r_dot_vbs_w,
-#                    r_ddot_vbs_sh=r_ddot_vbs_sh,
-#                    r_ddot_vbs_w=r_ddot_vbs_w,
-#                    h_add_vbs=h_add_vbs,
-#                    h_dot_add_vbs=h_dot_add_vbs)
-#
-#    def calculate_ss(self):
-#        """
-#        Calculates the Solid Structure (SS) contribution to the moment of inertia and its derivative.
-#
-#        Returns:
-#            dict: A dictionary containing:
-#                - "J_ss": Total moment of inertia for the solid structure in the body frame (3x3 matrix).
-#                - "J_dot_ss": Time derivative of the total moment of inertia for the solid structure (3x3 matrix, always 0).
-#                - "r_ss": CG position of solid structure in the Central frame (3x1 vector).
-#
-#
-#        """
-#        # Access Solid Structure parameters through the SolidStructure class
-#        J_ss_c = self.solid_structure.J_SS_c  # Inertia tensor in the central frame
-#        m_ss = self.solid_structure.m_SS  # Mass of the solid structure
-#        r_ss_c = self.solid_structure.r_SS_c  # CG position of the solid structure in the central frame
-#        r_cb = self.r_cb  # Central body vector from SAM class
-#
-#        # Calculate the skew-symmetric square matrices
-#        S2_r_ss_c = skew_symmetric(r_ss_c) @ skew_symmetric(r_ss_c)
-#        S2_diff = skew_symmetric(r_ss_c - r_cb) @ skew_symmetric(r_ss_c - r_cb)
-#
-#        # Total Moment of Inertia in Body Frame
-#        J_ss = J_ss_c + m_ss * S2_r_ss_c - m_ss * S2_diff
-#
-#        # Derivative of Moment of Inertia (always zero for solid structure)
-#        J_dot_ss = np.zeros((3, 3))
-#
-#        return dict(J_ss=J_ss,
-#                    J_dot_ss=J_dot_ss,
-#                    r_SS= r_ss_c)
-#
-#    def calculate_lcg(self, ksi, ksi_dot, ksi_ddot):
-#        """
-#        Calculates the LCG contribution to the moment of inertia, its derivative, and additional terms.
-#
-#        Args:
-#          ksi (list): Vector of time-varying parameters:
-#            - ksi[0] (float): x_vbs, position of the VBS (m).
-#            - ksi[1] (float): x_lcg, position of the LCG (m).
-#            - ksi[2] (float): delta_e, stern plane angle (rad).
-#            - ksi[3] (float): delta_r, rudder angle (rad).
-#            - ksi[4:] (list): theta_rpm_i, angles of rotation of each propeller \( i \) (list of floats).
-#
-#          ksi_dot (list): First derivatives of time-varying parameters:
-#            - ksi_dot[0] (float): x_dot_vbs, velocity of the VBS (m/s).
-#            - ksi_dot[1] (float): x_dot_lcg, velocity of the LCG (m/s).
-#            - ksi_dot[2] (float): delta_e_dot, rate of change of stern plane angle (rad/s).
-#            - ksi_dot[3] (float): delta_r_dot, rate of change of rudder angle (rad/s).
-#            - ksi_dot[4:] (list): theta_dot_rpm_i, rates of change of propeller angles (rad/s).
-#
-#          ksi_ddot (list): Second derivatives of time-varying parameters:
-#            - ksi_ddot[0] (float): x_ddot_vbs, Acceleration of the VBS (m/s^2).
-#            - ksi_ddot[1] (float): x_dot_lcg, Acceleration of the LCG (m/s^2).
-#            - ksi_ddot[2] (float): delta_e_ddot, Acceleration of stern plane angle (rad/s^2).
-#            - ksi_ddot[3] (float): delta_r_ddot, Acceleration of rudder angle (rad/s^2).
-#            - ksi_ddot[4:] (list): theta_ddot_rpm_i, Acceleration of propeller angles (rad/s^2).
-#
-#        Returns:
-#            dict: A dictionary containing:
-#                - "J_lcg": Total moment of inertia for LCG in the body frame (3x3 matrix).
-#                - "J_dot_lcg": Time derivative of the total moment of inertia for LCG (3x3 matrix).
-#                - "r_lcg_c": CG position of LCG in central frame (3x1 vector).
-#                - "r_dot_lcg_c": Velocity of LCG CG in central frame (3x1 vector).
-#                - "r_ddot_lcg_c": Acceleration of LCG CG in central frame (3x1 vector).
-#                - "cross_term": Cross product term.
-#                - "cross_term_dot": Derivative of the cross product term.
-#        """
-#        # Extract dynamic inputs
-#        x_lcg = ksi[1]  # Position of the LCG
-#        x_dot_lcg = ksi_dot[1]  # Velocity of the LCG
-#        x_ddot_lcg = ksi_ddot[1]  # Acceleration of the LCG
-#
-#        # Extract LCG parameters
-#        m_lcg = self.lcg.m_lcg  # Mass of LCG
-#        l_lcg_l = self.lcg.l_lcg_l  # Length of the LCG
-#        l_lcg_b = self.lcg.l_lcg_b  # Offset length of LCG
-#        h_lcg = self.lcg.h_lcg  # Vertical offset of LCG CG
-#        h_lcg_dim = self.lcg.h_lcg_dim  # Height of the LCG
-#        d_lcg = self.lcg.d_lcg  # Width of the LCG
-#        r_cb = self.r_cb  # Central body vector from SAM class
-#
-#        # --- Moment of Inertia in LCG CG Frame ---
-#        J1 = (1 / 12) * m_lcg * (h_lcg_dim ** 2 + d_lcg ** 2)
-#        J2 = (1 / 12) * m_lcg * (l_lcg_l ** 2 + h_lcg_dim ** 2)
-#        J3 = (1 / 12) * m_lcg * (l_lcg_l ** 2 + d_lcg ** 2)
-#        J_lcg_cg = np.diag([J1, J2, J3])
-#
-#        # --- CG Position of LCG in Central Frame ---
-#        r_lcg_c = np.array([x_lcg + l_lcg_l / 2 + l_lcg_b, 0, h_lcg])
-#
-#        # --- Velocity of CG Position ---
-#        r_dot_lcg_c = np.array([x_dot_lcg, 0, 0])
-#
-#        # --- Acceleration of CG Position ---
-#        r_ddot_lcg_c = np.array([x_ddot_lcg, 0, 0])
-#
-#        # --- Body Frame Moment of Inertia ---
-#        S2_diff = skew_symmetric(r_lcg_c - r_cb) @ skew_symmetric(r_lcg_c - r_cb)
-#        J_lcg = J_lcg_cg - m_lcg * S2_diff
-#
-#        # --- Derivative of Moment of Inertia ---
-#        D_S2 = dot_skew_squared(r_lcg_c - r_cb, r_dot_lcg_c)
-#        J_dot_lcg = -m_lcg * D_S2
-#
-#        # --- Cross Product Term ---
-#        h_add_lcg = m_lcg * np.cross(r_lcg_c - r_cb, r_dot_lcg_c)
-#
-#        # --- Derivative of Cross Product Term ---
-#        h_dot_add_lcg = m_lcg * np.cross(r_lcg_c - r_cb, r_ddot_lcg_c)
-#
-#        return {
-#            "J_lcg": J_lcg,
-#            "J_dot_lcg": J_dot_lcg,
-#            "r_lcg_c": r_lcg_c,
-#            "r_dot_lcg_c": r_dot_lcg_c,
-#            "r_ddot_lcg_c": r_ddot_lcg_c,
-#            "h_add_lcg": h_add_lcg,
-#            "h_dot_add_lcg": h_dot_add_lcg,
-#        }
-#
-#    def calculate_thruster_shaft(self, ksi, ksi_dot, ksi_ddot):
-#        """
-#        Calculates the Thruster Shaft contribution to the moment of inertia, its derivative, and additional terms.
-#
-#        Args:
-#            ksi (list): Vector of time-varying parameters:
-#                - ksi[0] (float): x_vbs, position of the VBS (m).
-#                - ksi[1] (float): x_lcg, position of the LCG (m).
-#                - ksi[2] (float): delta_e, stern plane angle (rad).
-#                - ksi[3] (float): delta_r, rudder angle (rad).
-#                - ksi[4:] (list): theta_rpm_i, angles of rotation of each propeller \( i \) (list of floats).
-#
-#            ksi_dot (list): First derivatives of time-varying parameters:
-#                - ksi_dot[0] (float): x_dot_vbs, velocity of the VBS (m/s).
-#                - ksi_dot[1] (float): x_dot_lcg, velocity of the LCG (m/s).
-#                - ksi_dot[2] (float): delta_e_dot, rate of change of stern plane angle (rad/s).
-#                - ksi_dot[3] (float): delta_r_dot, rate of change of rudder angle (rad/s).
-#                - ksi_dot[4:] (list): theta_dot_rpm_i, rates of change of propeller angles (rad/s).
-#
-#            ksi_ddot (list): Second derivatives of time-varying parameters:
-#                - ksi_ddot[0] (float): x_ddot_vbs, acceleration of the VBS (m/s^2).
-#                - ksi_ddot[1] (float): x_ddot_lcg, acceleration of the LCG (m/s^2).
-#                - ksi_ddot[2] (float): delta_e_ddot, acceleration of stern plane angle (rad/s^2).
-#                - ksi_ddot[3] (float): delta_r_ddot, acceleration of rudder angle (rad/s^2).
-#                - ksi_ddot[4:] (list): theta_ddot_rpm_i, acceleration of propeller angles (rad/s^2).
-#
-#        Returns:
-#            dict: A dictionary containing:
-#                - "J_t_sh": Total moment of inertia for Thruster Shaft in the body frame (3x3 matrix).
-#                - "J_dot_t_sh": Time derivative of the total moment of inertia for Thruster Shaft (3x3 matrix).
-#                - "r_t_sh_c": CG position of the thruster shaft in the central frame (3x1 vector).
-#                - "r_dot_t_sh_c": Velocity of the CG position of the thruster shaft in the central frame (3x1 vector).
-#                - "r_ddot_t_sh_c": Acceleration of the CG position of the thruster shaft in the central frame (3x1 vector).
-#                - "h_t_sh": Additional angular momentum of the thruster shaft in the body frame (3x1 vector).
-#                - "h_dot_t_sh": Time derivative of the additional angular momentum of the thruster shaft (3x1 vector).
-#        """
-#        # Extract dynamic inputs for stern plane and rudder angles
-#        delta_e = ksi[2]
-#        delta_r = ksi[3]
-#        delta_e_dot = ksi_dot[2]
-#        delta_r_dot = ksi_dot[3]
-#        delta_e_ddot = ksi_ddot[2]
-#        delta_r_ddot = ksi_ddot[3]
-#
-#        # Extract thruster shaft parameters from the ThrusterShaft class
-#        m_t_sh = self.thruster_shaft.m_t_sh  # Mass of the thruster shaft
-#        J_t_sh_t = self.thruster_shaft.J_t_sh_t  # Moment of inertia tensor in the thruster frame
-#        r_t_sh_t = self.thruster_shaft.r_t_sh_t  # Position of the thruster shaft CG in the thruster frame
-#        r_cb = self.r_cb  # Central body vector
-#
-#        # --- Transformation Matrices ---
-#        C_T2C = calculate_dcm(order=[2, 3], angles=[delta_e, delta_r])  # C_T^C
-#        C_C2T = calculate_dcm(order=[3, 2], angles=[-delta_r, -delta_e])  # C_C^T
-#        C_2_temp = calculate_dcm(order=[2], angles=[-delta_e])  # C_2(-delta_e)
-#
-#        # --- Angular Velocities ---
-#        omega_tc_t = np.array([0, -delta_e_dot, 0]) + C_2_temp @ np.array([0, 0, -delta_r_dot])
-#        omega_tc_c = C_T2C @ omega_tc_t
-#
-#        # --- Angular Accelerations ---
-#        C_2_dot = dcm_derivative_single_axis(-delta_e, delta_e_dot, axis=2)
-#        omega_dot_tc_t = np.array([0, -delta_e_ddot, 0]) - C_2_dot @ np.array(
-#            [0, 0, -delta_r_dot]) + C_2_temp @ np.array([0, 0, -delta_r_ddot])
-#        omega_dot_tc_c = C_T2C @ omega_dot_tc_t
-#
-#        # --- Adjust J_t_sh_t to CG ---
-#        S2_r_t_sh_t = skew_symmetric(r_t_sh_t) @ skew_symmetric(r_t_sh_t)
-#        J_t_sh_t_cg = J_t_sh_t + m_t_sh * S2_r_t_sh_t
-#
-#        # --- Compute J_prime_t_sh ---
-#        J_prime_t_sh = C_T2C @ J_t_sh_t_cg @ C_C2T
-#
-#        # --- Compute CG Position ---
-#        r_t_sh_c = C_T2C @ r_t_sh_t
-#        r_dot_t_sh_c = C_T2C @ (skew_symmetric(omega_tc_t) @ r_t_sh_t)
-#        r_ddot_t_sh_c = (
-#                C_T2C @ (
-#                    skew_symmetric(omega_tc_t) @ skew_symmetric(omega_tc_t) + skew_symmetric(omega_dot_tc_t)) @ r_t_sh_t
-#        )
-#        # --- Compute J_t_sh ---
-#        S2_r_t_sh_c = skew_symmetric(r_t_sh_c - r_cb) @ skew_symmetric(r_t_sh_c - r_cb)
-#        J_t_sh = J_prime_t_sh - m_t_sh * S2_r_t_sh_c
-#
-#        # --- Derivative of Moment of Inertia ---
-#        D_S2 = dot_skew_squared(r_t_sh_c - r_cb, r_dot_t_sh_c)
-#        J_dot_t_sh = (
-#                skew_symmetric(omega_tc_c) @ J_prime_t_sh
-#                - J_prime_t_sh @ skew_symmetric(omega_tc_c)
-#                - m_t_sh * D_S2
-#        )
-#
-#        # --- Additional Angular Momentum ---
-#        h_t_sh = (
-#                C_T2C @ J_prime_t_sh @ omega_tc_t
-#                + m_t_sh * skew_symmetric(r_t_sh_c - r_cb) @ r_dot_t_sh_c
-#        )
-#
-#        # --- Derivative of Additional Angular Momentum ---
-#        h_dot_t_sh = (
-#                skew_symmetric(omega_tc_c) @ C_T2C @ J_prime_t_sh @ omega_tc_t
-#                + C_T2C @ J_prime_t_sh @ omega_dot_tc_t
-#                + m_t_sh * skew_symmetric(r_t_sh_c - r_cb) @ r_ddot_t_sh_c
-#        )
-#
-#        return {
-#            "J_t_sh": J_t_sh,
-#            "J_dot_t_sh": J_dot_t_sh,
-#            "r_t_sh_c": r_t_sh_c,
-#            "r_dot_t_sh_c": r_dot_t_sh_c,
-#            "r_ddot_t_sh_c": r_ddot_t_sh_c,
-#            "h_t_sh": h_t_sh,
-#            "h_dot_t_sh": h_dot_t_sh,
-#        }
-#
-#    def calculate_thruster_propeller(self, ksi, ksi_dot, ksi_ddot):
-#        """
-#        Calculates the Thruster Propeller contribution to the moment of inertia, its derivative,
-#        and additional angular momentum terms, as well as intermediate results.
-#
-#        Args:
-#            ksi (list): Vector of time-varying parameters:
-#                - ksi[0] (float): x_vbs, position of the VBS (m).
-#                - ksi[1] (float): x_lcg, position of the LCG (m).
-#                - ksi[2] (float): delta_e, stern plane angle (rad).
-#                - ksi[3] (float): delta_r, rudder angle (rad).
-#                - ksi[4:] (list): theta_rpm_i, angles of rotation of each propeller \( i \) (list of floats).
-#
-#            ksi_dot (list): First derivatives of time-varying parameters:
-#                - ksi_dot[0] (float): x_dot_vbs, velocity of the VBS (m/s).
-#                - ksi_dot[1] (float): x_dot_lcg, velocity of the LCG (m/s).
-#                - ksi_dot[2] (float): delta_e_dot, rate of change of stern plane angle (rad/s).
-#                - ksi_dot[3] (float): delta_r_dot, rate of change of rudder angle (rad/s).
-#                - ksi_dot[4:] (list): theta_dot_rpm_i, rates of change of propeller angles (rad/s).
-#
-#            ksi_ddot (list): Second derivatives of time-varying parameters:
-#                - ksi_ddot[0] (float): x_ddot_vbs, acceleration of the VBS (m/s^2).
-#                - ksi_ddot[1] (float): x_ddot_lcg, acceleration of the LCG (m/s^2).
-#                - ksi_ddot[2] (float): delta_e_ddot, acceleration of stern plane angle (rad/s^2).
-#                - ksi_ddot[3] (float): delta_r_ddot, acceleration of rudder angle (rad/s^2).
-#                - ksi_ddot[4:] (list): theta_ddot_rpm_i, acceleration of propeller angles (rad/s^2).
-#
-#        Returns:
-#            dict: A dictionary containing:
-#                - "J_tp_total": Total moment of inertia for Thruster Propellers in the body frame (3x3 matrix).
-#                - "J_dot_tp_total": Total time derivative of the moment of inertia for Thruster Propellers (3x3 matrix).
-#                - "h_tp_total": Total angular momentum of Thruster Propellers in the body frame (3x1 vector).
-#                - "h_dot_tp_total": Total time derivative of angular momentum of Thruster Propellers (3x1 vector).
-#                - "h_tp_list": List of angular momenta of each propeller in the body frame.
-#                - "h_dot_tp_list": List of time derivatives of angular momenta of each propeller in the body frame.
-#                - "J_tp_individual": List of moment of inertia matrices for each propeller (list of 3x3 matrices).
-#                - "J_dot_tp_individual": List of time derivatives of moment of inertia matrices for each propeller (list of 3x3 matrices).
-#                - "positions": List of CG positions for each propeller in the body frame.
-#                - "velocities": List of CG velocities for each propeller in the body frame.
-#                - "accelerations": List of CG accelerations for each propeller in the body frame.
-#                - "omega_pc_p": List of angular velocities of each propeller in the propeller frame.
-#                - "omega_dot_pc_p": List of angular accelerations of each propeller in the propeller frame.
-#                - "dcms": List of DCMs for each propeller frame relative to the body frame.
-#        """
-#        # Extract dynamic inputs
-#        delta_e = ksi[2]  # Stern plane angle
-#        delta_r = ksi[3]  # Rudder angle
-#        theta_rpm_i = ksi[4:]  # List of propeller rotation angles
-#        delta_e_dot = ksi_dot[2]  # Rate of change of stern plane angle
-#        delta_r_dot = ksi_dot[3]  # Rate of change of rudder angle
-#        theta_dot_rpm_i = ksi_dot[4:]  # List of rates of change of propeller angles
-#        delta_e_ddot = ksi_ddot[2]  # Acceleration of stern plane angle
-#        delta_r_ddot = ksi_ddot[3]  # Acceleration of rudder angle
-#        theta_ddot_rpm_i = ksi_ddot[4:]  # List of accelerations of propeller angles
-#
-#        # Extract propeller parameters
-#        n_p = self.propellers.n_p  # Number of propellers
-#        m_tp = self.propellers.m_t_p  # List of masses for each propeller
-#        J_tp_p = self.propellers.J_t_p  # List of inertia tensors for each propeller
-#        r_tp_p = self.propellers.r_t_p  # List of CG positions for each propeller
-#        r_tp_sh = self.propellers.r_t_p_sh  # List of positions of propeller on shaft
-#        r_cb = self.r_cb  # Central body vector
-#
-#        # Initialize total contributions
-#        J_tp_total = np.zeros((3, 3))
-#        J_dot_tp_total = np.zeros((3, 3))
-#        h_tp_total = np.zeros(3)
-#        h_dot_tp_total = np.zeros(3)
-#        h_tp_list = []
-#        h_dot_tp_list = []
-#        J_tp_individual = []
-#        J_dot_tp_individual = []
-#        positions = []
-#        velocities = []
-#        accelerations = []
-#        omega_pc_p_list = []
-#        omega_dot_pc_p_list = []
-#        dcms = []
-#
-#        # Precompute angular velocities and accelerations for the central frame
-#        C_T2C = calculate_dcm(order=[2, 3], angles=[delta_e, delta_r])  # C_T^C
-#        omega_tc_t = np.array([0, -delta_e_dot, 0]) + calculate_dcm(order=[2], angles=[-delta_e]) @ np.array(
-#            [0, 0, -delta_r_dot])
-#        omega_dot_tc_t = (
-#                np.array([0, -delta_e_ddot, 0])
-#                - dcm_derivative_single_axis(-delta_e, delta_e_dot, axis=2) @ np.array([0, 0, -delta_r_dot])
-#                + calculate_dcm(order=[2], angles=[-delta_e]) @ np.array([0, 0, -delta_r_ddot])
-#        )
-#
-#        for i in range(n_p):
-#            # Extract propeller-specific parameters
-#            m_tp_i = m_tp[i]
-#            J_tp_p_i = J_tp_p[i]
-#            r_tp_p_i = r_tp_p[i]
-#            r_tp_sh_i = r_tp_sh[i]
-#            theta_rpm = theta_rpm_i[i]
-#            theta_dot_rpm = theta_dot_rpm_i[i]
-#            theta_ddot_rpm = theta_ddot_rpm_i[i]
-#
-#            # --- Transformation Matrices ---
-#            C_P2T = calculate_dcm(order=[1], angles=[-theta_rpm])
-#            C_T2P = C_P2T.T
-#            C_P2C = C_T2C @ C_P2T
-#            C_C2P = C_P2C.T
-#
-#            # Store DCM
-#            dcms.append(C_P2C)
-#
-#            # --- Angular Velocities ---
-#            omega_pc_p = np.array([theta_dot_rpm, 0, 0]) + C_T2P @ omega_tc_t  # Angular velocity in propeller frame
-#            omega_dot_pc_p = (
-#                    np.array([theta_ddot_rpm, 0, 0])
-#                    + dcm_derivative_single_axis(theta_rpm, theta_dot_rpm, axis=1) @ omega_tc_t
-#                    + C_T2P @ omega_dot_tc_t
-#            )
-#            omega_pc_c = C_P2C @ omega_pc_p
-#            omega_dot_pc_c = C_P2C @ omega_dot_pc_p
-#
-#            # Store angular velocities and accelerations
-#            omega_pc_p_list.append(omega_pc_p)
-#            omega_dot_pc_p_list.append(omega_dot_pc_p)
-#
-#            # --- CG Positions ---
-#            r_tp_c = C_T2C @ r_tp_sh_i + C_P2C @ r_tp_p_i
-#            positions.append(r_tp_c)
-#
-#            # --- CG Velocities ---
-#            r_dot_tp_c = (
-#                    C_T2C @ skew_symmetric(omega_tc_t) @ r_tp_sh_i
-#                    + C_P2C @ skew_symmetric(omega_pc_p) @ r_tp_p_i
-#            )
-#            velocities.append(r_dot_tp_c)
-#
-#            # --- CG Accelerations ---
-#            r_ddot_tp_c = (
-#                    C_T2C @ (skew_symmetric(omega_dot_tc_t) @ r_tp_sh_i + skew_symmetric(omega_tc_t) @ skew_symmetric(
-#                omega_tc_t) @ r_tp_sh_i)
-#                    + C_P2C @ (skew_symmetric(omega_dot_pc_p) @ r_tp_p_i + skew_symmetric(
-#                omega_pc_p) @ skew_symmetric(omega_pc_p) @ r_tp_p_i)
-#            )
-#            accelerations.append(r_ddot_tp_c)
-#
-#            # --- Adjust J_tp_p to CG ---
-#            S2_r_tp_p = skew_symmetric(r_tp_p_i) @ skew_symmetric(r_tp_p_i)
-#            J_tp_p_cg = J_tp_p_i + m_tp_i * S2_r_tp_p
-#
-#            # --- Compute J_prime_tp ---
-#            J_prime_tp = C_P2C @ J_tp_p_cg @ C_C2P
-#
-#            # --- Compute J_tp ---
-#            S2_r_tp_c = skew_symmetric(r_tp_c - r_cb) @ skew_symmetric(r_tp_c - r_cb)
-#            J_tp = J_prime_tp - m_tp_i * S2_r_tp_c
-#            J_tp_individual.append(J_tp)
-#
-#            # --- Derivative of Moment of Inertia ---
-#            D_S2 = dot_skew_squared(r_tp_c - r_cb, r_dot_tp_c)
-#            J_dot_tp = (
-#                    skew_symmetric(omega_pc_c) @ J_prime_tp
-#                    - J_prime_tp @ skew_symmetric(omega_pc_c)
-#                    - m_tp_i * D_S2
-#            )
-#            J_dot_tp_individual.append(J_dot_tp)
-#
-#            # --- Additional Angular Momentum ---
-#            h_tp = C_P2C @ J_tp_p_cg @ omega_pc_p + m_tp_i * skew_symmetric(r_tp_c - r_cb) @ r_dot_tp_c
-#            h_tp_list.append(h_tp)
-#
-#            # --- Derivative of Additional Angular Momentum ---
-#            h_dot_tp = (
-#                    skew_symmetric(omega_pc_c) @ C_P2C @ J_tp_p_cg @ omega_pc_p
-#                    + C_P2C @ J_tp_p_cg @ omega_dot_pc_p
-#                    + m_tp_i * skew_symmetric(r_tp_c - r_cb) @ r_ddot_tp_c
-#            )
-#            h_dot_tp_list.append(h_dot_tp)
-#
-#            # Accumulate total contributions
-#            J_tp_total += J_tp
-#            J_dot_tp_total += J_dot_tp
-#            h_tp_total += h_tp
-#            h_dot_tp_total += h_dot_tp
-#
-#        return {
-#            "J_tp_total": J_tp_total,
-#            "J_dot_tp_total": J_dot_tp_total,
-#            "J_tp_individual": J_tp_individual,
-#            "J_dot_tp_individual": J_dot_tp_individual,
-#            "h_tp_total": h_tp_total,
-#            "h_dot_tp_total": h_dot_tp_total,
-#            "h_tp_list": h_tp_list,
-#            "h_dot_tp_list": h_dot_tp_list,
-#            "positions": positions,
-#            "velocities": velocities,
-#            "accelerations": accelerations,
-#            "omega_pc_p": omega_pc_p_list,
-#            "omega_dot_pc_p": omega_dot_pc_p_list,
-#            "dcms": dcms,
-#        }
-#
-#    def calculate_center_of_gravity_and_dynamics(self, ksi, ksi_dot, ksi_ddot):
-#        """
-#        Calculates the Center of Gravity (CG), its derivatives, total angular momentum, total moment of inertia,
-#        and related dynamics for the SAM AUV.
-#
-#        Args:
-#            ksi (list): Vector of time-varying parameters.
-#            ksi_dot (list): First derivatives of time-varying parameters.
-#            ksi_ddot (list): Second derivatives of time-varying parameters.
-#
-#        Returns:
-#            dict: A dictionary containing:
-#                - r_BG (np.array): CG position in the body frame (3x1 vector).
-#                - r_dot_BG (np.array): Velocity of the CG in the body frame (3x1 vector).
-#                - r_ddot_BG (np.array): Acceleration of the CG in the body frame (3x1 vector).
-#                - J_total (np.array): Total moment of inertia in the body frame (3x3 matrix).
-#                - J_dot_total (np.array): Time derivative of the total moment of inertia in the body frame (3x3 matrix).
-#                - h_add_total (np.array): Total additional angular momentum in the body frame (3x1 vector).
-#                - h_dot_add_total (np.array): Time derivative of the total additional angular momentum (3x1 vector).
-#                - position_contributions (np.array): Matrix where each column shows CG position contributions from each part.
-#                - velocity_contributions (np.array): Matrix where each column shows CG velocity contributions from each part.
-#                - acceleration_contributions (np.array): Matrix where each column shows CG acceleration contributions from each part.
-#                - mass_contributions (np.array): Array where each element shows mass contributions from each part.
-#        """
-#        # Retrieve individual contributions
-#        vbs = self.calculate_vbs(ksi, ksi_dot, ksi_ddot)
-#        ss = self.calculate_ss()
-#        lcg = self.calculate_lcg(ksi, ksi_dot, ksi_ddot)
-#        thruster_shaft = self.calculate_thruster_shaft(ksi, ksi_dot, ksi_ddot)
-#        propeller = self.calculate_thruster_propeller(ksi, ksi_dot, ksi_ddot)
-#
-#        # Extract parameters from each part
-#        # Solid Structure
-#        m_ss = self.solid_structure.m_SS
-#        r_ss = ss["r_SS"]
-#        J_ss = ss["J_ss"]
-#        J_dot_ss = ss["J_dot_ss"]
-#
-#        # LCG
-#        m_lcg = self.lcg.m_lcg
-#        r_lcg_c = lcg["r_lcg_c"]
-#        r_dot_lcg_c = lcg["r_dot_lcg_c"]
-#        r_ddot_lcg_c = lcg["r_ddot_lcg_c"]
-#        J_lcg = lcg["J_lcg"]
-#        J_dot_lcg = lcg["J_dot_lcg"]
-#        h_add_lcg = lcg["h_add_lcg"]
-#        h_dot_add_lcg = lcg["h_dot_add_lcg"]
-#
-#        # Thruster Shaft
-#        m_t_sh = self.thruster_shaft.m_t_sh
-#        r_t_sh_c = thruster_shaft["r_t_sh_c"]
-#        r_dot_t_sh_c = thruster_shaft["r_dot_t_sh_c"]
-#        r_ddot_t_sh_c = thruster_shaft["r_ddot_t_sh_c"]
-#        J_t_sh = thruster_shaft["J_t_sh"]
-#        J_dot_t_sh = thruster_shaft["J_dot_t_sh"]
-#        h_t_sh = thruster_shaft["h_t_sh"]
-#        h_dot_t_sh = thruster_shaft["h_dot_t_sh"]
-#
-#        # Propellers
-#        m_t_p = self.propellers.m_t_p
-#        r_t_p_list = propeller["positions"]
-#        r_dot_t_p_list = propeller["velocities"]
-#        r_ddot_t_p_list = propeller["accelerations"]
-#        J_tp_total = propeller["J_tp_total"]
-#        J_dot_tp_total = propeller["J_dot_tp_total"]
-#        h_tp_total = propeller["h_tp_total"]
-#        h_dot_tp_total = propeller["h_dot_tp_total"]
-#
-#        # VBS
-#        m_vbs_sh = self.vbs.m_vbs_sh
-#        m_vbs_w = vbs["m_vbs_w"]
-#        m_dot_vbs_w = vbs["m_dot_vbs_w"]
-#        m_ddot_vbs_w = vbs["m_ddot_vbs_w"]
-#        r_vbs_sh = vbs["r_vbs_sh"]
-#        r_vbs_w = vbs["r_vbs_w"]
-#        r_dot_vbs_sh = vbs["r_dot_vbs_sh"]
-#        r_dot_vbs_w = vbs["r_dot_vbs_w"]
-#        r_ddot_vbs_sh = vbs["r_ddot_vbs_sh"]
-#        r_ddot_vbs_w = vbs["r_ddot_vbs_w"]
-#        J_vbs_total = vbs["J_vbs_total"]
-#        J_dot_vbs_total = vbs["J_dot_vbs_total"]
-#        h_add_vbs = vbs["h_add_vbs"]
-#        h_dot_add_vbs = vbs["h_dot_add_vbs"]
-#
-#        # Central body vector
-#        r_cb = self.r_cb
-#
-#        # Step 2: Calculate \( N \), \( \dot{N} \), \( \ddot{N} \), \( D \), \( \dot{D} \)
-#        N = (
-#                m_ss * r_ss
-#                + m_lcg * r_lcg_c
-#                + m_t_sh * r_t_sh_c
-#                + np.sum([m * r for m, r in zip(m_t_p, r_t_p_list)], axis=0)
-#                + m_vbs_sh * r_vbs_sh
-#                + m_vbs_w * r_vbs_w
-#        )
-#        N_dot = (
-#                m_lcg * r_dot_lcg_c
-#                + m_t_sh * r_dot_t_sh_c
-#                + np.sum([m * r_dot for m, r_dot in zip(m_t_p, r_dot_t_p_list)], axis=0)
-#                + m_vbs_sh * r_dot_vbs_sh
-#                + m_dot_vbs_w * r_vbs_w
-#                + m_vbs_w * r_dot_vbs_w
-#        )
-#        N_ddot = (
-#                m_lcg * r_ddot_lcg_c
-#                + m_t_sh * r_ddot_t_sh_c
-#                + np.sum([m * r_ddot for m, r_ddot in zip(m_t_p, r_ddot_t_p_list)], axis=0)
-#                + m_vbs_sh * r_ddot_vbs_sh
-#                + 2 * m_dot_vbs_w * r_dot_vbs_w
-#                + m_ddot_vbs_w * r_vbs_w
-#                + m_vbs_w * r_ddot_vbs_w
-#        )
-#        D = m_ss + m_lcg + m_t_sh + np.sum(m_t_p) + m_vbs_sh + m_vbs_w
-#        D_dot = m_dot_vbs_w
-#        D_ddot = m_ddot_vbs_w
-#
-#        # Step 3: Calculate \( r_{BG} \), \( \dot{r}_{BG} \), and \( \ddot{r}_{BG} \)
-#        r_BG = N / D - r_cb
-#        r_dot_BG = (N_dot * D - N * D_dot) / D ** 2
-#        r_ddot_BG = (N_ddot * D ** 2 - N_dot * D * D_dot - N * D_ddot + 2 * N * (D_dot ** 2)) / D ** 3
-#
-#        # Total J and J_dot
-#        J_total = J_ss + J_lcg + J_t_sh + J_tp_total + J_vbs_total
-#        J_dot_total = J_dot_ss + J_dot_lcg + J_dot_t_sh + J_dot_tp_total + J_dot_vbs_total
-#
-#        # Total additional angular momentum and its derivative
-#        h_add_total = h_add_lcg + h_t_sh + h_tp_total + h_add_vbs
-#        h_dot_add_total = h_dot_add_lcg + h_dot_t_sh + h_dot_tp_total + h_dot_add_vbs
-#
-#        # Step 4: Organize results
-#        position_contributions = np.array(
-#            [r_ss, r_lcg_c, r_t_sh_c, *r_t_p_list, r_vbs_sh, r_vbs_w]
-#        ).T  # Removed `- r_cb`
-#        velocity_contributions = np.array(
-#            [np.zeros(3), r_dot_lcg_c, r_dot_t_sh_c, *r_dot_t_p_list, r_dot_vbs_sh, r_dot_vbs_w]
-#        ).T
-#        acceleration_contributions = np.array(
-#            [np.zeros(3), r_ddot_lcg_c, r_ddot_t_sh_c, *r_ddot_t_p_list, r_ddot_vbs_sh, r_ddot_vbs_w]
-#        ).T
-#        mass_contributions = np.array([m_ss, m_lcg, m_t_sh, *m_t_p, m_vbs_sh, m_vbs_w])
-#
-#        return {
-#            "r_BG": r_BG,
-#            "r_dot_BG": r_dot_BG,
-#            "r_ddot_BG": r_ddot_BG,
-#            "J_total": J_total,
-#            "J_dot_total": J_dot_total,
-#            "h_add_total": h_add_total,
-#            "h_dot_add_total": h_dot_add_total,
-#            "position_contributions": position_contributions,
-#            "velocity_contributions": velocity_contributions,
-#            "acceleration_contributions": acceleration_contributions,
-#            "mass_contributions": mass_contributions,
-#        }
-#
+
+    def actuator_dynamics(self, u_cur, u_ref):
+        """
+        Compute the actuator dynamics.
+        delta_X and rpmX are assumed to be instantaneous
+
+        u: control inputs as [x_vbs, x_lcg, delta_s, delta_r, rpm1, rpm2]
+
+        """
+
+        u_dot = np.zeros(6)
+
+        u_dot = (u_ref - u_cur)/self.dt
+
+        if np.abs(u_dot[0]) > self.vbs.x_vbs_dot_max:
+            u_dot[0] = self.vbs.x_vbs_dot_max * np.sign(u_dot[0])
+        if np.abs(u_dot[1]) > self.lcg.x_lcg_dot_max:
+            u_dot[1] = self.lcg.x_lcg_dot_max * np.sign(u_dot[1])
+
+        return u_dot
+
+
