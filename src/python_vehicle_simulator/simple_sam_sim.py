@@ -35,6 +35,7 @@ class Sol():
         self.y = data
 
 
+# FIXME: consider removing the dynamics wrapper and just call the dynamics straight away.
 def run_simulation(t_span, x0, sam):
     """
     Run SAM simulation using solve_ivp.
@@ -60,26 +61,9 @@ def run_simulation(t_span, x0, sam):
 
     # Euler forward integration
     for i in range(n_sim-1):
-        # NOTE: for using Euler angles, we need the shortest angle wrap
-        #data[5,i] = ((data[5,i] + np.pi)% (2*np.pi)) - np.pi
         data[:,i+1] = data[:,i] + dynamics_wrapper(i, data[:,i]) * (t_span[1]/n_sim)
     sol = Sol(t_eval,data)
     print(f" Simulation complete!")
-
-    # RK 45 leads to numerical instabilities when setting the cb on top of the cg
-#    sol = solve_ivp(
-#        dynamics_wrapper,
-#        t_span,
-#        x0,
-#        method='RK45',
-#        t_eval=t_eval,
-#        rtol=1e-6,
-#        atol=1e-9
-#    )
-#    if sol.status == -1:
-#        print(f" Simulation failed: {sol.message}")
-#    else:
-#        print(f" Simulation complete!")
 
     return sol
 
@@ -103,9 +87,8 @@ def plot_results(sol):
         return psi, theta, phi
 
     psi_vec, theta_vec, phi_vec = quaternion_to_euler_vec(sol)
-    #phi_vec, theta_vec, psi_vec = sol.y[3,:], sol.y[4,:], sol.y[5,:] 
 
-    fig, axs = plt.subplots(6, 3, figsize=(12, 10))
+    _, axs = plt.subplots(6, 3, figsize=(12, 10))
 
     # Position plots
     axs[0,0].plot(sol.t, sol.y[1], label='x')
@@ -114,15 +97,6 @@ def plot_results(sol):
     axs[0,0].set_ylabel('x Position [m]')
     axs[0,1].set_ylabel('y Position [m]')
     axs[0,2].set_ylabel('-z Position [m]')
-#    axs[0].legend()
-
-    # Quaternion plots
-#    axs[1,0].plot(sol.t, sol.y[3], label='q1')
-#    axs[1,].plot(sol.t, sol.y[4], label='q2')
-#    axs[1].plot(sol.t, sol.y[5], label='q3')
-#    axs[1].plot(sol.t, sol.y[6], label='q0')
-#    axs[1].set_ylabel('Quaternion')
-#    axs[1].legend()
 
     # Euler plots
     axs[1,0].plot(sol.t, np.rad2deg(phi_vec), label='roll')
@@ -131,7 +105,6 @@ def plot_results(sol):
     axs[1,0].set_ylabel('roll [deg]')
     axs[1,1].set_ylabel('pitch [deg]')
     axs[1,2].set_ylabel('yaw [deg]')
-#    axs[1].legend()
 
     # Velocity plots
     axs[2,0].plot(sol.t, sol.y[7], label='u')
@@ -161,12 +134,11 @@ def plot_results(sol):
     axs[5,0].set_ylabel('u_dr')
     axs[5,1].set_ylabel('rpm1')
     axs[5,2].set_ylabel('rpm2')
-    #axs[3].legend()
 
     plt.xlabel('Time [s]')
     plt.tight_layout()
 
-def plot_trajectory(sol, numDataPoints, filename, FPS):
+def plot_trajectory(sol, numDataPoints, generate_gif=False, filename="3d.gif", FPS=10):
     
     # State vectors
     x = sol.y[0]
@@ -215,21 +187,22 @@ def plot_trajectory(sol, numDataPoints, filename, FPS):
     # Title of plot
     ax.set_title('North-East-Down')
     
-#    # Create the animation object
-#    ani = animation.FuncAnimation(fig, 
-#                         anim_function, 
-#                         frames=numDataPoints, 
-#                         fargs=(dataSet,line),
-#                         interval=200, 
-#                         blit=False,
-#                         repeat=True)
-#    
-#    # Save the 3D animation as a gif file
-#    ani.save(filename, writer=animation.PillowWriter(fps=FPS))  
+    if generate_gif:
+        # Create the animation object
+        ani = animation.FuncAnimation(fig, 
+                             anim_function, 
+                             frames=numDataPoints, 
+                             fargs=(dataSet,line),
+                             interval=200, 
+                             blit=False,
+                             repeat=True)
+        
+        # Save the 3D animation as a gif file
+        ani.save(filename, writer=animation.PillowWriter(fps=FPS))  
 
 
 # Run simulation and plot results
 sol = run_simulation(t_span, x0, sam)
 plot_results(sol)
-plot_trajectory(sol, n_sim, "3d.gif", 10)
+plot_trajectory(sol, 50, False, "3d.gif", 10)
 plt.show()

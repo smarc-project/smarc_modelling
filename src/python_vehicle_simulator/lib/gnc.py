@@ -243,79 +243,39 @@ def Rzyx(phi,theta,psi):
 
 def quaternion_to_dcm(q):
     """
-    Converts a quaternion [q1, q2, q3, q0] to a Direction Cosine Matrix (DCM).
-    The quaternion is assumed to be in the form [q1, q2, q3, q0], where q1, q2, q3 are
-    the vector components and q0 is the real part.
+    Converts a quaternion [q0, q1, q2, q3], with scalar part q0, to a Direction
+    Cosine Matrix (DCM).
 
     Parameters:
-        q (list or numpy array): Quaternion [q1, q2, q3, q0]
+        q (list or numpy array): Quaternion [q0, q1, q2, q3]
 
     Returns:
         numpy array: 3x3 Direction Cosine Matrix (DCM)
     """
-    # FIXME: Replace with scipy rotation
-    #q1, q2, q3, q0 = q
-
-    ## Compute the elements of the DCM
-    #dcm = np.array([
-    #    [1 - 2 * (q2**2 + q3**2), 2 * (q1 * q2 - q3 * q0), 2 * (q1 * q3 + q2 * q0)],
-    #    [2 * (q1 * q2 + q3 * q0), 1 - 2 * (q1**2 + q3**2), 2 * (q2 * q3 - q1 * q0)],
-    #    [2 * (q1 * q3 - q2 * q0), 2 * (q2 * q3 + q1 * q0), 1 - 2 * (q1**2 + q2**2)]
-    #])
-
-    # Scipy implementation same as Fossens quaternion implementation
     rot = R.from_quat(q, scalar_first=True)
     dcm = rot.as_matrix()
-
-    #print(f"DCM comp: {dcm-dcm_s}")
 
     return dcm
 # ------------------------------------------------------------------------------
 
 
-
 # ------------------------------------------------------------------------------
 def quaternion_to_angles(q):
     """
-    Converts a quaternion [q1, q2, q3, q0] to Euler angles (phi, theta, psi) using the 3-2-1 sequence.
-    The quaternion is assumed to be in the form [q1, q2, q3, q0], where q1, q2, q3 are
+    Converts a quaternion [q0, q1, q2, q3] to Euler angles (phi, theta, psi) using the 3-2-1 sequence.
+    The quaternion is assumed to be in the form [q0, q1, q2, q3], where q1, q2, q3 are
     the vector components and q0 is the real part.
 
     Parameters:
-        q (list or numpy array): Quaternion [q1, q2, q3, q0]
+        q (list or numpy array): Quaternion [q0, q1, q2, q3]
 
     Returns:
-        tuple: Euler angles (phi, theta, psi) in radians, that is phi=roll, theta=pitch, psi=yaw)
+        tuple: Euler angles (psi, theta, phi) in radians, that is phi=roll, theta=pitch, psi=yaw)
     """
-    #q1, q2, q3, q0 = q
-
-    # Compute Euler angles
-    #psi = np.arctan2(2 * (q1 * q2 + q3 * q0), 1 - 2 * (q2**2 + q3**2))
-    #theta = np.arcsin(np.clip(2 * (q1 * q3 - q2 * q0), -1, 1))
-    #phi = np.arctan2(2 * (q2 * q3 + q1 * q0), 1 - 2 * (q1**2 + q2**2))
 
     rot = R.from_quat(q, scalar_first=True)
     rot_euler = rot.as_euler('xyz')
-    #psi_s, theta_s, phi_s = rot_euler
-    phi_s, theta_s, psi_s = rot_euler
-
-    #q_x, q_y, q_z, q_w = q
-
-    #roll_x = np.arctan2(2 * (q_x * q_w + q_y * q_z), 1 - 2*(q_x**2 + q_y**2))
-    #pitch_y = np.arcsin(2*(q_w*q_y - q_x*q_z))
-    #yaw_z = np.arctan2(2*(q_w*q_z + q_x*q_y), 1-2*(q_y**2 + q_z**2))
-
-    #print(f"psi: {psi:.3f}, theta: {theta:.3f}, phi: {phi:.3f}")
-    #print(f"psi_s: {psi_s:.3f}, theta_s: {theta_s:.3f}, phi: {phi_s:.3f}")
-    #print(f"roll_x: {roll_x:.3f}, pitch_y: {pitch_y:.3f}, yaw_z: {yaw_z:.3f}")
-
-    #psi = roll_x
-    #theta = pitch_y
-    #phi = yaw_z
-
-    psi = psi_s
-    theta = theta_s
-    phi = phi_s
+    phi, theta, psi = rot_euler
 
     return psi, theta, phi
 # ------------------------------------------------------------------------------

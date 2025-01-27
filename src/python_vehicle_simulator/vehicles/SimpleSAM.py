@@ -9,7 +9,7 @@ SAM.py:
    The SAM AUV is controlled using counter-rotating propellers, a thrust vectoring system, a variable buoyancy system (VBS),
    and adjustable battery packs for center of gravity (c.g.) control. It is equipped with sensors such as IMU, DVL, GPS, and sonar.
 
-   The length of the AUV is 1.5 m, the cylinder diameter is 19 cm, and the mass of the vehicle is 31.9 kg.
+   The length of the AUV is 1.5 m, the cylinder diameter is 19 cm, and the mass of the vehicle is 17 kg.
    It has a maximum speed of 2.5 m/s, which is obtained when the propellers run at 1525 rpm in zero currents.
    SAM was developed by the Swedish Maritime Robotics Center and is underactuated, meaning it has fewer control inputs than
    degrees of freedom. The control system uses both static and dynamic actuation for different maneuvers.
@@ -29,14 +29,6 @@ SAM.py:
 
    SAM()
        Step input for tail rudder, stern plane, and propeller revolutions.
-
-   SAM('depthHeadingAutopilot',z_d,psi_d,rpm_1,rpm_2,V_c,beta_c)
-        z_d:    desired depth (m), positive downwards
-        psi_d:  desired yaw angle (deg)
-        rpm_1:  desired propeller revolution for propeller 1 (rpm)
-        rpm_2:  desired propeller revolution for propeller 2 (rpm)
-        V_c:    current speed (m/s)
-        beta_c: current direction (deg)
 
 Methods:
 
@@ -58,12 +50,6 @@ Methods:
         - **vbs**: Variable buoyancy system control, which adjusts buoyancy to control depth.
         - **lcg**: Longitudinal center of gravity adjustment by moving the battery pack to control pitch.
 
-    u = depthHeadingAutopilot(eta,nu,sampleTime)
-        Simultaneous control of depth and heading using PID and Sliding Mode Controllers (SMC).
-        The propeller RPMs are given as step commands, while thrust vectoring and c.g. control are used for precision adjustments.
-
-    u = stepInput(t) generates tail rudder, stern planes, and RPM step inputs for both propellers.
-
 References:
 
     Bhat, S., Panteli, C., Stenius, I., & Dimarogonas, D. V. (2023). Nonlinear model predictive control for hydrobatic AUVs:
@@ -77,15 +63,10 @@ Author:     Omid Mirzaeedodangeh
 
 Refactored: David Doerner
 """
-import sys
 
 import numpy as np
 import math
-from scipy.interpolate import PchipInterpolator, CubicSpline, interp1d
 from scipy.linalg import block_diag
-from sympy import prem
-from sympy.functions.elementary.piecewise import piecewise_simplify
-from python_vehicle_simulator.lib.control import integralSMC
 from python_vehicle_simulator.lib.gnc import *
 
 
@@ -280,10 +261,8 @@ class SimpleSAM():
 
         # Initialize state vectors
         self.nu = np.zeros(6)  # [u, v, w, p, q, r]
-        self.eta = np.zeros(7)  # [x, y, z, q1, q2, q3, q0]
+        self.eta = np.zeros(7)  # [x, y, z, q0, q1, q2, q3]
         self.eta[3] = 1.0
-        self.xi = np.zeros(6)   # [vbs, lcg, ds, dr, rpm1, rpm2]
-        #self.eta[6] = 1.0  # Initialize quaternion to identity rotation
 
         # Initialize the AUV model
         self.name = ("SAM")
@@ -291,19 +270,12 @@ class SimpleSAM():
         self.diam = self.d_SS  # cylinder diameter (m)
 
         # Hydrodynamics (Fossen 2021, Section 8.4.2)
-        self.S = 0.7 * self.L * self.diam  # S = 70% of rectangle L * diam
         self.a = self.L / 2  # semi-axes
         self.b = self.diam / 2
 
         self.p_OG_O = np.array([0., 0, 0.12], float)  # CG w.r.t. to the CO, we
                                                         # recalculate that in calculate_cg
         self.p_OB_O = np.array([0., 0, 0], float)  # CB w.r.t. to the CO
-
-        # Parasitic drag coefficient CD_0, i.e. zero lift and alpha = 0
-        # F_drag = 0.5 * rho * Cd * (pi * b^2)
-        # F_drag = 0.5 * rho * CD_0 * S
-        Cd = 0.42  # from Allen et al. (2000) # NOTE: Do we know this value? Do we need to estimate it?
-        self.CD_0 = Cd * math.pi * self.b ** 2 / self.S
 
         # Rigid-body mass matrix expressed in CO
         self.x_vbs = 0.0
@@ -324,21 +296,12 @@ class SimpleSAM():
         self.M = np.zeros((6,6)) #self.MRB + self.MA
         self.Minv = np.zeros((6,6)) #np.linalg.inv(self.M)
 
-        # Natural frequencies in roll and pitch
-        self.w_roll = 0.0 
-        self.w_pitch = 0.0 
-
-        # FIXME: No idea about these parameters, probably good to identify
-        # Low-speed linear damping matrix parameters
-        self.T_surge = 20  # time constant in surge (s)
-        self.T_sway = 20  # time constant in sway (s)
-        self.T_heave = self.T_sway  # equal for for a cylinder-shaped AUV
-        self.zeta_roll = 0.3  # relative damping ratio in roll
-        self.zeta_pitch = 0.8  # relative damping ratio in pitch
-        self.T_yaw = 1.5 # time constant in yaw (s) 
-
 
     def init_vehicle(self):
+        """
+        Initialize all subsystems based on their respective parameters
+        """
+
 #        # Initialize subsystems
         self.l_SS=1.5
         self.d_SS=0.19
@@ -431,20 +394,10 @@ class SimpleSAM():
         Returns:
             state_vector_dot: Time derivative of complete state vector
         """
-
-        # For quaternions
         eta = x[0:7]
         nu = x[7:13]
         u = x[13:19]
 
-        # For Euler angles
-        #eta = x[0:6]
-        #nu = x[6:12]
-        #u = x[12:18]
-
-        # NOTE: Not pretty, but does the job for now
-        #   Can be refactored into the actuator dynamics by having these
-        #   checks there.
         u = self.bound_actuators(u)
         u_ref = self.bound_actuators(u_ref)
 
@@ -470,7 +423,7 @@ class SimpleSAM():
         """
         u_bound = np.copy(u)
 
-        # FIXME: We control based on percentages right now.
+        # NOTE: We control based on percentages right now.
         #   If we want to send something different, we have to adjust here.
         if u[0] > 100: #self.vbs.x_vbs_max:
             u_bound[0] = 100 #self.vbs.x_vbs_max
@@ -486,6 +439,9 @@ class SimpleSAM():
         else:
             u_bound[1] = u[1]
 
+        # FIXME: Add the remaining actuator limits
+        # FIXME: call them as variable
+
         return u_bound
 
 
@@ -498,12 +454,10 @@ class SimpleSAM():
         # Extract Euler angles
         quat = eta[3:7]
         quat = quat/np.linalg.norm(quat)
-        self.psi, self.theta, self.phi = quaternion_to_angles(quat) # NOTE: the function uses quaternions as q1, q2, q3, q0
-
-        #self.phi, self.theta, self.psi = eta[3:6] 
+        self.psi, self.theta, self.phi = quaternion_to_angles(quat) 
 
         # Relative velocities due to current
-        u, v, w, p, q, r = nu
+        u, v, w, _, _, _ = nu
         u_c = self.V_c * math.cos(self.beta_c - self.psi)
         v_c = self.V_c * math.sin(self.beta_c - self.psi)
         self.nu_c = np.array([u_c, v_c, 0, 0, 0, 0], float)
@@ -576,21 +530,18 @@ class SimpleSAM():
 
         self.J_total = J_ss_co + J_vbs_co + J_lcg_co
 
+
     def calculate_M(self):
+        """
+        Calculated the mass matrix M
+        """
 
         # Rigid-body mass matrix expressed in CO
         m_diag = np.diag([self.m, self.m, self.m])
 
-        MRB_CG = block_diag(m_diag, self.J_total)
-        # NOTE: We calculate J_total already in the CO,
-        #   That's why we don't use the additional transformation below,
-        #   but set MRB_CG = MRB. Not quite right with the masses, but
-        #   close enough.
-
-        #H_rg = Hmtrx(self.p_OG_O)
-        #self.MRB = H_rg.T @ MRB_CG @ H_rg  # MRB expressed in the CO
-
-        self.MRB = MRB_CG
+        # Rigid-body mass matrix with total inertia in CO
+        MRB_CO = block_diag(m_diag, self.J_total)
+        self.MRB = MRB_CO
 
         # Added moment of inertia in roll: A44 = r44 * Ix
         r44 = 0.3
@@ -608,11 +559,15 @@ class SimpleSAM():
                 (2 - e ** 2) * (2 * e ** 2 - (2 - e ** 2) * (beta_0 - alpha_0)))
 
         # Added mass system matrix expressed in the CO
-        self.MA = np.diag([self.m * k1, self.m * k2, self.m * k2, MA_44, k_prime * self.J_total[1,1], k_prime * self.J_total[1,1]])
+        self.MA = np.diag([self.m * k1,
+                           self.m * k2,
+                           self.m * k2,
+                           MA_44,
+                           k_prime * self.J_total[1,1],
+                           k_prime * self.J_total[1,1]])
 
         # Mass matrix including added mass
         self.M = self.MRB + self.MA
-
         self.Minv = np.linalg.inv(self.M)
 
 
@@ -623,7 +578,6 @@ class SimpleSAM():
         CRB = m2c(self.MRB, self.nu_r)
         CA = m2c(self.MA, self.nu_r)
 
-        # Zero certain CA terms if originally done so
         CA[4, 0] = 0
         CA[0, 4] = 0
         CA[4, 2] = 0
@@ -639,11 +593,9 @@ class SimpleSAM():
         """
         Calculate damping
         """
-        # FIXME: All parameters are best guesses right now. They need to be
-        # properly identified.
-
         # Damping matrix based on Bhat 2021
         # Parameters from smarc_advanced_controllers mpc_inverted_pendulum...
+        # NOTE: These need to be identified properly
         # Damping coefficients
         Xuu = 3 #100     # x-damping
         Yvv = 50    # y-damping
@@ -675,52 +627,28 @@ class SimpleSAM():
         self.D[3,2] = y_cp * Zww * np.abs(self.nu_r[2])
         self.D[4,2] = -x_cp * Zww * np.abs(self.nu_r[2])
 
-        # Fossen's remus100 damping matrix
-        # Doesn't include the cross-couplings, as seen above
-        ## Natural frequencies in roll and pitch
-        #self.w_roll = math.sqrt(self.W * (self.p_OG_O[2] - self.p_OB_O[2]) /
-        #                        self.M[3][3])
-        #self.w_pitch = math.sqrt(self.W * (self.p_OG_O[2] - self.p_OB_O[2]) /
-        #                         self.M[4][4])
-        ## Damping
-        #self.D = np.diag([
-        #    self.M[0, 0] / self.T_surge,
-        #    self.M[1, 1] / self.T_sway,
-        #    self.M[2, 2] / self.T_heave,
-        #    self.M[3, 3] * 2 * self.zeta_roll * self.w_roll,
-        #    self.M[4, 4] * 2 * self.zeta_pitch * self.w_pitch,
-        #    self.M[5, 5] / self.T_yaw
-        #])
-        #self.D[0, 0] *= math.exp(-3 * self.U_r)
-        #self.D[1, 1] *= math.exp(-3 * self.U_r)
-
     def calculate_g(self):
         """
         Calculate gravity vector
         """
         self.W = self.m * self.g
-
         self.g_vec = gvect(self.W, self.B, self.theta, self.phi, self.p_OG_O, self.p_OB_O)
+
 
     def calculate_tau(self, u):
         """
         All external forces
 
-        Note: for forceLiftDrag, we use nu instead of U_r since SAM behaves
-              like an ROV when we dive statically.
+        Note: We use a non-diagonal damping matrix, that takes forceLiftDrag
+            and the crossFlowDrag, i.e. the cross-couplings in the damping already
+            into account. If you use a diagonal matrix, you have to add these
+            forces here, as shown in the commented code below:
+
+            tau_liftdrag = forceLiftDrag(self.diam, self.S, self.CD_0, self.alpha, self.nu)
+            tau_crossflow = crossFlowDrag(self.L, self.diam, self.diam, self.nu_r)
         """
-        tau_liftdrag = forceLiftDrag(self.diam, self.S, self.CD_0, self.alpha, self.nu)
-        tau_crossflow = crossFlowDrag(self.L, self.diam, self.diam, self.nu_r)
         tau_prop = self.calculate_propeller_force(u)
-
-        # NOTE: We updated the damping to include the cross-couplings. That's
-        # why we set liftdrag and crossflow to zero. Further investigation is
-        # needed if that's correct or not. The current behaviour matches SAM
-        # fairly well.
-        tau_liftdrag = np.zeros(6)
-        tau_crossflow = np.zeros(6)
-
-        self.tau = tau_liftdrag + tau_crossflow + tau_prop
+        self.tau = tau_prop
 
 
     def calculate_propeller_force(self, u):
@@ -748,7 +676,6 @@ class SimpleSAM():
 
         tau_prop = np.zeros(6)
         for i in range(len(n_rpm)):
-
             if n_rps[i] > 0:
                 X_prop_i = self.rho*(D_prop**4)*(
                         KT_0*abs(n_rps[i])*n_rps[i] +
@@ -759,8 +686,7 @@ class SimpleSAM():
             else:
                 X_prop_i = self.rho * (D_prop ** 4) * KT_0 * abs(n_rps[i]) * n_rps[i]
                 K_prop_i = self.rho * (D_prop ** 5) * KQ_0 * abs(n_rps[i]) * n_rps[i]
-        
-                # NOTE: Check the r_t_p_sh. That's 0 so we don't have any influence from C_T2C
+
             F_prop_b = C_T2C @ np.array([X_prop_i, 0, 0])
             r_prop_i = C_T2C @ self.propellers.r_t_p_sh[i] - self.p_OC_O
             M_prop_i = np.cross(r_prop_i, F_prop_b) \
@@ -782,7 +708,13 @@ class SimpleSAM():
         x_vbs = (u[0]/100) * self.vbs.l_vbs_l
         return x_vbs
 
+
     def calculate_lcg_position(self, u):
+        """
+        Calculate the position of the LCG based on control input. The control
+        input is scaled between 0 and 100. This function converts it to the
+        actual physical location.
+        """
 
         p_LcgPos_LcgO = np.array([(u[1]/100) * self.lcg.l_lcg_l, # Position of the LCG w.r.t fixed LCG point
                                  0, 0])
@@ -795,18 +727,14 @@ class SimpleSAM():
         Computes the time derivative of position and quaternion orientation.
 
         Args:
-            eta: [x, y, z, q1, q2, q3, q0] - Position and quaternion
+            eta: [x, y, z, q0, q1, q2, q3] - Position and quaternion
             nu: [u, v, w, p, q, r] - Body-fixed velocities
 
         Returns:
             eta_dot: [ẋ, ẏ, ż, q̇0, q̇1, q̇2, q̇3]
         """
-        # FIXME: Revert to quaternions
-        #   Think about how to write pose controllers for that.
-
         # Extract position and quaternion
-        pos = eta[0:3]
-        q = eta[3:7]  # [q1, q2, q3, q0] where q0 is scalar part
+        q = eta[3:7]  # [q0, q1, q2, q3] where q0 is scalar part
 
         q = q/np.linalg.norm(q)
 
@@ -816,25 +744,8 @@ class SimpleSAM():
         # Position dynamics: ṗ = C * v
         pos_dot = C @ nu[0:3]
 
-        # Quaternion dynamics: q̇ = 1/2 * Ω * q where Ω is the quaternion kinematic matrix
-        # From https://www.google.com/url?sa=t&source=web&rct=j&opi=89978449&url=https://nescacademy.nasa.gov/review/downloadfile.php%3Ffile%3Dquat_ident.pdf%26id%3D120%26distr%3DPublic&ved=2ahUKEwjH3MHGzZWLAxXMKRAIHXZ5GRcQFnoECB8QAQ&usg=AOvVaw18LNsxi3AhFPI7xyfr-Qms
         om = nu[3:6]  # Angular velocity
         gamma = 100
-        #omega = nu[3:6]
-        #Omega = np.array([
-        #    [0, -omega[0], -omega[1], -omega[2]],
-        #    [omega[0], 0, omega[2], -omega[1]],
-        #    [omega[1], -omega[2], 0, omega[0]],
-        #    [omega[2], omega[1], -omega[0], 0]
-        #])
-
-        Omega = np.array([
-                         [0, om[2], -om[1], om[0]],
-                         [-om[2], 0, om[0], om[1]],
-                         [om[1], -om[0], 0, om[2]],
-                         [-om[0], -om[1], -om[2], 0]
-                         ])
-        q_dot_nasa = 0.5 * Omega @ q + gamma/2 * (1 - q.T.dot(q)) * q
 
         ## From Fossen 2021, eq. 2.78:
         q0, q1, q2, q3 = q
@@ -844,21 +755,10 @@ class SimpleSAM():
                                  [q3, q0, -q1],
                                  [-q2, q1, q0]
                                  ])
-        q_dot_fossen = T_q_n_b @ om + gamma/2 * (1 - q.T.dot(q)) * q
-
-        np.set_printoptions(precision=3)
-        print(f"q_dot nasa: {q_dot_nasa}")
-        print(f"q_dot fossen: {q_dot_fossen}")
-
-        q_dot = q_dot_fossen
+        q_dot = T_q_n_b @ om + gamma/2 * (1 - q.T.dot(q)) * q
 
         return np.concatenate([pos_dot, q_dot])
 
-        # For Euler angles
-        #p_dot   = np.matmul( Rzyx(eta[3], eta[4], eta[5]), nu[0:3] )
-        #v_dot   = np.matmul( Tzyx(eta[3], eta[4]), nu[3:6] )
-
-        #return np.concatenate([p_dot, v_dot])
 
     def actuator_dynamics(self, u_cur, u_ref):
         """
