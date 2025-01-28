@@ -49,7 +49,7 @@ def run_simulation(t_span, x0, sam):
         u[0] = 50#*np.sin((i/(20/0.02))*(3*np.pi/4))        # VBS/
         u[1] = 50 # LCG
         #u[2] = np.deg2rad(7)    # Vertical (stern)
-        u[3] = -np.deg2rad(7)   # Horizontal (rudder)
+        #u[3] = -np.deg2rad(7)   # Horizontal (rudder)
         u[4] = 1000     # RPM 1
         u[5] = u[4]     # RPM 2
         return sam.dynamics(x, u)

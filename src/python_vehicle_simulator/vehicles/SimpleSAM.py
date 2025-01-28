@@ -679,13 +679,16 @@ class SimpleSAM():
             if n_rps[i] > 0:
                 X_prop_i = self.rho*(D_prop**4)*(
                         KT_0*abs(n_rps[i])*n_rps[i] +
-                        (KT_max-KT_0)/Ja_max * (Va/D_prop) * abs(n_rps[i]))
+                        (KT_max-KT_0)/Ja_max * (Va/D_prop) * abs(n_rps[i])
+                        )
                 K_prop_i = self.rho * (D_prop**5) * (
                         KQ_0 * abs(n_rps[i]) * n_rps[i] +
                         (KQ_max-KQ_0)/Ja_max * (Va/D_prop) * abs(n_rps[i]))
             else:
-                X_prop_i = self.rho * (D_prop ** 4) * KT_0 * abs(n_rps[i]) * n_rps[i]
-                K_prop_i = self.rho * (D_prop ** 5) * KQ_0 * abs(n_rps[i]) * n_rps[i]
+                X_prop_i = self.rho * (D_prop ** 4) * (
+                        KT_0*abs(n_rps[i])*n_rps[i]
+                        )/10
+                K_prop_i = self.rho * (D_prop ** 5) * KQ_0 * abs(n_rps[i]) * n_rps[i] / 10
 
             F_prop_b = C_T2C @ np.array([X_prop_i, 0, 0])
             r_prop_i = C_T2C @ self.propellers.r_t_p_sh[i] - self.p_OC_O
@@ -695,6 +698,8 @@ class SimpleSAM():
                                     # momentum
             tau_prop_i = np.concatenate([F_prop_b, M_prop_i])
             tau_prop += tau_prop_i
+
+        print(f"X_prop: {X_prop_i}")
 
         return tau_prop
 
