@@ -311,10 +311,8 @@ class SimpleSAM():
 
         Args:
             t: Current time
-            state_vector: Combined state vector [eta, nu, ksi, ksi_dot]
-            signal_generator: MultiVariablePiecewiseSignal object for ksi_ddot signals
-
-            u: control inputs as [x_vbs, x_lcg, delta_s, delta_r, rpm1, rpm2]
+            x: state space vector with [eta, nu, u]
+            u_ref: control inputs as [x_vbs, x_lcg, delta_s, delta_r, rpm1, rpm2]
 
         Returns:
             state_vector_dot: Time derivative of complete state vector
@@ -326,6 +324,9 @@ class SimpleSAM():
         u = self.bound_actuators(u)
         u_ref = self.bound_actuators(u_ref)
 
+        u_dot = self.actuator_dynamics(u, u_ref)
+        u = u + u_dot * self.dt
+
         self.calculate_system_state(nu, eta, u)
         self.calculate_cg()
         self.update_inertias()
@@ -336,11 +337,12 @@ class SimpleSAM():
         self.calculate_tau(u)
 
         nu_dot = self.Minv @ (self.tau - np.matmul(self.C,self.nu_r) - np.matmul(self.D,self.nu_r) - self.g_vec)
-        eta_dot = self.eta_dynamics(eta, nu)
-        u_dot = self.actuator_dynamics(u, u_ref)
-        x_dot = np.concatenate([eta_dot, nu_dot, u_dot])
+        nu = nu + nu_dot*self.dt
 
-        return x_dot
+        eta_dot = self.eta_dynamics(eta, nu)
+        #x_dot = np.concatenate([eta_dot, nu_dot, u_dot])
+
+        return eta_dot, nu, u 
 
     def bound_actuators(self, u):
         """

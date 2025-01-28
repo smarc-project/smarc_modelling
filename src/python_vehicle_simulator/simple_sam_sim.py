@@ -61,7 +61,12 @@ def run_simulation(t_span, x0, sam):
 
     # Euler forward integration
     for i in range(n_sim-1):
-        data[:,i+1] = data[:,i] + dynamics_wrapper(i, data[:,i]) * (t_span[1]/n_sim)
+        eta_dot, nu, u = dynamics_wrapper(i, data[:,i])
+        data[0:7,i+1] = data[0:7,i] + eta_dot * (t_span[1]/n_sim)
+        data[7:13,i+1] = nu
+        data[13:,i+1] = u
+
+        #data[:,i+1] = data[:,i] + dynamics_wrapper(i, data[:,i]) * (t_span[1]/n_sim)
     sol = Sol(t_eval,data)
     print(f" Simulation complete!")
 
