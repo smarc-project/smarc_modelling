@@ -324,9 +324,6 @@ class SimpleSAM():
         u = self.bound_actuators(u)
         u_ref = self.bound_actuators(u_ref)
 
-        u_dot = self.actuator_dynamics(u, u_ref)
-        u = u + u_dot * self.dt
-
         self.calculate_system_state(nu, eta, u)
         self.calculate_cg()
         self.update_inertias()
@@ -337,12 +334,11 @@ class SimpleSAM():
         self.calculate_tau(u)
 
         nu_dot = self.Minv @ (self.tau - np.matmul(self.C,self.nu_r) - np.matmul(self.D,self.nu_r) - self.g_vec)
-        nu = nu + nu_dot*self.dt
-
+        u_dot = self.actuator_dynamics(u, u_ref)
         eta_dot = self.eta_dynamics(eta, nu)
-        #x_dot = np.concatenate([eta_dot, nu_dot, u_dot])
+        x_dot = np.concatenate([eta_dot, nu_dot, u_dot])
 
-        return eta_dot, nu, u 
+        return x_dot
 
     def bound_actuators(self, u):
         """
