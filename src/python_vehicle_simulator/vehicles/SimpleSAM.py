@@ -19,6 +19,7 @@ SAM.py:
    2. **Thrust Vectoring System**: Propellers can be deflected horizontally (rudder-like) and vertically (stern-plane-like) with angles up to ±7°, enabling agile maneuvers.
    3. **Variable Buoyancy System (VBS)**: Allows for depth control by altering buoyancy through water intake and release.
    4. **Adjustable Center of Gravity (c.g.) Control**: Movable battery packs adjust the longitudinal and transversal c.g. positions, allowing for pitch and roll control.
+   5. **Rotating Counterweights**: Provides static roll control by shifting weight in the transverse direction.
 
    Sensor systems:
    - **IMU**: Inertial Measurement Unit for attitude and acceleration.
@@ -31,16 +32,23 @@ SAM.py:
 
 Methods:
 
-    [xdot] = dynamics(x, u_ref) returns for integration
+    [nu,u_actual] = dynamics(eta,nu,u_actual,u_control,sampleTime ) returns
+        nu[k+1] and u_actual[k+1] using Variable RK method(Possibility for other Methods). The control input is:
 
-    u_ref: control inputs as [x_vbs, x_lcg, delta_s, delta_r, rpm1, rpm2]
+    FIXME: That's not correct anymore
+            u_control = [ delta_r   rudder angle (rad)
+                         delta_s    stern plane angle (rad)
+                         rpm_1      propeller 1 revolution (rpm)
+                         rpm_2      propeller 2 revolution (rpm)
+                         vbs        variable buoyancy system control
+                         lcg        longitudinal center of gravity adjustment ]
 
-        - **vbs**: Variable buoyancy system control, which adjusts buoyancy to control depth.
-        - **lcg**: Longitudinal center of gravity adjustment by moving the battery pack to control pitch.
-        - **delta_s**: Stern plane angle for vertical thrust vectoring, used to control pitch (nose up/down).
         - **delta_r**: Rudder angle for horizontal thrust vectoring, used to control yaw (turning left/right).
+        - **delta_s**: Stern plane angle for vertical thrust vectoring, used to control pitch (nose up/down).
         - **rpm_1**: Propeller RPM for the first (counter-rotating) propeller, controlling forward thrust.
         - **rpm_2**: Propeller RPM for the second (counter-rotating) propeller, also controlling forward thrust and balancing roll.
+        - **vbs**: Variable buoyancy system control, which adjusts buoyancy to control depth.
+        - **lcg**: Longitudinal center of gravity adjustment by moving the battery pack to control pitch.
 
 References:
 
@@ -49,6 +57,7 @@ References:
 
     T. I. Fossen (2021). Handbook of Marine Craft Hydrodynamics and Motion Control. 2nd Edition, Wiley.
         URL: www.fossen.biz/wiley
+
 
 Author:     Omid Mirzaeedodangeh
 
@@ -61,26 +70,26 @@ from scipy.linalg import block_diag
 from python_vehicle_simulator.lib.gnc import *
 
 
-class SolidStructure:
-    """
-    Represents the Solid Structure (SS) of the SAM AUV.
-
-    Attributes:
-        l_SS: Length of the solid structure (m).
-        d_SS: Diameter of the solid structure (m).
-        m_SS: Mass of the solid structure (kg).
-        p_CSsg_O: Vector from frame C to CG of SS expressed in O (m)
-        p_OSsg_O: Vector from CO to CG of SS expressed in O (m)
-    """
-
-    def __init__(self, l_ss, d_ss, m_ss, p_CSsg_O, p_OC_O):
-        self.l_ss = l_ss
-        self.d_ss = d_ss
-        self.m_ss = m_ss
-        self.p_CSsg_O = p_CSsg_O
-        self.p_OSsg_O = p_OC_O + self.p_CSsg_O
-
-
+#class SolidStructure:
+#    """
+#    Represents the Solid Structure (SS) of the SAM AUV.
+#
+#    Attributes:
+#        l_SS: Length of the solid structure (m).
+#        d_SS: Diameter of the solid structure (m).
+#        m_SS: Mass of the solid structure (kg).
+#        J_SS_c: Inertia tensor of the solid structure relative to the body frame (kg·m²).
+#        r_SS_c: Position vector of the SS center of gravity (CG) relative to the central frame (m).
+#    """
+#
+#    def __init__(self, l_SS, d_SS, m_SS, J_SS_c, r_SS_c):
+#        self.l_SS = l_SS
+#        self.d_SS = d_SS
+#        self.m_SS = m_SS
+#        self.J_SS_c = J_SS_c
+#        self.r_SS_c = r_SS_c
+#
+#
 class VariableBuoyancySystem:
     """
     VariableBuoyancySystem Class
@@ -88,27 +97,32 @@ class VariableBuoyancySystem:
     Represents the Variable Buoyancy System (VBS) of the AUV.
 
     Parameters:
-        d_vbs (float): Diameter of the VBS (m).
-        l_vbs_l (float): Length of the VBS capsule (m).
-        p_CVbs_O: Vector from frame C to CG of VBS in CO (m)
-        p_OC_O: Vector from CO to C in CO
+        -d_vbs (float): Diameter of the VBS (m).
+        -l_vbs_l (float): Length of the VBS capsule (m).
+        -h_vbs (float): Vertical offset of the VBS CG (m).
+        -l_vbs_b (float): Horizontal offset length of the VBS CG (m).
+        -m_vbs_sh (float): Mass of the VBS shaft (kg).
+        -r_vbs_sh_cg (list or np.array): Vector from the shaft center to the end boundary of the water in the VBS (m).
+        -J_vbs_sh_cg (np.array): Moment of inertia of the VBS shaft around its CG (3x3 matrix).
 
     Vectors follow Tedrake's monogram:
     https://manipulation.csail.mit.edu/pick.html#monogram
     """
 
-    def __init__(self, r_vbs, l_vbs_l, p_CVbs_O, p_OC_O, rho_w):
+    def __init__(self, d_vbs, l_vbs_l, h_vbs, l_vbs_b, m_vbs_sh, r_vbs_sh_cg, J_vbs_sh_cg):
         # Physical parameters
-        self.r_vbs = r_vbs  # Radius of VBS chamber (m)
+        self.d_vbs = d_vbs  # Diameter of VBS (m)
         self.l_vbs_l = l_vbs_l  # Length of VBS capsule (m)
-        self.p_CVbs_O = p_CVbs_O
-        self.p_OVbs_O = p_OC_O + p_CVbs_O # FIXME: Check this how it goes into the CG calculation of the VBS. It changes with x_vbs, so you might want to adjust it as well.
-        self.m_vbs = rho_w * np.pi * self.r_vbs ** 2 * self.l_vbs_l/2 # Init the vbs with 50%
+        self.h_vbs = h_vbs  # Vertical offset of VBS CG (m)
+        self.l_vbs_b = l_vbs_b  # Horizontal offset of VBS CG (m)
+        self.m_vbs_sh = m_vbs_sh  # Mass of VBS shaft (kg)
+        self.r_vbs_sh_cg = r_vbs_sh_cg  # Vector from shaft center to water boundary (m)
+        self.J_vbs_sh_cg = J_vbs_sh_cg  # Moment of inertia of VBS shaft (kg·m²)
 
         # Motion bounds
         self.x_vbs_min = 0  # Minimum VBS position (m)
         self.x_vbs_max = l_vbs_l  # Maximum VBS position (m)
-        self.x_vbs_dot_min = -10  # Maximum retraction speed (m/s)
+        self.x_vbs_dot_min = -0.1  # Maximum retraction speed (m/s)
         self.x_vbs_dot_max = 10 # FIXME: This is an estimate. Need to adjust, since the speed is given in mm/s, but we control on percentages right now. Maximum extension speed (m/s)
 
 
@@ -119,19 +133,22 @@ class LongitudinalCenterOfGravityControl:
     Attributes:
         l_lcg_l: Length of the LCG structure along the x-axis (m).
         l_lcg_r: Maximum position of the LCG in the x-direction (m).
+        l_lcg_b: Additional offset length along the x-axis (m).
+        h_lcg: Vertical offset of the CG along the z-axis relative to the central frame (m).
         m_lcg: Mass of the LCG (kg).
         h_lcg_dim: Height of the LCG structure (m).
-        p_OC_O: Vector from CO to C in CO
+        d_lcg: Width of the LCG structure (m).
     """
 
-    def __init__(self, l_lcg_l, l_lcg_r, m_lcg, h_lcg_dim, p_OC_O):
+    def __init__(self, l_lcg_l, l_lcg_r, l_lcg_b, h_lcg, m_lcg, h_lcg_dim, d_lcg):
         # Physical parameters
         self.l_lcg_l = l_lcg_l  # Length of LCG structure (m)
         self.l_lcg_r = l_lcg_r  # Maximum x-direction position (m)
+        self.l_lcg_b = l_lcg_b  # Additional x-axis offset (m)
+        self.h_lcg = h_lcg  # Vertical CG offset (m)
         self.m_lcg = m_lcg  # Mass of LCG (kg)
         self.h_lcg_dim = h_lcg_dim  # Height of LCG structure (m)
-        p_CLcgpos_O = np.array([0.608+self.l_lcg_l/2, 0, 0.130]) # "Beginning" of the LCG in C frame. Mass moves from here
-        self.p_OLcgPos_O = p_OC_O + p_CLcgpos_O # Vector from CO to LCG position 0 in O
+        self.d_lcg = d_lcg  # Width of LCG structure (m)
 
         # Motion bounds
         self.x_lcg_min = 0  # Minimum LCG position (m)
@@ -139,20 +156,59 @@ class LongitudinalCenterOfGravityControl:
         self.x_lcg_dot_min = -0.1  # Maximum retraction speed (m/s)
         self.x_lcg_dot_max = 15  # FIXME: This is an estimate. Need to adjust, since the speed is given in mm/s, but we control on percentages right now. Maximum extension speed (m/s)
 
-
+#
+#class ThrusterShaft:
+#    """
+#    Represents the Thruster Shaft (Tsh) of the SAM AUV.
+#
+#    Attributes:
+#        l_t_sh: Length of the thruster shaft (m).
+#        r_t_sh_t: Position vector of the CG relative to the thruster frame origin (m).
+#        m_t_sh: Mass of the thruster shaft (kg).
+#        J_t_sh_t: Inertia tensor of the thruster shaft relative to the thruster frame (kg·m²).
+#    """
+#
+#    def __init__(self, l_t_sh, r_t_sh_t, m_t_sh, J_t_sh_t):
+#        # Physical parameters
+#        self.l_t_sh = l_t_sh  # Length of thruster shaft (m)
+#        self.r_t_sh_t = r_t_sh_t  # CG position vector (m)
+#        self.m_t_sh = m_t_sh  # Mass of thruster shaft (kg)
+#        self.J_t_sh_t = J_t_sh_t  # Inertia tensor (kg·m²)
+#
+#        # Control surface angle bounds
+#        self.delta_s_min = -15 * np.pi / 180  # Min stern plane angle (rad)
+#        self.delta_s_max = 15 * np.pi / 180  # Max stern plane angle (rad)
+#        self.delta_r_min = -15 * np.pi / 180  # Min rudder angle (rad)
+#        self.delta_r_max = 15 * np.pi / 180  # Max rudder angle (rad)
+#
+#        # Control surface angular rate bounds
+#        self.delta_s_dot_min = -10 * np.pi / 180  # Max stern plane rate (rad/s)
+#        self.delta_s_dot_max = 10 * np.pi / 180
+#        self.delta_r_dot_min = -10 * np.pi / 180  # Max rudder rate (rad/s)
+#        self.delta_r_dot_max = 10 * np.pi / 180
+#
+#
 class Propellers:
     """
     Represents the Propellers (TP) of the SAM AUV.
 
     Attributes:
         n_p: Number of propellers.
+        l_t_p (np.array): List of fixed offsets of each propeller along the x-axis relative to the thruster frame (m).
+        m_t_p (np.array): List of masses of each propeller (kg).
+        r_t_p: List of CG position vectors of each propeller (np.array) relative to the propeller frame (m).
         r_t_p_sh: List of each propeller location on thruster shaft (np.array) relative to the thruster frame (m).
+        J_t_p: List of inertia tensors of each propellers (np.array) in the propeller frame (kg·m²).
     """
 
-    def __init__(self, n_p, r_t_p_sh):
+    def __init__(self, n_p, l_t_p, m_t_p, r_t_p, r_t_p_sh, J_t_p):
         # Physical parameters
         self.n_p = n_p  # Number of propellers
+        self.l_t_p = l_t_p  # Fixed x-axis offsets list
+        self.m_t_p = m_t_p  # Mass list
+        self.r_t_p = r_t_p  # CG position vectors list
         self.r_t_p_sh = r_t_p_sh  # Shaft center locations list
+        self.J_t_p = J_t_p  # Inertia tensors list
 
         # RPM bounds
         self.rpm_min = np.zeros(n_p) - 1525  # Min RPM per propeller
@@ -161,20 +217,27 @@ class Propellers:
         self.rpm_dot_max = np.zeros(n_p) + 100  # Max acceleration (RPM/s)
 
 
+
 # Class Vehicle
 class SimpleSAM():
     """
     SAM()
         Integrates all subsystems of the Small and Affordable Maritime AUV.
 
+    Control Modes:
+        'depthHeadingAutopilot': Depth and heading autopilots
+        'stepInput': Step inputs for VBS, LCG, stern planes, rudder, and propellers
 
     Attributes:
-        eta: [x, y, z, q0, q1, q2, q3] - Position and quaternion orientation
+        eta: [x, y, z, q1, q2, q3, q0] - Position and quaternion orientation
         nu: [u, v, w, p, q, r] - Body-fixed linear and angular velocities
+        ksi: Time-varying parameters [x_vbs, x_lcg, delta_s, delta_r, rpm1, rpm2]
+        ksi_dot: Time derivatives of ksi
 
     Vectors follow Tedrake's monogram:
     https://manipulation.csail.mit.edu/pick.html#monogram
     """
+
     def __init__(
             self,
             dt=0.02,
@@ -203,8 +266,8 @@ class SimpleSAM():
 
         # Initialize the AUV model
         self.name = ("SAM")
-        self.L = self.ss.l_ss  # length (m)
-        self.diam = self.ss.d_ss  # cylinder diameter (m)
+        self.L = self.l_SS  # length (m)
+        self.diam = self.d_SS  # cylinder diameter (m)
 
         # Hydrodynamics (Fossen 2021, Section 8.4.2)
         self.a = self.L / 2  # semi-axes
@@ -215,95 +278,107 @@ class SimpleSAM():
         self.p_OB_O = np.array([0., 0, 0], float)  # CB w.r.t. to the CO
 
         # Rigid-body mass matrix expressed in CO
-        self.m = self.ss.m_ss + self.vbs.m_vbs + self.lcg.m_lcg
+        self.x_vbs = 0.0
+        self.r_vbs = 0.0425 # Radius of the VBS
+        self.m_vbs = self.rho_w * np.pi * self.r_vbs ** 2 * 0.0225
+        self.m = self.m_ss + self.m_vbs + self.m_lcg
         self.J_total = np.zeros((3,3)) 
         self.MRB = np.zeros((6,6)) 
         self.MA = np.zeros((6,6)) 
         self.M = np.zeros((6,6)) 
         self.Minv = np.zeros((6,6)) 
 
-        # Added moment of inertia in roll: A44 = r44 * Ix
-        self.r44 = 0.3
-
-        # Lamb's k-factors
-        e = math.sqrt(1 - (self.b / self.a) ** 2)
-        alpha_0 = (2 * (1 - e ** 2) / pow(e, 3)) * (0.5 * math.log((1 + e) / (1 - e)) - e)
-        beta_0 = 1 / (e ** 2) - (1 - e ** 2) / (2 * pow(e, 3)) * math.log((1 + e) / (1 - e))
-
-        self.k1 = alpha_0 / (2 - alpha_0)
-        self.k2 = beta_0 / (2 - beta_0)
-        self.k_prime = pow(e, 4) * (beta_0 - alpha_0) / (
-                (2 - e ** 2) * (2 * e ** 2 - (2 - e ** 2) * (beta_0 - alpha_0)))
-
         # Weight and buoyancy
         self.W = self.m * self.g
         self.B = self.W # NOTE: Init buoyancy as dry mass + half the VBS
 
-        # Damping matrix based on Bhat 2021
-        # Parameters from smarc_advanced_controllers mpc_inverted_pendulum...
+        # Mass matrix including added mass
+        self.M = np.zeros((6,6)) #self.MRB + self.MA
+        self.Minv = np.zeros((6,6)) #np.linalg.inv(self.M)
 
-        self.D = np.zeros((6,6))
-
-        # NOTE: These need to be identified properly
-        # Damping coefficients
-        self.Xuu = 3 #100     # x-damping
-        self.Yvv = 50    # y-damping
-        self.Zww = 50    # z-damping
-        self.Kpp = 40    # Roll damping
-        self.Mqq = 200    # Pitch damping
-        self.Nrr = 10    # Yaw damping
-
-        # Center of effort -> where the thrust force acts?
-        self.x_cp = 0.1
-        self.y_cp = 0
-        self.z_cp = 0
-
-        # Propeller Coefficients
-        self.D_prop = 0.14
-        self.Va_coef = 0.944
-        self.KT_0 = 0.4566
-        self.KQ_0 = 0.0700
-        self.KT_max = 0.1798
-        self.KQ_max = 0.0312
-        self.Ja_max = 0.6632
-
-        self.gamma = 100 # Scaling factor for numerical stability of quaternion differentiation
 
     def init_vehicle(self):
         """
         Initialize all subsystems based on their respective parameters
         """
-        self.ss = SolidStructure(
-            l_ss=1.5,
-            d_ss=0.19,
-            m_ss=14.9,
-            p_CSsg_O = np.array([0.74, 0, 0.06]),
-            p_OC_O=self.p_OC_O
-        )
 
+#        # Initialize subsystems
+        self.l_SS=1.5
+        self.d_SS=0.19
+        self.m_ss=14.9
+        p_CSSg_O = np.array([0.74, 0, 0.06]) 
+        self.p_CSSg_O = p_CSSg_O
+        self.p_OSsg_O = self.p_OC_O + self.p_CSSg_O
+#        self.solid_structure = SolidStructure(
+#            l_SS=1.5,
+#            d_SS=0.19,
+#            m_SS=14.9,
+#            #J_SS_c=np.array([[10, 0, 0], [0, 15, 0], [0, 0, 20]]),
+#            # Moment of inertia based on cylinder
+#            J_SS_c=np.array([[0.5 * m_SS * (d_SS/2)**2, 0, 0],
+#                             [0, 1/12 * m_SS * (3*(d_SS/2)**2 + l_SS**2), 0],
+#                             [0, 0, 1/12 * m_SS * (3*(d_SS/2)**2 + l_SS**2)]]),
+#            r_SS_c=np.array([0.75, 0, 0.1])
+#        )
+
+        # NOTE: Adjusted values
+        # All values in m
+        # Now the water mass for a full VBS makes more sense
+        p_CVbs_O = np.array([0.404, 0, 0.0125]) 
+        self.p_OVbs_O = self.p_OC_O + p_CVbs_O # FIXME: Check this how it goes into the CG calculation of the VBS. It changes with x_vbs, so you might want to adjust it as well.
         self.vbs = VariableBuoyancySystem(
-            r_vbs=0.0425,
+            d_vbs=0.085,
             l_vbs_l=0.045,
-            p_CVbs_O = np.array([0.404, 0, 0.0125]),
-            p_OC_O=self.p_OC_O,
-            rho_w=self.rho_w
+            h_vbs=0.01,
+            l_vbs_b=0.2,
+            m_vbs_sh=0.1,
+            r_vbs_sh_cg=np.array([0.1, 0, 0]),
+            J_vbs_sh_cg=np.diag([1, 2, 3])
         )
 
+        self.m_lcg = 2.6
+        self.l_lcg_l = 0.223
+        p_CLcgpos_O = np.array([0.608+self.l_lcg_l/2, 0, 0.130]) # "Beginning" of the LCG in C frame. Mass moves from here
+        self.p_OLcgPos_O = self.p_OC_O + p_CLcgpos_O
+        self.h_lcg_dim = 0.08
+        # NOTE: Adjusted Values
         self.lcg = LongitudinalCenterOfGravityControl(
-            l_lcg_l=0.223,
-            l_lcg_r=0.06,
-            m_lcg=2.6,
-            h_lcg_dim=0.08,
-            p_OC_O=self.p_OC_O
+            l_lcg_l=0.2,
+            l_lcg_r=0, #0.06,
+            l_lcg_b=0, #1.0,
+            h_lcg=0, #0.1,
+            m_lcg=self.m_lcg,
+            h_lcg_dim=self.h_lcg_dim, #0.1,
+            d_lcg=0 #0.1
         )
-
+#
+#        # NOTE: Adjusted values
+#        self.thruster_shaft = ThrusterShaft(
+#            l_t_sh=0, #0.3,
+#            r_t_sh_t=np.array([0.15, 0, -0.05])*0,
+#            m_t_sh=0, #1.0,
+#            J_t_sh_t=np.zeros((3,3)) #np.array([[1, 0, 0], [0, 2, 0], [0, 0, 3]])
+#        )
+#
         self.propellers = Propellers(
             n_p=2,
+            l_t_p=np.zeros(2), #np.array([0.1, 0.15]),
+            m_t_p=np.zeros(2), #np.array([1.5, 1.8]),
+            r_t_p=[
+                np.zeros(3), #np.array([0.05, 0, -0.02]),
+                np.zeros(3) #np.array([0.075, 0, -0.03])
+            ],
             r_t_p_sh=[
                 np.array([0.03, 0, 0]),
                 np.array([0.04, 0, 0])
+            ],
+            J_t_p=[
+                np.zeros((3,3)), #np.array([[0.3, 0, 0], [0, 0.4, 0], [0, 0, 0.5]]),
+                np.zeros((3,3)) #np.array([[0.35, 0, 0], [0, 0.45, 0], [0, 0, 0.55]])
             ]
         )
+
+
 
     def dynamics(self, x, u_ref):
         """
@@ -371,6 +446,7 @@ class SimpleSAM():
 
         return u_bound
 
+
     def calculate_system_state(self, x, eta, u_control):
         """
         Extract speeds etc. based on state and control inputs
@@ -401,16 +477,18 @@ class SimpleSAM():
         self.p_OLcg_O = self.calculate_lcg_position(u_control)
 
         # Update mass
-        self.vbs.m_vbs = self.rho_w * np.pi * self.vbs.r_vbs ** 2 * self.x_vbs
-        self.m = self.ss.m_ss + self.vbs.m_vbs + self.lcg.m_lcg
+        self.m_vbs = self.rho_w * np.pi * self.r_vbs ** 2 * self.x_vbs
+        self.m = self.m_ss + self.m_vbs + self.m_lcg
+
 
     def calculate_cg(self):
         """
         Compute the center of gravity based on VBS and LCG position
         """
-        self.p_OG_O = (self.ss.m_ss/self.m) * self.ss.p_OSsg_O \
-                    + (self.vbs.m_vbs/self.m) * self.vbs.p_OVbs_O \
-                    + (self.lcg.m_lcg/self.m) * self.p_OLcg_O
+        self.p_OG_O = (self.m_ss/self.m) * self.p_OSsg_O \
+                    + (self.m_vbs/self.m) * self.p_OVbs_O \
+                    + (self.m_lcg/self.m) * self.p_OLcg_O
+
 
     def update_inertias(self):
         """
@@ -424,35 +502,36 @@ class SimpleSAM():
         # Moment of inertia of a solid elipsoid
         # https://en.wikipedia.org/wiki/List_of_moments_of_inertia
         # with b = c.
-        Ix = (2 / 5) * self.ss.m_ss * self.b ** 2  # moment of inertia
-        Iy = (1 / 5) * self.ss.m_ss * (self.a ** 2 + self.b ** 2)
+        Ix = (2 / 5) * self.m_ss * self.b ** 2  # moment of inertia
+        Iy = (1 / 5) * self.m_ss * (self.a ** 2 + self.b ** 2)
         Iz = Iy
 
         J_ss_cg = np.diag([Ix, Iy, Iz]) # In center of gravity
-        S2_p_OSsg_O = skew_symmetric(self.ss.p_OSsg_O) @ skew_symmetric(self.ss.p_OSsg_O)
-        J_ss_co = J_ss_cg - self.ss.m_ss * S2_p_OSsg_O
+        S2_p_OSsg_O = skew_symmetric(self.p_OSsg_O) @ skew_symmetric(self.p_OSsg_O)
+        J_ss_co = J_ss_cg - self.m_ss * S2_p_OSsg_O
 
         # VBS
         # Moment of inertia of a solid cylinder
-        Ix_vbs = (1/2) * self.vbs.m_vbs * self.vbs.r_vbs**2
-        Iy_vbs = (1/12) * self.vbs.m_vbs * (3*self.vbs.r_vbs**2 + self.x_vbs**2)
+        Ix_vbs = (1/2) * self.m_vbs * self.r_vbs**2
+        Iy_vbs = (1/12) * self.m_vbs * (3*self.r_vbs**2 + self.x_vbs**2)
         Iz_vbs = Iy_vbs
 
         J_vbs_cg = np.diag([Ix_vbs, Iy_vbs, Iz_vbs])
-        S2_r_vbs_cg = skew_symmetric(self.vbs.p_OVbs_O) @ skew_symmetric(self.vbs.p_OVbs_O)
-        J_vbs_co = J_vbs_cg - self.vbs.m_vbs * S2_r_vbs_cg
+        S2_r_vbs_cg = skew_symmetric(self.p_OVbs_O) @ skew_symmetric(self.p_OVbs_O)
+        J_vbs_co = J_vbs_cg - self.m_vbs * S2_r_vbs_cg
 
         # LCG
         # Moment of inertia of a solid cylinder
-        Ix_lcg = (1/2) * self.lcg.m_lcg * (self.lcg.h_lcg_dim/2)**2
-        Iy_lcg = (1/12) * self.lcg.m_lcg* (3*(self.lcg.h_lcg_dim/2)**2 + self.lcg.l_lcg_l**2)
+        Ix_lcg = (1/2) * self.m_lcg * (self.h_lcg_dim/2)**2
+        Iy_lcg = (1/12) * self.m_lcg* (3*(self.h_lcg_dim/2)**2 + self.l_lcg_l**2)
         Iz_lcg = Iy_lcg
 
         J_lcg_cg = np.diag([Ix_lcg, Iy_lcg, Iz_lcg])
         S2_r_lcg_cg = skew_symmetric(self.p_OLcg_O) @ skew_symmetric(self.p_OLcg_O)
-        J_lcg_co = J_lcg_cg - self.lcg.m_lcg * S2_r_lcg_cg
+        J_lcg_co = J_lcg_cg - self.m_lcg * S2_r_lcg_cg
 
         self.J_total = J_ss_co + J_vbs_co + J_lcg_co
+
 
     def calculate_M(self):
         """
@@ -467,19 +546,32 @@ class SimpleSAM():
         self.MRB = MRB_CO
 
         # Added moment of inertia in roll: A44 = r44 * Ix
-        MA_44 = self.r44 * self.J_total[0,0]
+        r44 = 0.3
+        MA_44 = r44 * self.J_total[0,0]
+
+        # FIXME: This seems to be static, so put it back into init
+        # Lamb's k-factors
+        e = math.sqrt(1 - (self.b / self.a) ** 2)
+        alpha_0 = (2 * (1 - e ** 2) / pow(e, 3)) * (0.5 * math.log((1 + e) / (1 - e)) - e)
+        beta_0 = 1 / (e ** 2) - (1 - e ** 2) / (2 * pow(e, 3)) * math.log((1 + e) / (1 - e))
+
+        k1 = alpha_0 / (2 - alpha_0)
+        k2 = beta_0 / (2 - beta_0)
+        k_prime = pow(e, 4) * (beta_0 - alpha_0) / (
+                (2 - e ** 2) * (2 * e ** 2 - (2 - e ** 2) * (beta_0 - alpha_0)))
 
         # Added mass system matrix expressed in the CO
-        self.MA = np.diag([self.m * self.k1,
-                           self.m * self.k2,
-                           self.m * self.k2,
+        self.MA = np.diag([self.m * k1,
+                           self.m * k2,
+                           self.m * k2,
                            MA_44,
-                           self.k_prime * self.J_total[1,1],
-                           self.k_prime * self.J_total[1,1]])
+                           k_prime * self.J_total[1,1],
+                           k_prime * self.J_total[1,1]])
 
         # Mass matrix including added mass
         self.M = self.MRB + self.MA
         self.Minv = np.linalg.inv(self.M)
+
 
     def calculate_C(self):
         """
@@ -503,21 +595,39 @@ class SimpleSAM():
         """
         Calculate damping
         """
+        # Damping matrix based on Bhat 2021
+        # Parameters from smarc_advanced_controllers mpc_inverted_pendulum...
+        # NOTE: These need to be identified properly
+        # Damping coefficients
+        Xuu = 3 #100     # x-damping
+        Yvv = 50    # y-damping
+        Zww = 50    # z-damping
+        Kpp = 40    # Roll damping
+        Mqq = 200    # Pitch damping
+        Nrr = 10    # Yaw damping
+
+        # Center of effort -> where the thrust force acts?
+        x_cp = 0.1
+        y_cp = 0
+        z_cp = 0
+
+        self.D = np.zeros((6,6))
+
         # Nonlinear damping
-        self.D[0,0] = self.Xuu * np.abs(self.nu_r[0])
-        self.D[1,1] = self.Yvv * np.abs(self.nu_r[1])
-        self.D[2,2] = self.Zww * np.abs(self.nu_r[2])
-        self.D[3,3] = self.Kpp * np.abs(self.nu_r[3])
-        self.D[4,4] = self.Mqq * np.abs(self.nu_r[4])
-        self.D[5,5] = self.Nrr * np.abs(self.nu_r[5])
+        self.D[0,0] = Xuu * np.abs(self.nu_r[0])
+        self.D[1,1] = Yvv * np.abs(self.nu_r[1])
+        self.D[2,2] = Zww * np.abs(self.nu_r[2])
+        self.D[3,3] = Kpp * np.abs(self.nu_r[3])
+        self.D[4,4] = Mqq * np.abs(self.nu_r[4])
+        self.D[5,5] = Nrr * np.abs(self.nu_r[5])
 
         # Cross couplings
-        self.D[4,0] = self.z_cp * self.Xuu * np.abs(self.nu_r[0])
-        self.D[5,0] = -self.y_cp * self.Xuu * np.abs(self.nu_r[0])
-        self.D[3,1] = -self.z_cp * self.Yvv * np.abs(self.nu_r[1])
-        self.D[5,1] = self.x_cp * self.Yvv * np.abs(self.nu_r[1])
-        self.D[3,2] = self.y_cp * self.Zww * np.abs(self.nu_r[2])
-        self.D[4,2] = -self.x_cp * self.Zww * np.abs(self.nu_r[2])
+        self.D[4,0] = z_cp * Xuu * np.abs(self.nu_r[0])
+        self.D[5,0] = -y_cp * Xuu * np.abs(self.nu_r[0])
+        self.D[3,1] = -z_cp * Yvv * np.abs(self.nu_r[1])
+        self.D[5,1] = x_cp * Yvv * np.abs(self.nu_r[1])
+        self.D[3,2] = y_cp * Zww * np.abs(self.nu_r[2])
+        self.D[4,2] = -x_cp * Zww * np.abs(self.nu_r[2])
 
     def calculate_g(self):
         """
@@ -525,6 +635,7 @@ class SimpleSAM():
         """
         self.W = self.m * self.g
         self.g_vec = gvect(self.W, self.B, self.theta, self.phi, self.p_OG_O, self.p_OB_O)
+
 
     def calculate_tau(self, u):
         """
@@ -541,6 +652,7 @@ class SimpleSAM():
         tau_prop = self.calculate_propeller_force(u)
         self.tau = tau_prop
 
+
     def calculate_propeller_force(self, u):
         """
         Calculate force and torque of the propellers
@@ -554,24 +666,31 @@ class SimpleSAM():
         # Compute propeller forces
         C_T2C = calculate_dcm(order=[2, 3], angles=[delta_s, delta_r])
 
+        D_prop = 0.14
         n_rps = n_rpm / 60   
-        Va = self.Va_coef * self.U
+        Va = 0.944 * self.U
+
+        KT_0 = 0.4566
+        KQ_0 = 0.0700
+        KT_max = 0.1798
+        KQ_max = 0.0312
+        Ja_max = 0.6632
 
         tau_prop = np.zeros(6)
         for i in range(len(n_rpm)):
             if n_rps[i] > 0:
-                X_prop_i = self.rho*(self.D_prop**4)*(
-                        self.KT_0*abs(n_rps[i])*n_rps[i] +
-                        (self.KT_max-self.KT_0)/self.Ja_max * (Va/self.D_prop) * abs(n_rps[i])
+                X_prop_i = self.rho*(D_prop**4)*(
+                        KT_0*abs(n_rps[i])*n_rps[i] +
+                        (KT_max-KT_0)/Ja_max * (Va/D_prop) * abs(n_rps[i])
                         )
-                K_prop_i = self.rho * (self.D_prop**5) * (
-                        self.KQ_0 * abs(n_rps[i]) * n_rps[i] +
-                        (self.KQ_max-self.KQ_0)/self.Ja_max * (Va/self.D_prop) * abs(n_rps[i]))
+                K_prop_i = self.rho * (D_prop**5) * (
+                        KQ_0 * abs(n_rps[i]) * n_rps[i] +
+                        (KQ_max-KQ_0)/Ja_max * (Va/D_prop) * abs(n_rps[i]))
             else:
-                X_prop_i = self.rho * (self.D_prop ** 4) * (
-                        self.KT_0*abs(n_rps[i])*n_rps[i]
+                X_prop_i = self.rho * (D_prop ** 4) * (
+                        KT_0*abs(n_rps[i])*n_rps[i]
                         )/10
-                K_prop_i = self.rho * (self.D_prop ** 5) * self.KQ_0 * abs(n_rps[i]) * n_rps[i] / 10
+                K_prop_i = self.rho * (D_prop ** 5) * KQ_0 * abs(n_rps[i]) * n_rps[i] / 10
 
             F_prop_b = C_T2C @ np.array([X_prop_i, 0, 0])
             r_prop_i = C_T2C @ self.propellers.r_t_p_sh[i] - self.p_OC_O
@@ -582,7 +701,10 @@ class SimpleSAM():
             tau_prop_i = np.concatenate([F_prop_b, M_prop_i])
             tau_prop += tau_prop_i
 
+        print(f"X_prop: {X_prop_i}")
+
         return tau_prop
+
 
     def calculate_vbs_position(self, u):
         """
@@ -593,6 +715,7 @@ class SimpleSAM():
         x_vbs = (u[0]/100) * self.vbs.l_vbs_l
         return x_vbs
 
+
     def calculate_lcg_position(self, u):
         """
         Calculate the position of the LCG based on control input. The control
@@ -602,7 +725,7 @@ class SimpleSAM():
 
         p_LcgPos_LcgO = np.array([(u[1]/100) * self.lcg.l_lcg_l, # Position of the LCG w.r.t fixed LCG point
                                  0, 0])
-        p_OLcg_O = self.lcg.p_OLcgPos_O + p_LcgPos_LcgO
+        p_OLcg_O = self.p_OLcgPos_O + p_LcgPos_LcgO
 
         return p_OLcg_O
 
@@ -619,6 +742,7 @@ class SimpleSAM():
         """
         # Extract position and quaternion
         q = eta[3:7]  # [q0, q1, q2, q3] where q0 is scalar part
+
         q = q/np.linalg.norm(q)
 
         # Convert quaternion to DCM for position kinematics
@@ -627,8 +751,10 @@ class SimpleSAM():
         # Position dynamics: ṗ = C * v
         pos_dot = C @ nu[0:3]
 
-        ## From Fossen 2021, eq. 2.78:
         om = nu[3:6]  # Angular velocity
+        gamma = 100
+
+        ## From Fossen 2021, eq. 2.78:
         q0, q1, q2, q3 = q
         T_q_n_b = 0.5 * np.array([
                                  [-q1, -q2, -q3],
@@ -636,9 +762,10 @@ class SimpleSAM():
                                  [q3, q0, -q1],
                                  [-q2, q1, q0]
                                  ])
-        q_dot = T_q_n_b @ om + self.gamma/2 * (1 - q.T.dot(q)) * q
+        q_dot = T_q_n_b @ om + gamma/2 * (1 - q.T.dot(q)) * q
 
         return np.concatenate([pos_dot, q_dot])
+
 
     def actuator_dynamics(self, u_cur, u_ref):
         """
@@ -646,6 +773,7 @@ class SimpleSAM():
         delta_X and rpmX are assumed to be instantaneous
 
         u: control inputs as [x_vbs, x_lcg, delta_s, delta_r, rpm1, rpm2]
+
         """
 
         u_dot = np.zeros(6)

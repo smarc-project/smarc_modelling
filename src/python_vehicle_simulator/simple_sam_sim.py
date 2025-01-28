@@ -1,10 +1,11 @@
 import numpy as np
+from scipy.integrate import solve_ivp
 from python_vehicle_simulator.vehicles import *
 from python_vehicle_simulator.lib import *
+#from python_vehicle_simulator.vehicles.SAM import SAM
 from python_vehicle_simulator.vehicles.SimpleSAM import SimpleSAM
 import matplotlib
 import matplotlib.pyplot as plt
-import matplotlib.animation as animation
 import mpl_toolkits.mplot3d.axes3d as p3
 matplotlib.use('TkAgg')  # or 'Qt5Agg', depending on what you have installed
 
@@ -45,7 +46,7 @@ def run_simulation(t_span, x0, sam):
         u: control inputs as [x_vbs, x_lcg, delta_s, delta_r, rpm1, rpm2]
         """
         u = np.zeros(6)
-        u[0] = 50#*np.sin((i/(20/0.02))*(3*np.pi/4))        # VBS
+        u[0] = 50#*np.sin((i/(20/0.02))*(3*np.pi/4))        # VBS/
         u[1] = 50 # LCG
         #u[2] = np.deg2rad(7)    # Vertical (stern)
         #u[3] = -np.deg2rad(7)   # Horizontal (rudder)

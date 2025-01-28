@@ -32,12 +32,6 @@ sam.dynamics(x,u)
 ```
 where `x` is the appropriate state space vector and `u` your desired control input.
 
-### Ocean Currents
-
-Untested feature! You can provide an ocean current with `V_current` and
-`beta_current`. While we caluclate the relative speed and angle of attack, use
-at your own peril.
-
 ### Plots
 
 We provide some basic plotting functionality in the end, including a 3D
