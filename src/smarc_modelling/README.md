@@ -1,10 +1,10 @@
-# Simple SAM
+# SAM
 
-`SimpleSAM` provides a lightweight analytical model of the SAM AUV based on
+`SAM` provides a lightweight analytical model of the SAM AUV based on
 Fossen's python vehicle simulator.
 
 ## Running Things:
-To run the simulator, call `simple_sam_sim.py`. It instantiates a SimpleSAM
+To run the simulator, call `sam_sim.py`. It instantiates a SAM
 object. 
 
 ### Set Initial Conditions
@@ -18,7 +18,7 @@ Note that SAM is neutral with vbs = 50 and lcg = 50.
 ### Simulate
 
 The simulator uses an Euler forward integration method and provides a dynamics
-wrapper to interface with SimpleSAM. 
+wrapper to interface with SAM. 
 
 ### Control
 
@@ -27,7 +27,7 @@ the dynamics wrapper. This is also how you would interact with the model if you
 want to use it in e.g. a MPC scheme. Then you can write your own integration
 method or use what your optimization sovler provides, just call it with 
 ```python
-sam = SimpleSAM(dt)
+sam = SAM(dt)
 sam.dynamics(x,u)
 ```
 where `x` is the appropriate state space vector and `u` your desired control input.
@@ -46,7 +46,7 @@ trajectory which can be animated.
 
 
 
-## SimpleSAM
+## SAM
 
 The dynamics are based on Fossen 2021, ch. 8, eq. 8.1, 8.2.
 ```math

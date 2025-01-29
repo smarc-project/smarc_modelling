@@ -162,7 +162,7 @@ class Propellers:
 
 
 # Class Vehicle
-class SimpleSAM():
+class SAM():
     """
     SAM()
         Integrates all subsystems of the Small and Affordable Maritime AUV.

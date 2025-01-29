@@ -1,7 +1,7 @@
 import numpy as np
 from smarc_modelling.vehicles import *
 from smarc_modelling.lib import *
-from smarc_modelling.vehicles.SimpleSAM import SimpleSAM
+from smarc_modelling.vehicles.SAM import SAM
 import matplotlib
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
@@ -24,7 +24,7 @@ n_sim = int(t_span[1]/dt)
 t_eval = np.linspace(t_span[0], t_span[1], n_sim)
 
 # Create SAM instance
-sam = SimpleSAM(dt)
+sam = SAM(dt)
 
 class Sol():
     """
