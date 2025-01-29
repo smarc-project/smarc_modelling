@@ -1,10 +1,10 @@
 import numpy as np
-from scipy.integrate import solve_ivp
 from python_vehicle_simulator.vehicles import *
 from python_vehicle_simulator.lib import *
-#from python_vehicle_simulator.vehicles.SAM import SAM
 from python_vehicle_simulator.vehicles.SimpleSAM import SimpleSAM
 import matplotlib
+import matplotlib.pyplot as plt
+import matplotlib.animation as animation
 import mpl_toolkits.mplot3d.axes3d as p3
 matplotlib.use('TkAgg')  # or 'Qt5Agg', depending on what you have installed
 
@@ -45,10 +45,10 @@ def run_simulation(t_span, x0, sam):
         u: control inputs as [x_vbs, x_lcg, delta_s, delta_r, rpm1, rpm2]
         """
         u = np.zeros(6)
-        u[0] = 50#*np.sin((i/(20/0.02))*(3*np.pi/4))        # VBS/
+        u[0] = 50#*np.sin((i/(20/0.02))*(3*np.pi/4))        # VBS
         u[1] = 50 # LCG
         #u[2] = np.deg2rad(7)    # Vertical (stern)
-        u[3] = -np.deg2rad(7)   # Horizontal (rudder)
+        #u[3] = -np.deg2rad(7)   # Horizontal (rudder)
         u[4] = 1000     # RPM 1
         u[5] = u[4]     # RPM 2
         return sam.dynamics(x, u)
@@ -60,6 +60,10 @@ def run_simulation(t_span, x0, sam):
     data[:,0] = x0
 
     # Euler forward integration
+    # NOTE: This integrates eta, nu, u_control in the same time step.
+    #   Depending on the maneuvers, we might want to integrate nu and u_control first
+    #   and use these to compute eta_dot. This needs to be determined based on the 
+    #   performance we see.
     for i in range(n_sim-1):
         data[:,i+1] = data[:,i] + dynamics_wrapper(i, data[:,i]) * (t_span[1]/n_sim)
     sol = Sol(t_eval,data)

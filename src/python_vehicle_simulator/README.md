@@ -4,7 +4,7 @@
 Fossen's python vehicle simulator.
 
 ## Running Things:
-To run the simulator, call `simple\_sam\_sim.py`. It instantiates a SimpleSAM
+To run the simulator, call `simple_sam_sim.py`. It instantiates a SimpleSAM
 object. 
 
 ### Set Initial Conditions
@@ -23,12 +23,27 @@ wrapper to interface with SimpleSAM.
 ### Control
 
 If you want to write your own controller, take charge and provide an input u in
-the dynamics wrapper.
+the dynamics wrapper. This is also how you would interact with the model if you
+want to use it in e.g. a MPC scheme. Then you can write your own integration
+method or use what your optimization sovler provides, just call it with 
+```python
+sam = SimpleSAM(dt)
+sam.dynamics(x,u)
+```
+where `x` is the appropriate state space vector and `u` your desired control input.
+
+### Ocean Currents
+
+Untested feature! You can provide an ocean current with `V_current` and
+`beta_current`. While we caluclate the relative speed and angle of attack, use
+at your own peril.
 
 ### Plots
 
 We provide some basic plotting functionality in the end, including a 3D
 trajectory which can be animated.
+
+
 
 
 ## SimpleSAM
@@ -40,6 +55,11 @@ The dynamics are based on Fossen 2021, ch. 8, eq. 8.1, 8.2.
 M\dot{\nu_r} + C(\nu_r)&\nu_r + D(\nu_r)\nu_r + g(\eta) = \tau
 \end{align}
 ```
+
+The model outputs `x_dot`, where `x` is the state vector as defined above.
+Furthermore, the model takes `u_ref`, a desired control input that is provided
+to the `actuator_dynamics` that calculate the actual actuator input to take the
+VBS and LCG dynamics into account as well.
 
 ### \_\_init\_\_
 Initializes the vehicle parameters, including the subsystems in `init`.
@@ -53,7 +73,19 @@ with the LCG and the VBS as well as changing its buoyancy with the VBS. We
 apprximate the change in buoyancy as a change in mass. Based on these changes,
 we update the inertia tensors.
 
-Then we construct the individual matrices from eq 8.1 and 8.2.
+Then we construct the individual matrices from eq 8.1 and 8.2. The function
+returns
+```math
+\dot{x} = f(x, u_{\text{ref}}),
+```
+where $x = \[\eta, \nu, u_{\text{current}}\]^T$. Subsequently, we have
+$\dot{x} = \[\dot{\eta}, \dot{\nu}, \dot{u}\_{\text{current}}\]^T$. We
+calculate $\dot{\eta}$ in the eta\_dynamics function and
+$\dot{u}\_{\text{current}}$ in the actuator\_dynamics. $\dot{\nu}$ follows
+from eq. 8.2 as
+```math
+\dot{\nu} = M^{-1}\left(\tau - C(\nu_r)\nu_r - D(\nu_r)\nu_r - g(\eta)\right).
+```
 
 ### calculate\_M
 
