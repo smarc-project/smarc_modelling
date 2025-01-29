@@ -1,5 +1,5 @@
 # Python Vehicle Simulator
-smarc_modelling contains the dynamical models of the SMaRC vehicles and simple simulator for basic testing.
+smarc_modelling contains the dynamical models of the SMaRC vehicles and a simple simulator for basic testing.
 This repository was originally a fork of the [Python Vehicle Simulator](https://github.com/cybergalactic/PythonVehicleSimulator.git) by T.I. Fossen.
 
 ## Install:
