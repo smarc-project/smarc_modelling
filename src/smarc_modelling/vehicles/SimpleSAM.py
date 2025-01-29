@@ -58,7 +58,7 @@ Refactored: David Doerner
 import numpy as np
 import math
 from scipy.linalg import block_diag
-from python_vehicle_simulator.lib.gnc import *
+from smarc_modelling.lib.gnc import *
 
 
 class SolidStructure:

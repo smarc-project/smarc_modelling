@@ -1,7 +1,7 @@
 import numpy as np
-from python_vehicle_simulator.vehicles import *
-from python_vehicle_simulator.lib import *
-from python_vehicle_simulator.vehicles.SimpleSAM import SimpleSAM
+from smarc_modelling.vehicles import *
+from smarc_modelling.lib import *
+from smarc_modelling.vehicles.SimpleSAM import SimpleSAM
 import matplotlib
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
