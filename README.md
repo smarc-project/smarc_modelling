@@ -25,4 +25,4 @@ Note that the -e option is needed to update and change the files. If omitted, yo
 Then, create your own fork and a folder under ```src/smarc_modelling``` where you'll add your own scripts. I.e "control".
 
 ## Run
-To get started with SAM, check this [readme](https://gitr.sys.kth.se/smarc-project/smarc_modelling/blob/main/src/smarc_modelling/README.md)
+To get started with SAM, check this [readme](/src/smarc_modelling/README.md)
