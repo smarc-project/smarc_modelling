@@ -359,16 +359,16 @@ class SAM_casadi():
         u_ref_sym = ca.MX.sym('u_ref', 6,1)
 
         # Create an implicit expression
-        eta_dot_sym = ca.MX.sym('x', 7, 1)
-        nu_dot_sym  = ca.MX.sym('x', 6, 1)
-        u_dot_sym   = ca.MX.sym('x', 6, 1)
+        eta_dot_sym = ca.MX.sym('eta_dot', 7, 1)
+        nu_dot_sym  = ca.MX.sym('nu_dot', 6, 1)
+        u_dot_sym   = ca.MX.sym('u_dot', 6, 1)
         # Concatenate the symbolic state derivates to one vector
         x_dot_sym   = ca.vertcat(eta_dot_sym, nu_dot_sym, u_dot_sym)
 
+        # Declaration of explicit and implicit expressions
         x_dot  = self.dynamics()
         f_expl = x_dot(x_sym, u_ref_sym)
         f_impl = x_dot_sym - f_expl
-
         model.f_expl_expr = f_expl
         model.f_impl_expr = f_impl
 

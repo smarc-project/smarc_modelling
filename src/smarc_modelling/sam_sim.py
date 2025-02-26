@@ -5,6 +5,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', 'src'))
 
 import time
 import numpy as np
+from control import NMPC
 from smarc_modelling.vehicles import *
 from smarc_modelling.lib import *
 from smarc_modelling.vehicles.SAM import SAM
@@ -35,6 +36,13 @@ t_eval = np.linspace(t_span[0], t_span[1], n_sim)
 sam = SAM(dt)
 sam_casadi = SAM_casadi(dt)
 sam_dynamics = sam_casadi.dynamics()
+
+
+# Pre-testing of the NMPC
+model = sam_casadi.export_dynamics_model()
+NMPC().solve(model)
+#-----------------------------------------
+
 
 class Sol():
     """

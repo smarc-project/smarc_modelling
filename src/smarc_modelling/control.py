@@ -7,7 +7,7 @@ class NMPC:
     def solve(self, model):
         self.ocp = AcadosOcp()
         self.model = model  # Must be an acados ocp-model
-
+        
         # Horizon parameters
         N = 20
         Tf = 1.0
@@ -15,25 +15,25 @@ class NMPC:
         self.ocp.solver_options.tf = Tf
 
         # Declaration of cost matrices
-        nx = model.x.rows()
-        nu = model.u.rows()
+        nx = self.model.x.rows()
+        nu = self.model.u.rows()
+        print(nx, nu)
         Q = np.eye(nx)
-        R = np.diag(nu)
-
+        R = np.eye(nu)
+        
         # path cost
         self.ocp.cost.cost_type = 'NONLINEAR_LS'
-        self.ocp.model.cost_y_expr = ca.vertcat(model.x, model.u)
-        self.ocp.cost.yref = np.zeros((nx+nu,))
+        self.ocp.model.cost_y_expr = ca.vertcat(self.model.x, self.model.u)
+        self.ocp.cost.yref = np.zeros((nx+nu))
         self.ocp.cost.W = ca.diagcat(Q, R).full()
 
         # terminal cost
         self.ocp.cost.cost_type_e = 'NONLINEAR_LS'
-        self.ocp.cost.yref_e = np.zeros((nx,))
-        self.ocp.model.cost_y_expr_e = model.x
+        self.ocp.cost.yref_e = np.zeros((nx))
+        self.ocp.model.cost_y_expr_e = self.model.x
         self.ocp.cost.W_e = Q
 
         # set constraints
-
         self.ocp.constraints.x0 = np.array([0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0])
 
         # set options
@@ -48,17 +48,17 @@ class NMPC:
 
         ocp_solver = AcadosOcpSolver(self.ocp)
 
-        simX = np.zeros((N+1, nx))
-        simU = np.zeros((N, nu))
-
         status = ocp_solver.solve()
         ocp_solver.print_statistics() # encapsulates: stat = ocp_solver.get_stats("statistics")
 
         if status != 0:
             raise Exception(f'acados returned status {status}.')
 
-        # get solution
+        # Create two empty arrays to store the solution in
+        x_opt_values = np.zeros((N+1, nx))
+        u_opt_values = np.zeros((N, nu))
+        # Extract the values from the solution
         for i in range(N):
-            simX[i,:] = ocp_solver.get(i, "x")
-            simU[i,:] = ocp_solver.get(i, "u")
-        simX[N,:] = ocp_solver.get(N, "x")
+            x_opt_values[i,:] = ocp_solver.get(i, "x")
+            u_opt_values[i,:] = ocp_solver.get(i, "u")
+        x_opt_values[N,:] = ocp_solver.get(N, "x")
