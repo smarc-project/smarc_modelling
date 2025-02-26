@@ -38,12 +38,6 @@ sam_casadi = SAM_casadi(dt)
 sam_dynamics = sam_casadi.dynamics()
 
 
-# Pre-testing of the NMPC
-model = sam_casadi.export_dynamics_model()
-NMPC().solve(model)
-#-----------------------------------------
-
-
 class Sol():
     """
     Solver data class to match with Omid's plotting functions
