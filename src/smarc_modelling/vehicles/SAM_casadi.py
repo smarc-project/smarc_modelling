@@ -306,7 +306,7 @@ class SAM_casadi():
             ]
         )
 
-    def dynamics(self, x, u_ref, export=False):
+    def dynamics(self):
         """
         Main dynamics function for integrating the complete AUV state.
 
@@ -347,36 +347,37 @@ class SAM_casadi():
             self.x_dot_sym = ca.Function('x_dot', [x_sym, u_ref_sym], [x_dot])
             self.create_model = False
 
-        if export == True:
-            model = AcadosModel()
-            model.name = 'x_dot'
+        #return self.x_dot_sym(x, u_ref) # returns a ca.DM
+        return self.x_dot_sym  # returns a casadi MX.function
+
+    def export_dynamics_model(self):
+        model = AcadosModel()
+        model.name = 'x_dot'
+
+        # Create state and control variables
+        x_sym = ca.MX.sym('x', 19,1)
+        u_ref_sym = ca.MX.sym('u_ref', 6,1)
+
+        # Create an implicit expression
+        eta_dot_sym = ca.MX.sym('x', 7, 1)
+        nu_dot_sym  = ca.MX.sym('x', 6, 1)
+        u_dot_sym   = ca.MX.sym('x', 6, 1)
+        # Concatenate the symbolic state derivates to one vector
+        x_dot_sym   = ca.vertcat(eta_dot_sym, nu_dot_sym, u_dot_sym)
+
+        x_dot  = self.dynamics()
+        f_expl = x_dot(x_sym, u_ref_sym)
+        f_impl = x_dot_sym - f_expl
+
+        model.f_expl_expr = f_expl
+        model.f_impl_expr = f_impl
+
+        model.x    = x_sym
+        model.xdot = x_dot_sym
+        model.u    = u_ref_sym
+
+        return model
     
-            # Create ann explicit expression
-            f_expl = x_dot
-
-            # Create an implicit expression
-            eta_dot_sym = ca.MX.sym('x', 7, 1)
-            nu_dot_sym  = ca.MX.sym('x', 6, 1)
-            u_dot_sym   = ca.MX.sym('x', 6, 1)
-            # Concatenate the symbolic state derivates to one vector
-            x_dot_sym   = ca.vertcat(eta_dot_sym, nu_dot_sym, u_dot_sym)
-
-            f_impl = x_dot_sym - f_expl
-
-            model.f_expl_expr = f_expl
-            model.f_impl_expr = f_impl
-
-            model.x    = x_sym
-            model.xdot = x_dot_sym
-            model.u    = u_ref_sym
-
-            return model
-
-        else:
-            return self.x_dot_sym(x, u_ref) # returns a ca.DM
-        
-        #return self.x_dot_sym  # returns a casadi MX.function
-
     def linear_dynamics(self, x, u_ref, x_lin, u_lin):
         """
         Function to create A and B matrices

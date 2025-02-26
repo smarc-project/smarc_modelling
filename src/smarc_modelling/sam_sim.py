@@ -34,6 +34,7 @@ t_eval = np.linspace(t_span[0], t_span[1], n_sim)
 # Create SAM instances
 sam = SAM(dt)
 sam_casadi = SAM_casadi(dt)
+sam_dynamics = sam_casadi.dynamics()
 
 class Sol():
     """
@@ -66,7 +67,7 @@ def run_simulation(t_span, x0, sam):
         if model == 0:
             return sam.dynamics(x, u)
         else:
-            x_dot = sam_casadi.dynamics(x,u)
+            x_dot = sam_dynamics(x,u)
             x_dot = np.array(x_dot).flatten()
             return x_dot
 
