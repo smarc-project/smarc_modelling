@@ -3,6 +3,7 @@ import os
 # Add the src directory to the system path
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', 'src'))
 
+import time
 import numpy as np
 from smarc_modelling.vehicles import *
 from smarc_modelling.lib import *
@@ -61,7 +62,7 @@ def run_simulation(t_span, x0, sam):
         u[5] = u[4]     # RPM 2
 
         # choose between numpy model (0) or casadi model (1)
-        model = 1
+        model = 0
         if model == 0:
             return sam.dynamics(x, u)
         else:
@@ -80,11 +81,14 @@ def run_simulation(t_span, x0, sam):
     #   Depending on the maneuvers, we might want to integrate nu and u_control first
     #   and use these to compute eta_dot. This needs to be determined based on the 
     #   performance we see.
+    start_time = time.time()
     for i in range(n_sim-1):
         data[:,i+1] = data[:,i] + dynamics_wrapper(i, data[:,i]) * (t_span[1]/n_sim)
     sol = Sol(t_eval,data)
+    
+    end_time = time.time()
     print(f" Simulation complete!")
-
+    print(f"Time for simulation: {end_time-start_time}s")
     return sol
 
 
