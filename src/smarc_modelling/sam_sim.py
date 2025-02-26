@@ -1,7 +1,14 @@
+import sys
+import os
+# Add the src directory to the system path
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', 'src'))
+
 import numpy as np
 from smarc_modelling.vehicles import *
 from smarc_modelling.lib import *
 from smarc_modelling.vehicles.SAM import SAM
+from smarc_modelling.vehicles.SAM_casadi import SAM_casadi
+
 import matplotlib
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
@@ -23,8 +30,9 @@ t_span = (0, 30)  # 20 seconds simulation
 n_sim = int(t_span[1]/dt)
 t_eval = np.linspace(t_span[0], t_span[1], n_sim)
 
-# Create SAM instance
+# Create SAM instances
 sam = SAM(dt)
+sam_casadi = SAM_casadi(dt)
 
 class Sol():
     """
@@ -51,7 +59,15 @@ def run_simulation(t_span, x0, sam):
         #u[3] = -np.deg2rad(7)   # Horizontal (rudder)
         u[4] = 1000     # RPM 1
         u[5] = u[4]     # RPM 2
-        return sam.dynamics(x, u)
+
+        # choose between numpy model (0) or casadi model (1)
+        model = 1
+        if model == 0:
+            return sam.dynamics(x, u)
+        else:
+            x_dot = sam_casadi.dynamics(x,u)
+            x_dot = np.array(x_dot).flatten()
+            return x_dot
 
     # Run integration
     print(f" Start simulation")
