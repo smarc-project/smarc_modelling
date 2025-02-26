@@ -62,7 +62,7 @@ def run_simulation(t_span, x0, sam):
         u[5] = u[4]     # RPM 2
 
         # choose between numpy model (0) or casadi model (1)
-        model = 0
+        model = 1
         if model == 0:
             return sam.dynamics(x, u)
         else:
@@ -85,7 +85,7 @@ def run_simulation(t_span, x0, sam):
     for i in range(n_sim-1):
         data[:,i+1] = data[:,i] + dynamics_wrapper(i, data[:,i]) * (t_span[1]/n_sim)
     sol = Sol(t_eval,data)
-    
+
     end_time = time.time()
     print(f" Simulation complete!")
     print(f"Time for simulation: {end_time-start_time}s")
