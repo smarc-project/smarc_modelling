@@ -57,8 +57,7 @@ Refactored: David Doerner
 
 import numpy as np
 import casadi as ca
-import math
-from scipy.linalg import block_diag
+from acados_template import AcadosModel
 from smarc_modelling.lib.gnc import *
 from smarc_modelling.lib.casadi_functions import *
 
@@ -307,7 +306,7 @@ class SAM_casadi():
             ]
         )
 
-    def dynamics(self, x, u_ref):
+    def dynamics(self, x, u_ref, export=False):
         """
         Main dynamics function for integrating the complete AUV state.
 
@@ -315,6 +314,7 @@ class SAM_casadi():
             t: Current time
             x: state space vector with [eta, nu, u]
             u_ref: control inputs as [x_vbs, x_lcg, delta_s, delta_r, rpm1, rpm2]
+            export: export the model to acados [bool]. Standard is False
 
         Returns:
             state_vector_dot: Time derivative of complete state vector
@@ -343,13 +343,37 @@ class SAM_casadi():
             u_dot = self.actuator_dynamics(u, u_ref_sym)
             eta_dot = self.eta_dynamics(eta, nu)
 
-            x_dot = ca.simplify(ca.vertcat(eta_dot, nu_dot, u_dot))
+            x_dot = ca.vertcat(eta_dot, nu_dot, u_dot)
             self.x_dot_sym = ca.Function('x_dot', [x_sym, u_ref_sym], [x_dot])
             self.create_model = False
 
+        if export == True:
+            model = AcadosModel()
+            model.name = 'x_dot'
+    
+            # Create ann explicit expression
+            f_expl = x_dot
 
-        
-        return self.x_dot_sym(x, u_ref) # returns a ca.DM
+            # Create an implicit expression
+            eta_dot_sym = ca.MX.sym('x', 7, 1)
+            nu_dot_sym  = ca.MX.sym('x', 6, 1)
+            u_dot_sym   = ca.MX.sym('x', 6, 1)
+            # Concatenate the symbolic state derivates to one vector
+            x_dot_sym   = ca.vertcat(eta_dot_sym, nu_dot_sym, u_dot_sym)
+
+            f_impl = x_dot_sym - f_expl
+
+            model.f_expl_expr = f_expl
+            model.f_impl_expr = f_impl
+
+            model.x    = x_sym
+            model.xdot = x_dot_sym
+            model.u    = u_ref_sym
+
+            return model
+
+        else:
+            return self.x_dot_sym(x, u_ref) # returns a ca.DM
         
         #return self.x_dot_sym  # returns a casadi MX.function
 
@@ -370,7 +394,6 @@ class SAM_casadi():
 
         return self.Ac, self.Bc, self.const
         
-
     def continuous_to_discrete(self, A, B, dt):
         """
         Convert continuous-time system matrices (A, B) to discrete-time (A_d, B_d) using zero-order hold.
