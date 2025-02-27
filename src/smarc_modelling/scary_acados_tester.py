@@ -33,7 +33,7 @@ def main():
    
 
     # ------------------- HORIZON OPTION -------------------------
-    N = 10
+    N = 20
     Tf = 5.0
     ocp.solver_options.N_horizon = N
     ocp.solver_options.tf = Tf
@@ -48,18 +48,17 @@ def main():
     ocp.cost.cost_type = 'NONLINEAR_LS'
     ocp.model.cost_y_expr = ca.vertcat(model.x, model.u)
     #ocp.cost.yref = np.zeros((nx+nu,))
-    ocp.cost.yref = np.array([0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+    ocp.cost.yref = np.array([-1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
     ocp.cost.W = ca.diagcat(Q, R).full()
 
     # terminal cost
     ocp.cost.cost_type_e = 'NONLINEAR_LS'
     #ocp.cost.yref_e = np.zeros((nx,))
-    ocp.cost.yref_e = np.array([0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+    ocp.cost.yref_e = np.array([-1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
     ocp.model.cost_y_expr_e = model.x
     ocp.cost.W_e = Q
-
+    
     # ---------------------- CONSTRAINTS -------------------------
-    # Fmax = 80
     # ocp.constraints.lbu = np.array([-Fmax])
     # ocp.constraints.ubu = np.array([+Fmax])
     # ocp.constraints.idxbu = np.array([0])
@@ -68,7 +67,7 @@ def main():
 
 
     # --------------------- SOLVER OPTIONS ------------------------
-    ocp.solver_options.qp_solver = 'FULL_CONDENSING_HPIPM' # FULL_CONDENSING_QPOASES
+    ocp.solver_options.qp_solver = 'PARTIAL_CONDENSING_HPIPM' # FULL_CONDENSING_QPOASES
     # PARTIAL_CONDENSING_HPIPM, FULL_CONDENSING_QPOASES, FULL_CONDENSING_HPIPM,
     # PARTIAL_CONDENSING_QPDUNES, PARTIAL_CONDENSING_OSQP, FULL_CONDENSING_DAQP
     ocp.solver_options.hessian_approx = 'GAUSS_NEWTON' # 'GAUSS_NEWTON', 'EXACT'

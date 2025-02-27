@@ -351,22 +351,19 @@ class SAM_casadi():
         return self.x_dot_sym  # returns a casadi MX.function
 
     def export_dynamics_model(self):
-        model = AcadosModel()
-        model.name = 'x_dot'
-
-        # Create state and control variables
-        x_sym = ca.MX.sym('x', 19,1)
+        # Create symbolic state and control variables
+        x_sym     = ca.MX.sym('x', 19,1)
         u_ref_sym = ca.MX.sym('u_ref', 6,1)
 
-        # Create an implicit expression
-        eta_dot_sym = ca.MX.sym('eta_dot', 7, 1)
-        nu_dot_sym  = ca.MX.sym('nu_dot', 6, 1)
-        u_dot_sym   = ca.MX.sym('u_dot', 6, 1)
-        # Concatenate the symbolic state derivates to one vector
-        x_dot_sym   = ca.vertcat(eta_dot_sym, nu_dot_sym, u_dot_sym)
+        # Create symbolic derivative
+        x_dot_sym = ca.MX.sym('x_dot', 19, 1)
+        
+        # Set up acados model
+        model = AcadosModel()
+        model.name = 'SAM_equation_system'
 
         # Declaration of explicit and implicit expressions
-        x_dot  = self.dynamics()
+        x_dot  = self.dynamics()    # extract casadi.MX function
         f_expl = x_dot(x_sym, u_ref_sym)
         f_impl = x_dot_sym - f_expl
         model.f_expl_expr = f_expl
