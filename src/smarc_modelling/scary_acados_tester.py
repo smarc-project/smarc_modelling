@@ -20,29 +20,31 @@ from acados_template import AcadosOcp, AcadosOcpSolver
 
 # TODO: add the SAM model 
 def main():
-    # create ocp object to formulate the OCP
+    # create ocp object and sam object
     ocp = AcadosOcp()
     sam = SAM_casadi()
 
-    # set model
+    # ------------------ MODEL EXTRACTION ---------------------
     model = sam.export_dynamics_model()
-    ocp.model = model
+    ocp.model = model                   # set model
 
     nx = model.x.rows()
     nu = model.u.rows()
    
 
-    # set prediction horizon
+    # ------------------- HORIZON OPTION -------------------------
     N = 10
     Tf = 5.0
     ocp.solver_options.N_horizon = N
     ocp.solver_options.tf = Tf
 
+
+    # ------------------ COST DECLARATION -----------------------
     # cost matrices
     Q = np.diag([1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1])
     R = np.diag([1, 1, 1, 1, 1, 1])
 
-    # path cost
+    # Stage cost
     ocp.cost.cost_type = 'NONLINEAR_LS'
     ocp.model.cost_y_expr = ca.vertcat(model.x, model.u)
     #ocp.cost.yref = np.zeros((nx+nu,))
@@ -56,15 +58,16 @@ def main():
     ocp.model.cost_y_expr_e = model.x
     ocp.cost.W_e = Q
 
-    # set constraints
+    # ---------------------- CONSTRAINTS -------------------------
     # Fmax = 80
     # ocp.constraints.lbu = np.array([-Fmax])
     # ocp.constraints.ubu = np.array([+Fmax])
     # ocp.constraints.idxbu = np.array([0])
-
+    # Initial state
     ocp.constraints.x0 = np.array([0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
 
-    # set options
+
+    # --------------------- SOLVER OPTIONS ------------------------
     ocp.solver_options.qp_solver = 'FULL_CONDENSING_HPIPM' # FULL_CONDENSING_QPOASES
     # PARTIAL_CONDENSING_HPIPM, FULL_CONDENSING_QPOASES, FULL_CONDENSING_HPIPM,
     # PARTIAL_CONDENSING_QPDUNES, PARTIAL_CONDENSING_OSQP, FULL_CONDENSING_DAQP
