@@ -92,8 +92,10 @@ def setup(x0, N_horizon, Tf):
     nu = model.u.rows()
 
     # -------------------- Set costs ---------------------------
-    ocp.cost.cost_type = 'NONLINEAR_LS'
-    ocp.cost.cost_type_e = 'NONLINEAR_LS'
+    # Set reference point - same both for intermediate shooting nodes and terminal state
+    ref = np.zeros((nx + nu,))
+    ref[0] = 0.1
+    ref[3] = 1      # Must be one for the quaternions
 
     # Adjust the state weight matrix
     Q_diag = np.ones(nx)
@@ -104,27 +106,22 @@ def setup(x0, N_horizon, Tf):
     R = np.eye(nu)*0.5
 
     # Stage costs
+    ocp.cost.cost_type = 'NONLINEAR_LS'
     ocp.cost.W = ca.diagcat(Q, R).full() #scipy.linalg.block_diag
-    ref = np.zeros((nx + nu,))
-    ref[0] = 0.3
-    ref[3] = 1
     ocp.cost.yref  = ref
 
     ocp.model.cost_y_expr = ca.vertcat(model.x, model.u)
     ocp.cost.W_e = Q
 
     # Terminal cost
+    ocp.cost.cost_type_e = 'NONLINEAR_LS'
     ocp.model.cost_y_expr_e = model.x
-    ocp.cost.yref_e = np.zeros((nx,))
+    ocp.cost.yref_e = ref[:nx]
 
 
     # -------------------- Constraints -------------------------
-    # set constraints
-    # ocp.constraints.lbu = np.array([-Fmax])
-    # ocp.constraints.ubu = np.array([+Fmax])
-
     ocp.constraints.x0 = x0
-    #ocp.constraints.idxbu = np.array([0])
+
 
     # --------------- Solver options -------------------
     # set prediction horizon
@@ -139,9 +136,6 @@ def setup(x0, N_horizon, Tf):
     ocp.solver_options.nlp_solver_type = 'SQP'
     ocp.solver_options.globalization = 'MERIT_BACKTRACKING'
     ocp.solver_options.nlp_solver_max_iter = 150
-
-    ocp.solver_options.qp_solver_cond_N = N_horizon
-
 
     solver_json = 'acados_ocp_' + model.name + '.json'
     acados_ocp_solver = AcadosOcpSolver(ocp, json_file = solver_json)
@@ -188,7 +182,6 @@ def main():
         if status != 0:
             print(f" Note: acados_ocp_solver returned {status}")
         
-
         t[i] = ocp_solver.get_stats('time_tot')
 
         # simulate system
@@ -196,8 +189,7 @@ def main():
         simX[i+1, :] = integrator.simulate(x=simX[i, :], u=simU[i,:])
 
     # evaluate timings
-    # scale to milliseconds
-    t *= 1000
+    t *= 1000  # scale to milliseconds
     print(f'Computation time in ms: min {np.min(t):.3f} median {np.median(t):.3f} max {np.max(t):.3f}')
 
 
@@ -210,4 +202,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
