@@ -34,12 +34,12 @@ def main():
 
     # set prediction horizon
     N = 10
-    Tf = 2.0
+    Tf = 5.0
     ocp.solver_options.N_horizon = N
     ocp.solver_options.tf = Tf
 
     # cost matrices
-    Q = np.diag([10, 10, 10, 10, 10, 10, 10, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1])
+    Q = np.diag([1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1])
     R = np.diag([1, 1, 1, 1, 1, 1])
 
     # path cost
@@ -65,7 +65,7 @@ def main():
     ocp.constraints.x0 = np.array([0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
 
     # set options
-    ocp.solver_options.qp_solver = 'PARTIAL_CONDENSING_HPIPM' # FULL_CONDENSING_QPOASES
+    ocp.solver_options.qp_solver = 'FULL_CONDENSING_HPIPM' # FULL_CONDENSING_QPOASES
     # PARTIAL_CONDENSING_HPIPM, FULL_CONDENSING_QPOASES, FULL_CONDENSING_HPIPM,
     # PARTIAL_CONDENSING_QPDUNES, PARTIAL_CONDENSING_OSQP, FULL_CONDENSING_DAQP
     ocp.solver_options.hessian_approx = 'GAUSS_NEWTON' # 'GAUSS_NEWTON', 'EXACT'
@@ -92,22 +92,52 @@ def main():
     simX[N,:] = ocp_solver.get(N, "x")
 
     plt.figure()
-    plt.subplot(3,3,1)
+    plt.subplot(4,2,1)
     plt.plot(range(len(simX)), simX[:,:3])
     plt.legend(["X", "Y", "Z"])
     plt.ylabel("Position [m]")
     plt.grid()
 
-    plt.subplot(3,3,2)
+    plt.subplot(4,2,2)
     plt.plot(range(len(simX)), simX[:,3:7])
     plt.legend(["q0", "q1", "q2", "q3"])
     plt.ylabel("Quaternion")
     plt.grid()
 
-    plt.subplot(3,3,4)
+    plt.subplot(4,2,3)
     plt.plot(range(len(simX)), simX[:,7:10])
     plt.legend(["V_x", "V_y", "V_z"])
     plt.ylabel("Velocity [m/s]")
+    plt.grid()
+
+    plt.subplot(4,2,4)
+    plt.plot(range(len(simX)), simX[:,10:13])
+    plt.legend(["Roll", "Pitch", "Yaw"])
+    plt.ylabel("Angular velocity [rad/s]")
+    plt.grid()
+
+    plt.subplot(4,2,5)
+    plt.step(range(len(simX)), simX[:,13:17])
+    plt.legend(["VBS", "LCG", "rudder", "Stern"])
+    plt.ylabel("Control 1")
+    plt.grid()
+
+    plt.subplot(4,2,6)
+    plt.step(range(len(simX)), simX[:,17:19])
+    plt.legend(["RPM1", "RPM2"])
+    plt.ylabel("Control 2")
+    plt.grid()
+
+    plt.subplot(4,2,7)
+    plt.step(range(len(simU)), simU[:,:4])
+    plt.legend(["VBS", "LCG", "rudder", "Stern"])
+    plt.ylabel("Control ref")
+    plt.grid()
+
+    plt.subplot(4,2,8)
+    plt.step(range(len(simU)), simU[:,4:])
+    plt.legend(["RPM1", "RPM2"])
+    plt.ylabel("Control ref")
     plt.grid()
     plt.show()
 if __name__ == '__main__':
