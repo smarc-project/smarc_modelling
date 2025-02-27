@@ -34,7 +34,7 @@ def main():
 
     # set prediction horizon
     N = 10
-    Tf = 1.0
+    Tf = 2.0
     ocp.solver_options.N_horizon = N
     ocp.solver_options.tf = Tf
 
@@ -90,10 +90,24 @@ def main():
         simX[i,:] = ocp_solver.get(i, "x")
         simU[i,:] = ocp_solver.get(i, "u")
     simX[N,:] = ocp_solver.get(N, "x")
-    print(len(simX))
 
     plt.figure()
-    plt.plot(range(len(simX)), simX)
+    plt.subplot(3,3,1)
+    plt.plot(range(len(simX)), simX[:,:3])
+    plt.legend(["X", "Y", "Z"])
+    plt.ylabel("Position [m]")
+    plt.grid()
+
+    plt.subplot(3,3,2)
+    plt.plot(range(len(simX)), simX[:,3:7])
+    plt.legend(["q0", "q1", "q2", "q3"])
+    plt.ylabel("Quaternion")
+    plt.grid()
+
+    plt.subplot(3,3,4)
+    plt.plot(range(len(simX)), simX[:,7:10])
+    plt.legend(["V_x", "V_y", "V_z"])
+    plt.ylabel("Velocity [m/s]")
     plt.grid()
     plt.show()
 if __name__ == '__main__':
