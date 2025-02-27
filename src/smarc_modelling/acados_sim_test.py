@@ -17,6 +17,67 @@ from smarc_modelling.lib import *
 from smarc_modelling.vehicles.SAM_casadi import SAM_casadi
 from acados_template import AcadosOcp, AcadosOcpSolver, AcadosSimSolver
 
+def plot(x_axis, simX, simU):
+    plt.figure()
+    plt.subplot(4,2,1)
+    plt.plot(x_axis, simX[:,:3])
+    plt.legend(["X", "Y", "Z"])
+    plt.ylabel("Position [m]")
+    plt.grid()
+
+    n = len(simX)
+    psi = np.zeros(n)
+    theta = np.zeros(n)
+    phi = np.zeros(n)
+
+    for i in range(n):
+        q = [simX[i, 3], simX[i, 4], simX[i, 5], simX[i, 6]]
+        psi[i], theta[i], phi[i] = gnc.quaternion_to_angles(q)
+
+
+    plt.subplot(4,2,2)
+    plt.plot(x_axis, np.rad2deg(psi), x_axis, np.rad2deg(theta), x_axis, np.rad2deg(phi))
+    plt.legend(["roll", "pitch", "yaw"])
+    plt.ylabel("Angle [deg]")
+    plt.grid()
+
+    plt.subplot(4,2,3)
+    plt.plot(x_axis, simX[:,7:10])
+    plt.legend(["u", "v", "w"])
+    plt.ylabel("Velocity [m/s]")
+    plt.grid()
+
+    plt.subplot(4,2,4)
+    plt.plot(x_axis, simX[:,10:13])
+    plt.legend(["Roll", "Pitch", "Yaw"])
+    plt.ylabel("Angular velocity")
+    plt.grid()
+
+    plt.subplot(4,2,5)
+    plt.step(x_axis, simX[:,13:17])
+    plt.legend(["VBS", "LCG", "d_s", "d_r"])
+    plt.ylabel("Control 1")
+    plt.grid()
+
+    plt.subplot(4,2,6)
+    plt.step(x_axis, simX[:,17:19])
+    plt.legend(["RPM1", "RPM2"])
+    plt.ylabel("Control 2")
+    plt.grid()
+
+    plt.subplot(4,2,7)
+    plt.step(x_axis[:-1], simU[:,:4])
+    plt.legend(["VBS", "LCG", "d_s", "d_r"])
+    plt.ylabel("Control ref")
+    plt.grid()
+
+    plt.subplot(4,2,8)
+    plt.step(x_axis[:-1], simU[:,4:])
+    plt.legend(["RPM1", "RPM2"])
+    plt.ylabel("Control ref")
+    plt.grid()
+    plt.show()
+
 
 def setup(x0, Fmax, N_horizon, Tf, RTI=False):
     # create ocp object to formulate the OCP
@@ -30,12 +91,11 @@ def setup(x0, Fmax, N_horizon, Tf, RTI=False):
     nx = model.x.rows()
     nu = model.u.rows()
 
-
     # -------------------- Set costs ---------------------------
     ocp.cost.cost_type = 'NONLINEAR_LS'
     ocp.cost.cost_type_e = 'NONLINEAR_LS'
 
-    Q = np.eye(nx + nu)
+    Q = np.eye(nx)
     R = np.eye(nu)
 
     # Stage costs
@@ -49,7 +109,7 @@ def setup(x0, Fmax, N_horizon, Tf, RTI=False):
     ocp.cost.yref_e = np.zeros((nx,))
 
 
-    # ---------------- Constraints ---------------------
+    # -------------------- Constraints -------------------------
     # set constraints
     # ocp.constraints.lbu = np.array([-Fmax])
     # ocp.constraints.ubu = np.array([+Fmax])
@@ -87,8 +147,8 @@ def setup(x0, Fmax, N_horizon, Tf, RTI=False):
 
 
 def main(use_RTI=False):
-
-    x0 = np.zeros(25)
+    # Declare the initial state
+    x0 = np.zeros(19)
     x0[3] = 1
     Fmax = 80
 
@@ -160,14 +220,16 @@ def main(use_RTI=False):
         # scale to milliseconds
         t *= 1000
         print(f'Computation time in ms: min {np.min(t):.3f} median {np.median(t):.3f} max {np.max(t):.3f}')
-    print(np.shape(simX))
+
+
     # plot results
-    model = ocp_solver.acados_ocp.model
-    plot_pendulum(np.linspace(0, (Tf/N_horizon)*Nsim, Nsim+1), Fmax, simU, simX, latexify=False, time_label=model.t_label, x_labels=model.x_labels, u_labels=model.u_labels)
+    x_axis = np.linspace(0, (Tf/N_horizon)*Nsim, Nsim+1)
+    plot(x_axis, simX, simU)
+    #plot_pendulum(np.linspace(0, (Tf/N_horizon)*Nsim, Nsim+1), Fmax, simU, simX, latexify=False, time_label=model.t_label, x_labels=model.x_labels, u_labels=model.u_labels)
 
     ocp_solver = None
 
 
 if __name__ == '__main__':
-    main(use_RTI=False)
+    main()
 
