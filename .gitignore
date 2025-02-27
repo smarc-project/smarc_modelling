@@ -1,1 +1,9 @@
 **/__pycache__
+
+# Ignore files from acados
+*.c
+*.h
+*.o
+*.so
+*.pxd
+*.json
