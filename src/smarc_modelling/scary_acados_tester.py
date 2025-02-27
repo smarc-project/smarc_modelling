@@ -10,52 +10,57 @@ import os
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', 'src'))
 import numpy as np
 import casadi as ca
+import matplotlib.pyplot as plt
+
 from smarc_modelling.vehicles import *
 from smarc_modelling.lib import *
 from smarc_modelling.vehicles.SAM_casadi import SAM_casadi
 from acados_template import AcadosOcp, AcadosOcpSolver
 
+
 # TODO: add the SAM model 
 def main():
     # create ocp object to formulate the OCP
     ocp = AcadosOcp()
+    sam = SAM_casadi()
 
     # set model
-    model = export_pendulum_ode_model()
+    model = sam.export_dynamics_model()
     ocp.model = model
 
-    Tf = 1.0
     nx = model.x.rows()
     nu = model.u.rows()
-    N = 20
+   
 
     # set prediction horizon
+    N = 10
+    Tf = 1.0
     ocp.solver_options.N_horizon = N
     ocp.solver_options.tf = Tf
 
     # cost matrices
-    Q_mat = 2*np.diag([1e3, 1e3, 1e-2, 1e-2])
-    R_mat = 2*np.diag([1e-2])
+    Q = np.diag([1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1])
+    R = np.diag([1, 1, 1, 1, 1, 1])
 
     # path cost
     ocp.cost.cost_type = 'NONLINEAR_LS'
     ocp.model.cost_y_expr = ca.vertcat(model.x, model.u)
     ocp.cost.yref = np.zeros((nx+nu,))
-    ocp.cost.W = ca.diagcat(Q_mat, R_mat).full()
+    ocp.cost.W = ca.diagcat(Q, R).full()
 
     # terminal cost
     ocp.cost.cost_type_e = 'NONLINEAR_LS'
     ocp.cost.yref_e = np.zeros((nx,))
     ocp.model.cost_y_expr_e = model.x
-    ocp.cost.W_e = Q_mat
+    ocp.cost.W_e = Q
 
     # set constraints
-    Fmax = 80
-    ocp.constraints.lbu = np.array([-Fmax])
-    ocp.constraints.ubu = np.array([+Fmax])
-    ocp.constraints.idxbu = np.array([0])
+    # Fmax = 80
+    # ocp.constraints.lbu = np.array([-Fmax])
+    # ocp.constraints.ubu = np.array([+Fmax])
+    # ocp.constraints.idxbu = np.array([0])
 
-    ocp.constraints.x0 = np.array([0.0, np.pi, 0.0, 0.0])
+    ocp.constraints.x0 = np.array([0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
 
     # set options
     ocp.solver_options.qp_solver = 'PARTIAL_CONDENSING_HPIPM' # FULL_CONDENSING_QPOASES
@@ -83,6 +88,11 @@ def main():
         simX[i,:] = ocp_solver.get(i, "x")
         simU[i,:] = ocp_solver.get(i, "u")
     simX[N,:] = ocp_solver.get(N, "x")
+    print(len(simX))
 
+    plt.figure()
+    plt.plot(range(len(simX)), simX)
+    plt.grid()
+    plt.show()
 if __name__ == '__main__':
     main()
