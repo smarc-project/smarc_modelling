@@ -95,7 +95,7 @@ def setup(x0, N_horizon, Tf, model, ocp):
     R_diag[ :2] = 1e-2
     R_diag[2:4] = 1e-1
     R_diag[4: ] = 1e-3
-    R = np.diag(R_diag)
+    R = np.diag(R_diag)*1e-4
 
     # Stage costs
     ocp.cost.cost_type = 'NONLINEAR_LS'
@@ -156,7 +156,7 @@ def main():
 
     # Declare the reference state - Static point in first tests
     ref = np.zeros((nx + nu,))
-    ref[0] = 1
+    ref[0] = 3
     ref[3] = 1
 
     # Horizon parameters 
@@ -205,7 +205,7 @@ def main():
         t[i] = ocp_solver.get_stats('time_tot')
         simU[i, :]   = ocp_solver.get(0, "u")
         print(f"Nsim: {i}\n{np.round(simU[i, :],3)}")
-        simX[i+1, :] = integrator.simulate(x=simX[i, :], u=simU[i, :])
+        simX[i+1, :] = integrator.simulate(x=simX[i, :], u=np.array([0,0,1,1,200,200]))
 
     # evaluate timings
     t *= 1000  # scale to milliseconds
