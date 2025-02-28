@@ -88,11 +88,13 @@ def setup(x0, N_horizon, Tf, model, ocp):
     # -------------------- Set costs ---------------------------
     # State weight matrix
     Q_diag = np.ones(nx)
-    Q_diag[:3] = 1e4
     Q = np.diag(Q_diag)
 
     # Control weight matrix
     R_diag = np.ones(nu)
+    R_diag[ :2] = 1e-2
+    R_diag[2:4] = 1e-1
+    R_diag[4: ] = 1e-3
     R = np.diag(R_diag)
 
     # Stage costs
@@ -155,7 +157,7 @@ def main():
     # Declare the reference state - Static point in first tests
     ref = np.zeros((nx + nu,))
     ref[0] = 0.1
-    ref[3] = 1      # Must be one for the quaternions
+    ref[3] = 1
 
     # Horizon parameters 
     Tf = 1
