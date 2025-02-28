@@ -81,23 +81,13 @@ def plot(x_axis, simX, simU):
     plt.show()
 
 
-def setup(x0, N_horizon, Tf):
-    # create ocp object to formulate the OCP
-    ocp = AcadosOcp()
-    sam = SAM_casadi()
-
-    # ------------------ MODEL EXTRACTION ---------------------
-    model = sam.export_dynamics_model()
-    ocp.model = model
-
+def setup(x0, N_horizon, Tf, model, ocp):
     nx = model.x.rows()
     nu = model.u.rows()
 
     # -------------------- Set costs ---------------------------
-    # Set reference point - same both for intermediate shooting nodes and terminal state
+    # Set reference point - used only in the setup. The true references are declared in the sim. for-loop
     ref = np.zeros((nx + nu,))
-    ref[0] = 0.1
-    ref[3] = 1      # Must be one for the quaternions
 
     # Adjust the state weight matrix
     Q_diag = np.ones(nx)
@@ -125,7 +115,6 @@ def setup(x0, N_horizon, Tf):
     # ---------------- Constraints ---------------------
     ocp.constraints.x0 = x0
 
-
     # --------------- Solver options -------------------
     # set prediction horizon
     ocp.solver_options.N_horizon = N_horizon
@@ -150,9 +139,24 @@ def setup(x0, N_horizon, Tf):
 
 
 def main():
+    # create ocp object to formulate the OCP
+    ocp = AcadosOcp()
+
+    # Extract the CasADi model
+    sam = SAM_casadi()
+    model = sam.export_dynamics_model()
+    ocp.model = model
+    nx = model.x.rows()
+    nu = model.u.rows()
+
     # Declare the initial state
-    x0 = np.zeros(19)
-    x0[3] = 1
+    x0 = np.zeros(nx)
+    x0[3] = 1       # Must be 1 (quaternions)
+
+    # Declare the reference state - Static point in first tests
+    ref = np.zeros((nx + nu,))
+    ref[0] = 0.1
+    ref[3] = 1      # Must be one for the quaternions
 
     # Horizon parameters 
     Tf = 1
@@ -160,10 +164,7 @@ def main():
     Nsim = 100  # Simulation duration (no. of iterations)
 
     # Setup of the solver and integrator
-    ocp_solver, integrator = setup(x0, N_horizon, Tf)
-
-    nx = ocp_solver.acados_ocp.dims.nx
-    nu = ocp_solver.acados_ocp.dims.nu
+    ocp_solver, integrator = setup(x0, N_horizon, Tf, ocp.model, ocp)
 
     simU = np.zeros((Nsim, nu))     # Matrix to store the optimal control sequence
     simX = np.zeros((Nsim+1, nx))   # Matrix to store the simulated state
@@ -172,7 +173,7 @@ def main():
     # Array to store the time values
     t = np.zeros((Nsim))
 
-    # Initialize as David does
+    # Initialize the state and control vector as David does
     for stage in range(N_horizon + 1):
         ocp_solver.set(stage, "x", x0)
     for stage in range(N_horizon):
@@ -185,6 +186,11 @@ def main():
 
     # closed loop - simulation
     for i in range(Nsim):
+        # Update reference vector
+        for stage in range(N_horizon):
+            ocp_solver.set(stage, "yref", ref)
+            ocp_solver.set(N_horizon, "yref", ref[:nx])
+
         # Set current state
         ocp_solver.set(0, "lbx", simX[i, :])
         ocp_solver.set(0, "ubx", simX[i, :])
