@@ -169,10 +169,16 @@ def main():
     # Array to store the time values
     t = np.zeros((Nsim))
 
+    # Initialize as David does
+    for stage in range(N_horizon + 1):
+        ocp_solver.set(stage, "x", x0)
+    for stage in range(N_horizon):
+        ocp_solver.set(stage, "u", np.zeros(nu,))
+        
     # do some initial iterations to start with a good initial guess - Used from the example
-    num_iter_initial = 5
-    for _ in range(num_iter_initial):
-        ocp_solver.solve_for_x0(x0_bar = x0)
+    # num_iter_initial = 5
+    # for _ in range(num_iter_initial):
+    #     ocp_solver.solve_for_x0(x0_bar = x0)
 
     # closed loop - simulation
     for i in range(Nsim):
