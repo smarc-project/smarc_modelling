@@ -69,12 +69,14 @@ def plot(x_axis, simX, simU):
     plt.step(x_axis[:-1], simU[:,:4])
     plt.legend(["VBS", "LCG", "d_s", "d_r"])
     plt.ylabel("Control ref")
+    plt.xlabel("Time [s]")
     plt.grid()
 
     plt.subplot(4,2,8)
     plt.step(x_axis[:-1], simU[:,4:])
     plt.legend(["RPM1", "RPM2"])
     plt.ylabel("Control ref")
+    plt.xlabel("Time [s]")
     plt.grid()
     plt.show()
 
@@ -119,7 +121,7 @@ def setup(x0, N_horizon, Tf):
     ocp.cost.yref_e = ref[:nx]
 
 
-    # -------------------- Constraints -------------------------
+    # ---------------- Constraints ---------------------
     ocp.constraints.x0 = x0
 
 
@@ -174,7 +176,7 @@ def main():
         ocp_solver.set(stage, "x", x0)
     for stage in range(N_horizon):
         ocp_solver.set(stage, "u", np.zeros(nu,))
-        
+
     # do some initial iterations to start with a good initial guess - Used from the example
     # num_iter_initial = 5
     # for _ in range(num_iter_initial):
