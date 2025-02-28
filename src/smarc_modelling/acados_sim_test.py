@@ -115,6 +115,9 @@ def setup(x0, N_horizon, Tf, model, ocp):
 
     # ---------------- Constraints ---------------------
     ocp.constraints.x0 = x0
+    ocp.constraints.lbu = np.array([0, 0, -7, -7, -1000, -1000])
+    ocp.constraints.ubu = np.array([100, 100, 7, 7, 1000, 1000])
+    ocp.constraints.idxbu = np.arange(nu)
 
     # --------------- Solver options -------------------
     # set prediction horizon
@@ -190,7 +193,7 @@ def main():
         # Update reference vector
         for stage in range(N_horizon):
             ocp_solver.set(stage, "yref", ref)
-            ocp_solver.set(N_horizon, "yref", ref[:nx])
+        ocp_solver.set(N_horizon, "yref", ref[:nx])
 
         # Set current state
         ocp_solver.set(0, "lbx", simX[i, :])
