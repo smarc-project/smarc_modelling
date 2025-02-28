@@ -39,9 +39,13 @@ def main():
 
 
     # ------------------ COST DECLARATION -----------------------
-    # cost matrices
-    Q = np.diag([5, 5, 5, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1])
-    R = np.diag([1, 1, 1, 1, 1, 1])
+    # Adjust the state weight matrix
+    Q_diag = np.ones(nx)
+    Q = np.diag(Q_diag)
+
+    # Adjust the control weight matrix
+    R_diag = np.ones(nu)
+    R = np.diag(R_diag)
 
     # Stage cost
     ocp.cost.cost_type = 'NONLINEAR_LS'
