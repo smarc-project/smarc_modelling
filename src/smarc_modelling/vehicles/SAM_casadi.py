@@ -361,6 +361,9 @@ class SAM_casadi():
         # Set up acados model
         model = AcadosModel()
         model.name = 'SAM_equation_system'
+        model.x    = x_sym
+        model.xdot = x_dot_sym
+        model.u    = u_ref_sym
 
         # Declaration of explicit and implicit expressions
         x_dot  = self.dynamics()    # extract casadi.MX function
@@ -368,10 +371,6 @@ class SAM_casadi():
         f_impl = x_dot_sym - f_expl
         model.f_expl_expr = f_expl
         model.f_impl_expr = f_impl
-
-        model.x    = x_sym
-        model.xdot = x_dot_sym
-        model.u    = u_ref_sym
 
         return model
     
