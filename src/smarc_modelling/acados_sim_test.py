@@ -105,7 +105,8 @@ def setup(x0, N_horizon, Tf):
     Q = np.diag(Q_diag)
 
     # Adjust the control weight matrix
-    R = np.eye(nu)*0.5
+    R_diag = np.ones(nu)
+    R = np.diag(R_diag)
 
     # Stage costs
     ocp.cost.cost_type = 'NONLINEAR_LS'
@@ -191,7 +192,7 @@ def main():
         # solve ocp and get next control input
         status = ocp_solver.solve()
         if status != 0:
-            print(f" Note: acados_ocp_solver returned {status}")
+            print(f" Note: acados_ocp_solver returned status: {status}")
 
         # simulate system
         t[i] = ocp_solver.get_stats('time_tot')
