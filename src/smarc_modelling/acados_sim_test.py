@@ -86,21 +86,20 @@ def setup(x0, N_horizon, Tf, model, ocp):
     nu = model.u.rows()
 
     # -------------------- Set costs ---------------------------
-    # Set reference point - used only in the setup. The true references are declared in the sim. for-loop
-    ref = np.zeros((nx + nu,))
-
-    # Adjust the state weight matrix
+    # State weight matrix
     Q_diag = np.ones(nx)
     Q_diag[:3] = 1e4
     Q = np.diag(Q_diag)
 
-    # Adjust the control weight matrix
+    # Control weight matrix
     R_diag = np.ones(nu)
     R = np.diag(R_diag)
 
     # Stage costs
     ocp.cost.cost_type = 'NONLINEAR_LS'
-    ocp.cost.W = ca.diagcat(Q, R).full() #scipy.linalg.block_diag
+    ocp.cost.W = ca.diagcat(Q, R).full()
+    # Set reference point - used only in the setup. The true references are declared in the sim. for-loop
+    ref = np.zeros((nx + nu,))
     ocp.cost.yref  = ref
 
     ocp.model.cost_y_expr = ca.vertcat(model.x, model.u)
@@ -179,7 +178,7 @@ def main():
     for stage in range(N_horizon):
         ocp_solver.set(stage, "u", np.zeros(nu,))
 
-    # do some initial iterations to start with a good initial guess - Used from the example
+    # do some initial iterations to start with a good initial guess - from the example
     # num_iter_initial = 5
     # for _ in range(num_iter_initial):
     #     ocp_solver.solve_for_x0(x0_bar = x0)
@@ -203,7 +202,7 @@ def main():
         # simulate system
         t[i] = ocp_solver.get_stats('time_tot')
         simU[i, :]   = ocp_solver.get(0, "u")
-        simX[i+1, :] = integrator.simulate(x=simX[i, :], u=simU[i,:])
+        simX[i+1, :] = integrator.simulate(x=simX[i, :], u=simU[i, :])
 
     # evaluate timings
     t *= 1000  # scale to milliseconds
