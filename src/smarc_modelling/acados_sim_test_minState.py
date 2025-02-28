@@ -84,10 +84,11 @@ def plot(x_axis, simX, simU):
 def setup(x0, N_horizon, Tf, model, ocp):
     nx = model.x.rows()
     nu = model.u.rows()
-
+    n_opt = 7 # Number of states to optimize for
     # -------------------- Set costs ---------------------------
     # State weight matrix
-    Q_diag = np.ones(nx)
+    Q_diag = np.ones(n_opt)
+    Q_diag[:3] = 10
     Q = np.diag(Q_diag)
 
     # Control weight matrix
@@ -95,26 +96,29 @@ def setup(x0, N_horizon, Tf, model, ocp):
     R_diag[ :2] = 1e-2
     R_diag[2:4] = 1e-1
     R_diag[4: ] = 1e-3
-    R = np.diag(R_diag)*1e-4
+    R = np.diag(R_diag)
 
     # Stage costs
     ocp.cost.cost_type = 'NONLINEAR_LS'
     ocp.cost.W = ca.diagcat(Q, R).full()
     # Set reference point - used only in the setup. The true references are declared in the sim. for-loop
-    ref = np.zeros((nx + nu,))
+    ref = np.zeros((n_opt + nu,))
     ocp.cost.yref  = ref
 
-    ocp.model.cost_y_expr = ca.vertcat(model.x, model.u)
+    ocp.model.cost_y_expr = ca.vertcat(model.x[:n_opt], model.u)
     ocp.cost.W_e = Q
 
     # Terminal cost
     ocp.cost.cost_type_e = 'NONLINEAR_LS'
-    ocp.model.cost_y_expr_e = model.x
-    ocp.cost.yref_e = ref[:nx]
+    ocp.model.cost_y_expr_e = model.x[:n_opt]
+    ocp.cost.yref_e = ref[:n_opt]
 
 
     # ---------------- Constraints ---------------------
     ocp.constraints.x0 = x0
+    ocp.constraints.lbu = np.array([0, 0, -7, -7, -1000, -1000])
+    ocp.constraints.ubu = np.array([100, 100, 7, 7, 1000, 1000])
+    ocp.constraints.idxbu = np.arange(nu)
 
     # --------------- Solver options -------------------
     # set prediction horizon
@@ -149,17 +153,18 @@ def main():
     ocp.model = model
     nx = model.x.rows()
     nu = model.u.rows()
-
+    n_opt = 7
     # Declare the initial state
     x0 = np.zeros(nx)
     x0[3] = 1       # Must be 1 (quaternions)
 
     # Declare the reference state - Static point in first tests
-    ref = np.zeros((nx + nu,))
+    ref = np.zeros((n_opt + nu,))
     ref[0] = 3
     ref[3] = 1
 
-    # Horizon parameters 
+
+    # Horizon and simulation parameters 
     Tf = 1
     N_horizon = 20
     Nsim = 100  # Simulation duration (no. of iterations)
@@ -190,7 +195,7 @@ def main():
         # Update reference vector
         for stage in range(N_horizon):
             ocp_solver.set(stage, "yref", ref)
-            ocp_solver.set(N_horizon, "yref", ref[:nx])
+        ocp_solver.set(N_horizon, "yref", ref[:n_opt])
 
         # Set current state
         ocp_solver.set(0, "lbx", simX[i, :])
@@ -204,8 +209,8 @@ def main():
         # simulate system
         t[i] = ocp_solver.get_stats('time_tot')
         simU[i, :]   = ocp_solver.get(0, "u")
-        print(f"Nsim: {i}\n{np.round(simU[i, :],3)}")
-        simX[i+1, :] = integrator.simulate(x=simX[i, :], u=np.array([0,0,1,1,200,200]))
+        print(f"Nsim: {i}\n{np.round(simX[i, :],3)}")
+        simX[i+1, :] = integrator.simulate(x=simX[i, :], u=simU[i, :])
 
     # evaluate timings
     t *= 1000  # scale to milliseconds
