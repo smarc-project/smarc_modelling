@@ -150,41 +150,43 @@ def main():
     # Declare the initial state
     x0 = np.zeros(19)
     x0[3] = 1
+
+    # Horizon parameters 
     Tf = 1
     N_horizon = 20
+    Nsim = 100  # Simulation duration (no. of iterations)
 
+    # Setup of the solver and integrator
     ocp_solver, integrator = setup(x0, N_horizon, Tf)
 
     nx = ocp_solver.acados_ocp.dims.nx
     nu = ocp_solver.acados_ocp.dims.nu
 
-    Nsim = 100
-    simX = np.zeros((Nsim+1, nx))
-    simU = np.zeros((Nsim, nu))
-
+    simU = np.zeros((Nsim, nu))     # Matrix to store the optimal control sequence
+    simX = np.zeros((Nsim+1, nx))   # Matrix to store the simulated state
     simX[0,:] = x0
 
+    # Array to store the time values
     t = np.zeros((Nsim))
 
-    # do some initial iterations to start with a good initial guess
+    # do some initial iterations to start with a good initial guess - Used from the example
     num_iter_initial = 5
     for _ in range(num_iter_initial):
         ocp_solver.solve_for_x0(x0_bar = x0)
 
-    # closed loop
+    # closed loop - simulation
     for i in range(Nsim):
-        # Set initial state for current optimization
+        # Set current state
         ocp_solver.set(0, "lbx", simX[i, :])
         ocp_solver.set(0, "ubx", simX[i, :])
+
         # solve ocp and get next control input
-        #simU[i,:] = ocp_solver.solve_for_x0(x0_bar = simX[i, :])
         status = ocp_solver.solve()
         if status != 0:
             print(f" Note: acados_ocp_solver returned {status}")
-        
-        t[i] = ocp_solver.get_stats('time_tot')
 
         # simulate system
+        t[i] = ocp_solver.get_stats('time_tot')
         simU[i, :]   = ocp_solver.get(0, "u")
         simX[i+1, :] = integrator.simulate(x=simX[i, :], u=simU[i,:])
 
