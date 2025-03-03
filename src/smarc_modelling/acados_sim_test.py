@@ -86,15 +86,23 @@ def setup(x0, N_horizon, Tf, model, ocp):
     nu = model.u.rows()
 
     # -------------------- Set costs ---------------------------
+
     # State weight matrix
     Q_diag = np.ones(nx)
+    Q_diag[ 0:3 ] = 500
+    Q_diag[ 3:7 ] = 1/0.1**2
+    Q_diag[ 7:10] = 0*1/0.1**2
+    Q_diag[10:13] = 0*1/0.1**2
+    #Q_diag[13:15] = 1/(100**2)
+    #Q_diag[15:17] = 1/(7**2)
+    Q_diag[17:  ] = 1e-6
     Q = np.diag(Q_diag)
 
-    # Control weight matrix
+    # Control weight matrix - Costs set according to Bryson's rule
     R_diag = np.ones(nu)
-    R_diag[ :2] = 1e-2
-    R_diag[2:4] = 1e-1
-    R_diag[4: ] = 1e-3
+    R_diag[ :2] = 1/(100**2)
+    R_diag[2:4] = 1/(7**2)
+    R_diag[4: ] = 1/(1000**2)
     R = np.diag(R_diag)
 
     # Stage costs
@@ -103,12 +111,12 @@ def setup(x0, N_horizon, Tf, model, ocp):
     # Set reference point - used only in the setup. The true references are declared in the sim. for-loop
     ref = np.zeros((nx + nu,))
     ocp.cost.yref  = ref
-
     ocp.model.cost_y_expr = ca.vertcat(model.x, model.u)
-    ocp.cost.W_e = Q
+    
 
     # Terminal cost
     ocp.cost.cost_type_e = 'NONLINEAR_LS'
+    ocp.cost.W_e = np.zeros(np.shape(Q))
     ocp.model.cost_y_expr_e = model.x
     ocp.cost.yref_e = ref[:nx]
 
@@ -129,9 +137,12 @@ def setup(x0, N_horizon, Tf, model, ocp):
     ocp.solver_options.integrator_type = 'IRK'
     ocp.solver_options.sim_method_newton_iter = 10
 
-    ocp.solver_options.nlp_solver_type = 'SQP'
+    ocp.solver_options.nlp_solver_type = 'SQP_RTI'
     ocp.solver_options.globalization = 'MERIT_BACKTRACKING'
-    ocp.solver_options.nlp_solver_max_iter = 150
+    ocp.solver_options.nlp_solver_max_iter = 80
+    ocp.solver_options.tol    = 1e-6       # NLP tolerance
+    ocp.solver_options.qp_tol = 1e-6       # QP tolerance
+    #ocp.solver_options.nlp_solver_tol_eq = 1e-6
 
     solver_json = 'acados_ocp_' + model.name + '.json'
     acados_ocp_solver = AcadosOcpSolver(ocp, json_file = solver_json)
@@ -155,17 +166,20 @@ def main():
 
     # Declare the initial state
     x0 = np.zeros(nx)
+    x0[0] = 0 
     x0[3] = 1       # Must be 1 (quaternions)
+    x0[17:] = 1e-6
+    x0[7]   = 1e-6
 
-    # Declare the reference state - Static point in first tests
+    # Declare the reference state - Static point in this tests
     ref = np.zeros((nx + nu,))
-    ref[0] = 1
+    ref[0] = 0.2
     ref[3] = 1
 
     # Horizon parameters 
     Tf = 1
     N_horizon = 20
-    Nsim = 100  # Simulation duration (no. of iterations)
+    Nsim = 300  # Simulation duration (no. of iterations)
 
     # Setup of the solver and integrator
     ocp_solver, integrator = setup(x0, N_horizon, Tf, ocp.model, ocp)
@@ -201,6 +215,7 @@ def main():
 
         # solve ocp and get next control input
         status = ocp_solver.solve()
+        ocp_solver.print_statistics()
         if status != 0:
             print(f" Note: acados_ocp_solver returned status: {status}")
 
