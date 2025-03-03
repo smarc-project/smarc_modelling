@@ -89,16 +89,16 @@ def setup(x0, N_horizon, Tf, model, ocp):
 
     # State weight matrix
     Q_diag = np.ones(nx)
-    Q_diag[ 0:3 ] = 500
-    Q_diag[ 3:7 ] = 1/0.1**2
-    Q_diag[ 7:10] = 0*1/0.1**2
-    Q_diag[10:13] = 0*1/0.1**2
-    #Q_diag[13:15] = 1/(100**2)
-    #Q_diag[15:17] = 1/(7**2)
-    Q_diag[17:  ] = 1e-6
+    Q_diag[ 0:3 ] = 250
+    Q_diag[ 3:7 ] = 1000
+    Q_diag[ 7:10] = 500
+    Q_diag[10:13] = 500
+    Q_diag[13:15] = 1
+    Q_diag[15:17] = 1/7
+    Q_diag[17:  ] = 1e-5
     Q = np.diag(Q_diag)
 
-    # Control weight matrix - Costs set according to Bryson's rule
+    # Control weight matrix - Costs set according to Bryson's rule (MPC course)
     R_diag = np.ones(nu)
     R_diag[ :2] = 1/(100**2)
     R_diag[2:4] = 1/(7**2)
@@ -116,7 +116,7 @@ def setup(x0, N_horizon, Tf, model, ocp):
 
     # Terminal cost
     ocp.cost.cost_type_e = 'NONLINEAR_LS'
-    ocp.cost.W_e = np.zeros(np.shape(Q))
+    ocp.cost.W_e = Q#np.zeros(np.shape(Q))
     ocp.model.cost_y_expr_e = model.x
     ocp.cost.yref_e = ref[:nx]
 
