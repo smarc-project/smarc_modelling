@@ -89,13 +89,13 @@ def setup(x0, N_horizon, Tf, model, ocp):
 
     # State weight matrix
     Q_diag = np.ones(nx)
-    Q_diag[ 0:3 ] = 250
+    Q_diag[ 0:3 ] = 2000
     Q_diag[ 3:7 ] = 1000
     Q_diag[ 7:10] = 500
     Q_diag[10:13] = 500
-    Q_diag[13:15] = 1
+    Q_diag[13:15] = 1e-1
     Q_diag[15:17] = 1/7
-    Q_diag[17:  ] = 1e-5
+    Q_diag[17:  ] = 1e-6
     Q = np.diag(Q_diag)
 
     # Control weight matrix - Costs set according to Bryson's rule (MPC course)
