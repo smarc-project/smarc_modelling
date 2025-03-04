@@ -198,35 +198,19 @@ def main():
 
 
     # Declare the initial state
-    use_trajectories = True
-    if use_trajectories == True:
-        # load trajectory
-        rtf_file_path = "/home/admin/smarc_modelling/src/smarc_modelling/sam_example_trajectory.rtf"  # Replace with your actual file path
-        # Extract numpy arrays from the RTF content
-        trajectory = extract_arrays_from_rtf(rtf_file_path)
-        x0 = trajectory[0,:]
-    else:
-        x0[0] = 0.1
-        x0[3] = 1       # Must be 1 (quaternions)
-        x0[17:] = 1e-6
-        x0[7]   = 1e-6
-
-        # Declare the reference state - Static point in this tests
-        ref = np.zeros((nx + nu,))
-        ref[0] = 0.2
-        ref[1] = 0
-        ref[2] = 0
-        ref[3] = 1
+    # load trajectory
+    rtf_file_path = "/home/admin/smarc_modelling/src/smarc_modelling/sam_example_trajectory.rtf"  # Replace with your actual file path
+    # Extract numpy arrays from the RTF content
+    trajectory = extract_arrays_from_rtf(rtf_file_path)
+    x0 = trajectory[0]
+ 
 
     # Horizon parameters 
-    if use_trajectories == True:
-        Tf = 2
-        N_horizon = 20
-        Nsim = np.size(trajectory, 0)  # Simulation duration (no. of iterations)
-    else:
-        Tf = 1
-        N_horizon = 20
-        Nsim = 300
+    Tf = 1
+    N_horizon = 20
+    update_factor = 20
+    Nsim = np.size(trajectory, 0)*update_factor  # Simulation duration (no. of iterations)
+
 
     # Setup of the solver and integrator
     ocp_solver, integrator = setup(x0, N_horizon, Tf, ocp.model, ocp)
@@ -250,16 +234,15 @@ def main():
     #     ocp_solver.solve_for_x0(x0_bar = x0)
 
     # closed loop - simulation
+    Uref = np.zeros(nu)
     for i in range(Nsim):
         # Update reference vector
-        if use_trajectories == True:
+        if i % update_factor == 0:
+            ref = np.concatenate((trajectory[int(i/update_factor)], Uref))
             for stage in range(N_horizon):
                 ocp_solver.set(stage, "yref", ref)
             ocp_solver.set(N_horizon, "yref", ref[:nx])
-        else:
-            for stage in range(N_horizon):
-                ocp_solver.set(stage, "yref", ref)
-            ocp_solver.set(N_horizon, "yref", ref[:nx])            
+         
 
         # Set current state
         ocp_solver.set(0, "lbx", simX[i, :])

@@ -39,6 +39,7 @@ arrays = extract_arrays_from_rtf(rtf_file_path)
 # Print the numpy arrays
 i = 0
 for array in arrays:
-    print(i)
-    print(array)
-    i +=1
+    pass
+print(arrays[0])
+print(arrays[-1])
+print(arrays[-1]-arrays[0])
