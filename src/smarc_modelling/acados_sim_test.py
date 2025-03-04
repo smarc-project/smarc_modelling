@@ -93,8 +93,8 @@ def setup(x0, N_horizon, Tf, model, ocp):
     Q_diag[ 3:7 ] = 1000
     Q_diag[ 7:10] = 500
     Q_diag[10:13] = 500
-    Q_diag[13:15] = 1e-1
-    Q_diag[15:17] = 1/7
+    Q_diag[13:15] = 1e-2
+    Q_diag[15:17] = 1/50
     Q_diag[17:  ] = 1e-6
     Q = np.diag(Q_diag)
 
@@ -174,6 +174,8 @@ def main():
     # Declare the reference state - Static point in this tests
     ref = np.zeros((nx + nu,))
     ref[0] = 0.2
+    ref[1] = 0
+    ref[2] = 0
     ref[3] = 1
 
     # Horizon parameters 
