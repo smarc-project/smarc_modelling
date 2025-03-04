@@ -3,7 +3,10 @@ import re
 import numpy as np
 
 # Function to extract arrays from the RTF content
-def extract_arrays_from_rtf(rtf_content):
+def extract_arrays_from_rtf(rtf_file_path):
+    with open(rtf_file_path, "r") as file:
+        rtf_content = file.read()
+
     # Regex pattern to match the arrays in the RTF content
     array_pattern = r'\[array\((.*?)\)\]'
     array_pattern = r'\ array\((.*?)\)'
@@ -30,17 +33,12 @@ def extract_arrays_from_rtf(rtf_content):
     return numpy_arrays
 
 rtf_file_path = "/home/admin/smarc_modelling/src/smarc_modelling/sam_example_trajectory.rtf"  # Replace with your actual file path
-
-# Read the RTF file content (replace 'your_file.rtf' with the actual file path)
-with open(rtf_file_path, "r") as file:
-    rtf_content = file.read()
-
 # Extract numpy arrays from the RTF content
-arrays = extract_arrays_from_rtf(rtf_content)
+arrays = extract_arrays_from_rtf(rtf_file_path)
 
 # Print the numpy arrays
 i = 0
 for array in arrays:
     print(i)
-    print(np.shape(arrays))
+    print(array)
     i +=1
