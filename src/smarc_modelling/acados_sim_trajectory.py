@@ -202,13 +202,14 @@ def main():
     # Extract numpy arrays from the RTF content
     trajectory = extract_arrays_from_rtf(rtf_file_path)
     x0 = trajectory[0]
- 
-
+    
+    u0 = np.zeros(nu)
+    u0[:2] = x0[13:15]
     # Horizon parameters 
     Tf = 1
     N_horizon = 20
-    update_factor = 20
-    Nsim = np.size(trajectory, 0)*update_factor  # Simulation duration (no. of iterations)
+    update_factor = 5
+    Nsim = np.size(trajectory, 0)*update_factor+100  # Simulation duration (no. of iterations)
 
 
     # Setup of the solver and integrator
@@ -225,7 +226,7 @@ def main():
     for stage in range(N_horizon + 1):
         ocp_solver.set(stage, "x", x0)
     for stage in range(N_horizon):
-        ocp_solver.set(stage, "u", np.zeros(nu,))
+        ocp_solver.set(stage, "u", u0)
 
     # do some initial iterations to start with a good initial guess - from the example
     # num_iter_initial = 5
@@ -235,8 +236,8 @@ def main():
     # closed loop - simulation
     Uref = np.zeros(nu)
     for i in range(Nsim):
-        # Update reference vector
-        if i % update_factor == 0:
+        # Update reference vector at every {update_factor} interval. 
+        if i % update_factor == 0 and int(i/update_factor) < np.size(trajectory, 0):
             ref = np.concatenate((trajectory[int(i/update_factor)], Uref))
             for stage in range(N_horizon):
                 ocp_solver.set(stage, "yref", ref)

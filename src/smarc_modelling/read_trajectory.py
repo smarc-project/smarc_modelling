@@ -44,9 +44,6 @@ rtf_file_path = "/home/admin/smarc_modelling/src/smarc_modelling/sam_example_tra
 arrays = extract_arrays_from_rtf(rtf_file_path)
 
 # Print the numpy arrays
-i = 0
-for array in arrays:
-    pass
 reshaped_arrays = np.array([row.reshape(19, 1) for row in arrays])
 
 
