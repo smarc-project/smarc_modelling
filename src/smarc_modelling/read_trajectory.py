@@ -1,6 +1,13 @@
 
-import re
+import sys
+import os
+import re 
+# Add the src directory to the system path
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', 'src'))
 import numpy as np
+import matplotlib.pyplot as plt
+from smarc_modelling.lib import *
+
 
 # Function to extract arrays from the RTF content
 def extract_arrays_from_rtf(rtf_file_path):
@@ -40,6 +47,55 @@ arrays = extract_arrays_from_rtf(rtf_file_path)
 i = 0
 for array in arrays:
     pass
-print(arrays[0])
+reshaped_arrays = np.array([row.reshape(19, 1) for row in arrays])
+
+
+print(reshaped_arrays[0,:3])
 print(arrays[-1])
 print(arrays[-1]-arrays[0])
+
+plt.figure()
+plt.subplot(2,2,1)
+plt.plot(reshaped_arrays[:,0])
+plt.plot(reshaped_arrays[:,1])
+plt.plot(reshaped_arrays[:,2])
+plt.legend(["x", "y", "z"])
+plt.ylabel("Position [m]")
+plt.grid()
+
+n   = len(reshaped_arrays)
+psi = np.zeros(n)
+theta = np.zeros(n)
+phi = np.zeros(n)
+for i in range(n):
+        quat = reshaped_arrays[i]
+        quat = quat.flatten()
+        print(f"heheh: {quat[3]}")
+        print(quat)
+        q = [quat[3], quat[4], quat[5], quat[6]]
+        psi[i], theta[i], phi[i] = gnc.quaternion_to_angles(q)
+
+plt.subplot(2,2,2)
+plt.plot(np.rad2deg(phi))
+plt.plot(np.rad2deg(theta))
+plt.plot(np.rad2deg(psi))
+plt.legend(["roll", "pitch", "yaw"])
+plt.ylabel("Angle [deg]")
+plt.grid()
+
+plt.subplot(2,2,3)
+plt.plot(reshaped_arrays[:,7])
+plt.plot(reshaped_arrays[:,8])
+plt.plot(reshaped_arrays[:,9])
+plt.legend(["x", "y", "z"])
+plt.ylabel("Velocity [m/s]")
+plt.grid()
+
+plt.subplot(2,2,4)
+plt.plot(reshaped_arrays[:,10])
+plt.plot(reshaped_arrays[:,11])
+plt.plot(reshaped_arrays[:,12])
+plt.legend(["x", "y", "z"])
+plt.ylabel("Velocity [m/s]")
+plt.grid()
+plt.show()

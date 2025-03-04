@@ -48,7 +48,6 @@ def extract_arrays_from_rtf(rtf_file_path):
         numpy_arrays.append(np.array(array_list))
     return numpy_arrays
 
-
 def plot(x_axis, simX, simU):
     plt.figure()
     plt.subplot(4,2,1)
@@ -68,7 +67,7 @@ def plot(x_axis, simX, simU):
 
 
     plt.subplot(4,2,2)
-    plt.plot(x_axis, np.rad2deg(psi), x_axis, np.rad2deg(theta), x_axis, np.rad2deg(phi))
+    plt.plot(x_axis, np.rad2deg(phi), x_axis, np.rad2deg(theta), x_axis, np.rad2deg(psi))
     plt.legend(["roll", "pitch", "yaw"])
     plt.ylabel("Angle [deg]")
     plt.grid()
