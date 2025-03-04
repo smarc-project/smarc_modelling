@@ -48,10 +48,11 @@ def extract_arrays_from_rtf(rtf_file_path):
         numpy_arrays.append(np.array(array_list))
     return numpy_arrays
 
-def plot(x_axis, simX, simU):
+def plot(x_axis, simX, simU, ref):
     plt.figure()
     plt.subplot(4,2,1)
     plt.plot(x_axis, simX[:,:3])
+    plt.plot(x_axis, ref[:,:3], linestyle='--')
     plt.legend(["X", "Y", "Z"])
     plt.ylabel("Position [m]")
     plt.grid()
@@ -195,23 +196,22 @@ def main():
     nx = model.x.rows()
     nu = model.u.rows()
 
-
-    # Declare the initial state
     # load trajectory
     rtf_file_path = "/home/admin/smarc_modelling/src/smarc_modelling/sam_example_trajectory.rtf"  # Replace with your actual file path
-    # Extract numpy arrays from the RTF content
     trajectory = extract_arrays_from_rtf(rtf_file_path)
-    x0 = trajectory[0]
-    
-    u0 = np.zeros(nu)
-    u0[:2] = x0[13:15]
+
+
     # Horizon parameters 
     Tf = 1
     N_horizon = 20
-    update_factor = 5
-    Nsim = np.size(trajectory, 0)*update_factor+100  # Simulation duration (no. of iterations)
+    update_factor = 15 # Update the reference every n:th iteration
+    Nsim = np.size(trajectory, 0)*update_factor +400 # Simulation duration (no. of iterations)
 
-
+    # Declare the initial state
+    x0 = trajectory[0]
+    u0 = np.zeros(nu)
+    u0[:2] = x0[13:15]
+    
     # Setup of the solver and integrator
     ocp_solver, integrator = setup(x0, N_horizon, Tf, ocp.model, ocp)
 
@@ -267,7 +267,18 @@ def main():
 
     # plot results
     x_axis = np.linspace(0, (Tf/N_horizon)*Nsim, Nsim+1)
-    plot(x_axis, simX, simU)
+
+    # Reference
+    trajectory_ref = np.reshape(trajectory[0], (1,19))
+    for i in range(len(trajectory) - 1):
+        interpolated_segment = np.linspace(trajectory[i], trajectory[i + 1], update_factor, endpoint=False)
+        trajectory_ref = np.concatenate((trajectory_ref, interpolated_segment))
+
+    if np.size(trajectory_ref, 0) != len(x_axis):
+        diff = len(x_axis) - np.size(trajectory_ref, 0)
+        for i in range(diff):
+            trajectory_ref = np.vstack((trajectory_ref, trajectory[-1]))
+    plot(x_axis, simX, simU, trajectory_ref)
 
     ocp_solver = None
 
