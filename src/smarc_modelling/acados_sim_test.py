@@ -100,9 +100,9 @@ def setup(x0, N_horizon, Tf, model, ocp):
 
     # Control weight matrix - Costs set according to Bryson's rule (MPC course)
     R_diag = np.ones(nu)
-    R_diag[ :2] = 1/(100**2)
-    R_diag[2:4] = 1/(7**2)
-    R_diag[4: ] = 1/(1000**2)
+    R_diag[ :2] = 4e-2
+    R_diag[2:4] = 1
+    R_diag[4: ] = 1e-5
     R = np.diag(R_diag)
 
     # Stage costs
@@ -123,22 +123,22 @@ def setup(x0, N_horizon, Tf, model, ocp):
 
     # ---------------- Constraints ---------------------
     ocp.constraints.x0 = x0
-    ocp.constraints.lbu = np.array([  0,   0, -7, -7, -1000, -1000])
-    ocp.constraints.ubu = np.array([100, 100,  7,  7,  1000,  1000])
+    ocp.constraints.lbu = np.array([-10*0.05,-15*0.05, -7, -7, -1000, -1000])
+    ocp.constraints.ubu = np.array([10*0.05, 15*0.05,  7,  7,  1000,  1000])
     ocp.constraints.idxbu = np.arange(nu)
 
     x_ubx = np.ones(nx)
-    x_ubx[:13] = 10000
-    x_ubx[7:8]  = 0.2
-    #x_ubx[13] = 10 # vbs_dot
-    #x_ubx[14] = 15 # lcg_dot
-    x_ubx[15:17]= 7
+    x_ubx[  :13] = 1000
+    x_ubx[13:15] = 100 # vbs and lcg max
+    x_ubx[15:17] = 7 # lcg_dot
     x_ubx[17:]= 1000
-    x_lbx = -x_ubx
 
-    # ocp.constraints.lbx = x_lbx
-    # ocp.constraints.ubx = x_ubx
-    # ocp.constraints.idxbx = np.arange(nx)
+    x_lbx = -x_ubx
+    x_lbx[13:15] = 0
+
+    ocp.constraints.lbx = x_lbx
+    ocp.constraints.ubx = x_ubx
+    ocp.constraints.idxbx = np.arange(nx)
 
     # --------------- Solver options -------------------
     # set prediction horizon
@@ -189,9 +189,9 @@ def main():
 
     # Declare the reference state - Static point in this tests
     ref = np.zeros((nx + nu,))
-    ref[0] = 0.2
-    ref[1] = 0
-    ref[2] = 0
+    ref[0] = 0.5
+    ref[1] = 0.0
+    ref[2] = 0.2
     ref[3] = 1
 
     # Horizon parameters 

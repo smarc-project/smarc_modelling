@@ -322,28 +322,28 @@ class SAM_casadi():
         
         # Create the dynamical model the first time this method is executed
         if self.create_model == True:
-            x_sym = ca.MX.sym('x', 19,1)
+            x_sym = ca.MX.sym('x', 13,1)
             u_ref_sym = ca.MX.sym('u_ref', 6,1)
             eta = x_sym[0:7]
             nu = x_sym[7:13]
-            u = x_sym[13:19]
+            #u = x_sym[13:19]
 
             # Bound_actuators is removed -see SAM for reference
 
-            self.calculate_system_state(nu, eta, u)
+            self.calculate_system_state(nu, eta, u_ref_sym)
             self.calculate_cg()
             self.update_inertias()
             self.calculate_M()
             self.calculate_C()
             self.calculate_D()
             self.calculate_g()
-            self.calculate_tau(u)
+            self.calculate_tau(u_ref_sym)
 
             nu_dot = self.Minv @ (self.tau - ca.mtimes(self.C,self.nu_r) - ca.mtimes(self.D,self.nu_r) - self.g_vec)
-            u_dot = self.actuator_dynamics(u, u_ref_sym)
+            # u_dot = self.actuator_dynamics(u, u_ref_sym)
             eta_dot = self.eta_dynamics(eta, nu)
 
-            x_dot = ca.vertcat(eta_dot, nu_dot, u_dot)
+            x_dot = ca.vertcat(eta_dot, nu_dot)
             self.x_dot_sym = ca.Function('x_dot', [x_sym, u_ref_sym], [x_dot])
             self.create_model = False
 
@@ -367,7 +367,7 @@ class SAM_casadi():
 
         # Declaration of explicit and implicit expressions
         x_dot  = self.dynamics()    # extract casadi.MX function
-        f_expl = x_dot(x_sym, u_ref_sym)
+        f_expl = ca.vertcat(x_dot(x_sym[:13], x_sym[13:]), u_ref_sym)
         f_impl = x_dot_sym - f_expl
         model.f_expl_expr = f_expl
         model.f_impl_expr = f_impl
