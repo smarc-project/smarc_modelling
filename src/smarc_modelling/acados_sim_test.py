@@ -195,9 +195,11 @@ def main():
     ref[3] = 1
 
     # Horizon parameters 
-    Tf = 1
-    N_horizon = 20
-    Nsim = 300  # Simulation duration (no. of iterations)
+    Ts = 0.05           # Sampling Time
+    N_horizon = 20      # Prediction Horizon
+    Tf = Ts*20
+    Nsim = 300          # Simulation duration (no. of iterations) - sim. length is Ts*Nsim
+
 
     # Setup of the solver and integrator
     ocp_solver, integrator = setup(x0, N_horizon, Tf, ocp.model, ocp)
