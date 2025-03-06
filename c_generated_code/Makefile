@@ -52,9 +52,6 @@ OCP_SRC+= SAM_equation_system_cost/SAM_equation_system_cost_y_0_hess.c
 OCP_SRC+= SAM_equation_system_cost/SAM_equation_system_cost_y_fun.c
 OCP_SRC+= SAM_equation_system_cost/SAM_equation_system_cost_y_fun_jac_ut_xt.c
 OCP_SRC+= SAM_equation_system_cost/SAM_equation_system_cost_y_hess.c
-OCP_SRC+= SAM_equation_system_cost/SAM_equation_system_cost_y_e_fun.c
-OCP_SRC+= SAM_equation_system_cost/SAM_equation_system_cost_y_e_fun_jac_ut_xt.c
-OCP_SRC+= SAM_equation_system_cost/SAM_equation_system_cost_y_e_hess.c
 
 OCP_SRC+= acados_solver_SAM_equation_system.c
 

@@ -123,9 +123,22 @@ def setup(x0, N_horizon, Tf, model, ocp):
 
     # ---------------- Constraints ---------------------
     ocp.constraints.x0 = x0
-    ocp.constraints.lbu = np.array([0, 0, -7, -7, -1000, -1000])
-    ocp.constraints.ubu = np.array([100, 100, 7, 7, 1000, 1000])
+    ocp.constraints.lbu = np.array([  0,   0, -7, -7, -1000, -1000])
+    ocp.constraints.ubu = np.array([100, 100,  7,  7,  1000,  1000])
     ocp.constraints.idxbu = np.arange(nu)
+
+    x_ubx = np.ones(nx)
+    x_ubx[:13] = 10000
+    x_ubx[7:8]  = 0.2
+    #x_ubx[13] = 10 # vbs_dot
+    #x_ubx[14] = 15 # lcg_dot
+    x_ubx[15:17]= 7
+    x_ubx[17:]= 1000
+    x_lbx = -x_ubx
+
+    # ocp.constraints.lbx = x_lbx
+    # ocp.constraints.ubx = x_ubx
+    # ocp.constraints.idxbx = np.arange(nx)
 
     # --------------- Solver options -------------------
     # set prediction horizon
@@ -133,16 +146,19 @@ def setup(x0, N_horizon, Tf, model, ocp):
     ocp.solver_options.tf = Tf
 
     ocp.solver_options.qp_solver = 'PARTIAL_CONDENSING_HPIPM'
+    ocp.solver_options.hpipm_mode = 'ROBUST'
     ocp.solver_options.hessian_approx = 'GAUSS_NEWTON'
     ocp.solver_options.integrator_type = 'IRK'
-    ocp.solver_options.sim_method_newton_iter = 10
+    ocp.solver_options.sim_method_newton_iter = 3 #3 default
 
     ocp.solver_options.nlp_solver_type = 'SQP_RTI'
-    ocp.solver_options.globalization = 'MERIT_BACKTRACKING'
     ocp.solver_options.nlp_solver_max_iter = 80
     ocp.solver_options.tol    = 1e-6       # NLP tolerance
     ocp.solver_options.qp_tol = 1e-6       # QP tolerance
-    #ocp.solver_options.nlp_solver_tol_eq = 1e-6
+
+    ocp.solver_options.globalization = 'MERIT_BACKTRACKING'
+    ocp.solver_options.regularize_method = 'NO_REGULARIZE'
+
 
     solver_json = 'acados_ocp_' + model.name + '.json'
     acados_ocp_solver = AcadosOcpSolver(ocp, json_file = solver_json)
@@ -199,10 +215,6 @@ def main():
     for stage in range(N_horizon):
         ocp_solver.set(stage, "u", np.zeros(nu,))
 
-    # do some initial iterations to start with a good initial guess - from the example
-    # num_iter_initial = 5
-    # for _ in range(num_iter_initial):
-    #     ocp_solver.solve_for_x0(x0_bar = x0)
 
     # closed loop - simulation
     for i in range(Nsim):
@@ -217,19 +229,20 @@ def main():
 
         # solve ocp and get next control input
         status = ocp_solver.solve()
-        ocp_solver.print_statistics()
+        #ocp_solver.print_statistics()
         if status != 0:
             print(f" Note: acados_ocp_solver returned status: {status}")
 
         # simulate system
         t[i] = ocp_solver.get_stats('time_tot')
-        simU[i, :]   = ocp_solver.get(0, "u")
-        print(f"Nsim: {i}\n{np.round(simU[i, :],3)}")
+        simU[i, :] = ocp_solver.get(0, "u")
+        X_eval = ocp_solver.get(0, "x")
+        print(f"Nsim: {i}\nX_opt {X_eval[13:]}")
         simX[i+1, :] = integrator.simulate(x=simX[i, :], u=simU[i, :])
 
     # evaluate timings
     t *= 1000  # scale to milliseconds
-    print(f'Computation time in ms: min {np.min(t):.3f} median {np.median(t):.3f} max {np.max(t):.3f}')
+    print(f'Computation time in ms:\n min: {np.min(t):.3f}\nmax: {np.max(t):.3f}\navg: {np.average(t):.3f}\nstdev: {np.std(t)}\nmedian: {np.median(t):.3f}')
 
 
     # plot results
