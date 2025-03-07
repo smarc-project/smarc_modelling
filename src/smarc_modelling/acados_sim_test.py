@@ -85,8 +85,7 @@ def setup(x0, N_horizon, Tf, model, ocp):
     nx = model.x.rows()
     nu = model.u.rows()
 
-    # -------------------- Set costs ---------------------------
-
+    # --------------------------- Cost setup ---------------------------------
     # State weight matrix
     Q_diag = np.ones(nx)
     Q_diag[ 0:3 ] = 4e3
@@ -100,6 +99,7 @@ def setup(x0, N_horizon, Tf, model, ocp):
     Q_diag[17:  ] = 1e-6
     Q = np.diag(Q_diag)
 
+    # Control rate of change weight matrix
     R_diag = np.ones(nu)
     R_diag[ :2] = 4e-2
     R_diag[2:4] = 1
@@ -107,11 +107,10 @@ def setup(x0, N_horizon, Tf, model, ocp):
     R = np.diag(R_diag)
 
     # Stage costs
+    ref = np.zeros((nx + nu,))
+    ocp.cost.yref  = ref        # Init ref point. The true references are declared in the sim. for-loop
     ocp.cost.cost_type = 'NONLINEAR_LS'
     ocp.cost.W = ca.diagcat(Q, R).full()
-    # Set reference point - used only in the setup. The true references are declared in the sim. for-loop
-    ref = np.zeros((nx + nu,))
-    ocp.cost.yref  = ref
     ocp.model.cost_y_expr = ca.vertcat(model.x, model.u)
     
 
@@ -122,17 +121,29 @@ def setup(x0, N_horizon, Tf, model, ocp):
     ocp.cost.yref_e = ref[:nx]
 
 
-    # ---------------- Constraints ---------------------
+    # --------------------- Constraint Setup --------------------------
+    vbs_dot = 10    # Maximum rate of change for the VBS
+    lcg_dot = 15    # Maximum rate of change for the LCG
+    ds_dot  = 7     # Maximum rate of change for stern angle
+    dr_dot  = 7     # Maximum rate of change for rudder angle
+    rpm_dot = 1000  # Maximum rate of change for rpm
+
+    # Declare initial state
     ocp.constraints.x0 = x0
-    ocp.constraints.lbu = np.array([-10*0.05,-15*0.05, -7, -7, -1000, -1000])
-    ocp.constraints.ubu = np.array([10*0.05, 15*0.05,  7,  7,  1000,  1000])
+
+    # Set constraints on the control rate of change
+    ocp.constraints.lbu = np.array([-vbs_dot,-lcg_dot, -ds_dot, -dr_dot, -rpm_dot, -rpm_dot])
+    ocp.constraints.ubu = np.array([ vbs_dot, lcg_dot,  ds_dot,  dr_dot,  rpm_dot,  rpm_dot])
     ocp.constraints.idxbu = np.arange(nu)
 
+    # Set constraints on the states
     x_ubx = np.ones(nx)
     x_ubx[  :13] = 1000
-    x_ubx[13:15] = 100 # vbs and lcg max
-    x_ubx[15:17] = 7 # lcg_dot
-    x_ubx[17:]= 1000
+
+    # Set constraints on the control
+    x_ubx[13:15] = 100 
+    x_ubx[15:17] = 7
+    x_ubx[17:  ] = 1000
 
     x_lbx = -x_ubx
     x_lbx[13:15] = 0
@@ -141,7 +152,7 @@ def setup(x0, N_horizon, Tf, model, ocp):
     ocp.constraints.ubx = x_ubx
     ocp.constraints.idxbx = np.arange(nx)
 
-    # --------------- Solver options -------------------
+    # ----------------------- Solver Setup --------------------------
     # set prediction horizon
     ocp.solver_options.N_horizon = N_horizon
     ocp.solver_options.tf = Tf
@@ -154,7 +165,7 @@ def setup(x0, N_horizon, Tf, model, ocp):
 
     ocp.solver_options.nlp_solver_type = 'SQP_RTI'
     ocp.solver_options.nlp_solver_max_iter = 80
-    ocp.solver_options.tol    = 1e-6       # NLP tolerance
+    ocp.solver_options.tol    = 1e-6       # NLP tolerance. 1e-6 is default for tolerances
     ocp.solver_options.qp_tol = 1e-6       # QP tolerance
 
     ocp.solver_options.globalization = 'MERIT_BACKTRACKING'
@@ -202,7 +213,7 @@ def main():
 
     # Horizon parameters 
     Ts = 0.1            # Sampling Time
-    N_horizon = 10      # Prediction Horizon
+    N_horizon = 12       # Prediction Horizon
     Tf = Ts*N_horizon
     Nsim = 400          # Simulation duration (no. of iterations) - sim. length is Ts*Nsim
 
