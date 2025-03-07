@@ -17,13 +17,6 @@ u0[0] = 50
 u0[1] = 45
 x0 = np.concatenate([eta0, nu0, u0])
 
-x0 = np.array([9.14858505e+00, 1.50390851e+00, 5.03598088e-01,
-               9.98568953e-01, 2.23832741e-03, 1.14489037e-02,
-               5.44947496e-02, -5.56199329e-01, 4.59815999e-02, 
-               -3.53929948e-03, 2.04329833e-02, 4.19439456e-03,
-               1.60962712e-01, 5.00000000e+01, 5.00000000e+01,
-               0.00000000e+00, 8.72664626e-02, -9.00000000e+02, -9.00000000e+02])
-
 # Simulation timespan
 dt = 0.01 
 t_span = (0, 30)  # 20 seconds simulation
@@ -58,7 +51,6 @@ def run_simulation(t_span, x0, dt, sam):
         #u[3] = -np.deg2rad(7)   # Horizontal (rudder)
         u[4] = 1000     # RPM 1
         u[5] = u[4]     # RPM 2
-        u = np.array([5.00000000e+01, 5.00000000e+01, 0.00000000e+00, 1.13446401e-01, 1.00000000e+03, 1.00000000e+03])
         return sam.dynamics(x, u)
 
     # Run integration
@@ -216,6 +208,7 @@ def plot_trajectory(sol, numDataPoints, generate_gif=False, filename="3d.gif", F
 
 # Run simulation and plot results
 sol = run_simulation(t_span, x0, dt, sam)
-plot_results(sol)
-plot_trajectory(sol, 50, False, "3d.gif", 10)
-plt.show()
+print(f"data: {sol.y[:,-1]}")
+#plot_results(sol)
+#plot_trajectory(sol, 50, False, "3d.gif", 10)
+#plt.show()
