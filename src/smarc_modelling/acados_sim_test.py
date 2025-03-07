@@ -68,14 +68,14 @@ def plot(x_axis, simX, simU):
     plt.subplot(4,2,7)
     plt.step(x_axis[:-1], simU[:,:4])
     plt.legend(["VBS", "LCG", "d_s", "d_r"])
-    plt.ylabel("Control ref")
+    plt.ylabel("Control derivative")
     plt.xlabel("Time [s]")
     plt.grid()
 
     plt.subplot(4,2,8)
     plt.step(x_axis[:-1], simU[:,4:])
     plt.legend(["RPM1", "RPM2"])
-    plt.ylabel("Control ref")
+    plt.ylabel("Control derivative")
     plt.xlabel("Time [s]")
     plt.grid()
     plt.show()
@@ -89,16 +89,17 @@ def setup(x0, N_horizon, Tf, model, ocp):
 
     # State weight matrix
     Q_diag = np.ones(nx)
-    Q_diag[ 0:3 ] = 2000
-    Q_diag[ 3:7 ] = 1000
+    Q_diag[ 0:3 ] = 4e3
+    Q_diag[ 3:7 ] = 4e3
     Q_diag[ 7:10] = 500
     Q_diag[10:13] = 500
-    Q_diag[13:15] = 1e-2
+
+    # Control weight matrix - Costs set according to Bryson's rule (MPC course)
+    Q_diag[13:15] = 1e-6
     Q_diag[15:17] = 1/50
     Q_diag[17:  ] = 1e-6
     Q = np.diag(Q_diag)
 
-    # Control weight matrix - Costs set according to Bryson's rule (MPC course)
     R_diag = np.ones(nu)
     R_diag[ :2] = 4e-2
     R_diag[2:4] = 1
@@ -186,19 +187,24 @@ def main():
     x0[3] = 1       # Must be 1 (quaternions)
     x0[17:] = 1e-6
     x0[7]   = 1e-6
+    # x0[13] = 50
+    # x0[14] = 50
+
+
 
     # Declare the reference state - Static point in this tests
     ref = np.zeros((nx + nu,))
-    ref[0] = 0.5
+    ref[0] = 0.2
     ref[1] = 0.0
-    ref[2] = 0.2
+    ref[2] = 0.0
     ref[3] = 1
 
+
     # Horizon parameters 
-    Ts = 0.05           # Sampling Time
-    N_horizon = 20      # Prediction Horizon
-    Tf = Ts*20
-    Nsim = 300          # Simulation duration (no. of iterations) - sim. length is Ts*Nsim
+    Ts = 0.1            # Sampling Time
+    N_horizon = 10      # Prediction Horizon
+    Tf = Ts*N_horizon
+    Nsim = 400          # Simulation duration (no. of iterations) - sim. length is Ts*Nsim
 
 
     # Setup of the solver and integrator
