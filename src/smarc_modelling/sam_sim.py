@@ -36,7 +36,7 @@ class Sol():
 
 
 # FIXME: consider removing the dynamics wrapper and just call the dynamics straight away.
-def run_simulation(t_span, x0, sam):
+def run_simulation(t_span, x0, dt, sam):
     """
     Run SAM simulation using solve_ivp.
     """
@@ -65,9 +65,10 @@ def run_simulation(t_span, x0, sam):
     #   and use these to compute eta_dot. This needs to be determined based on the 
     #   performance we see.
     for i in range(n_sim-1):
-        data[:,i+1] = data[:,i] + dynamics_wrapper(i, data[:,i]) * (t_span[1]/n_sim)
+        data[:,i+1] = data[:,i] + dynamics_wrapper(i, data[:,i]) * dt #(t_span[1]/n_sim)
     sol = Sol(t_eval,data)
     print(f" Simulation complete!")
+    #print(f"data: {data}")
 
     return sol
 
@@ -206,7 +207,8 @@ def plot_trajectory(sol, numDataPoints, generate_gif=False, filename="3d.gif", F
 
 
 # Run simulation and plot results
-sol = run_simulation(t_span, x0, sam)
-plot_results(sol)
-plot_trajectory(sol, 50, False, "3d.gif", 10)
-plt.show()
+sol = run_simulation(t_span, x0, dt, sam)
+print(f"data: {sol.y[:,-1]}")
+#plot_results(sol)
+#plot_trajectory(sol, 50, False, "3d.gif", 10)
+#plt.show()
