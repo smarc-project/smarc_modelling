@@ -18,7 +18,6 @@ from smarc_modelling.vehicles.SAM_casadi import SAM_casadi
 from acados_template import AcadosOcp, AcadosOcpSolver, AcadosSimSolver
 
 def plot(x_axis, ref, simX, simU):
-    ref_err = ref
     ref = ref[:13]  
 
     q = [ref[3], ref[4], ref[5], ref[6]]
@@ -140,7 +139,6 @@ def plot(x_axis, ref, simX, simU):
     plt.legend([r"$\dot\psi$", r"$\dot\psi_{ref}$"])
     plt.ylabel("Angular Velocity [rad/s]")
     plt.grid()
-    plt.show()
 
     print(np.shape(y_axis))
     x_error = RMSE_calculation(y_axis, ref)
@@ -184,38 +182,38 @@ def plot(x_axis, ref, simX, simU):
     plt.grid()
 
     plt.subplot(4,3,7)
-    plt.plot(x_axis[:-1], simU[:, 0])
+    plt.plot(x_axis, simX[:, 13])
     plt.legend([r"$VBS$"])
     plt.title("Control inputs")
     plt.ylabel("VBS input") 
     plt.grid()
 
     plt.subplot(4,3,8)
-    plt.plot(x_axis[:-1], simU[:, 2])
+    plt.plot(x_axis, simX[:, 15])
     plt.legend([r"$Stern angle$"])
     plt.ylabel(r"Stern Input [$\degree$]")
     plt.grid()
 
     plt.subplot(4,3,9)
-    plt.plot(x_axis[:-1], simU[:, 4])
+    plt.plot(x_axis, simX[:, 17])
     plt.legend([r"RPM1$"])
     plt.ylabel("Motor RPM")
     plt.grid()
 
     plt.subplot(4,3,10)
-    plt.plot(x_axis[:-1], simU[:, 1])
+    plt.plot(x_axis, simX[:, 14])
     plt.legend([r"$LCG$"])
     plt.ylabel("LCG input")
     plt.grid()
 
     plt.subplot(4,3,11)
-    plt.plot(x_axis[:-1], simU[:, 3])
+    plt.plot(x_axis, simX[:, 16])
     plt.legend([r"$Rudder angle$"])
     plt.ylabel(r"Rudder Input [$\degree$]")
     plt.grid()
 
     plt.subplot(4,3,12)
-    plt.plot(x_axis[:-1], simU[:, 5])
+    plt.plot(x_axis, simX[:, 18])
     plt.legend([r"RPM2$"])
     plt.ylabel("Motor RPM")
     plt.grid()
