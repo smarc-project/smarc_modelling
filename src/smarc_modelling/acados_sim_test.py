@@ -41,18 +41,17 @@ def plot(x_axis, ref, simX, simU):
         q = [simX[i, 3], simX[i, 4], simX[i, 5], simX[i, 6]]
         psi[i], theta[i], phi[i] = gnc.quaternion_to_angles(q)
     
-    print(np.shape(simX))
-    y_axis = simX[:, 0]
+    y_axis = np.zeros(np.shape(simX))
     for i in range(np.size(simX, 1)):
         if i in [3, 4, 5, 6]:
             if i == 3:
-                y_axis = np.column_stack((y_axis, phi))
+                y_axis[:,i] = phi
             elif i == 4:
-                y_axis = np.column_stack((y_axis, theta))
+                y_axis[:,i] = theta
             elif i == 5:
-                y_axis = np.column_stack((y_axis, psi))
+                y_axis[:,i] = psi
         else: 
-            y_axis = np.column_stack((y_axis, simX[:,i]))
+            y_axis[:,i] = simX[:,i]
             
 
     plt.figure()
@@ -140,85 +139,125 @@ def plot(x_axis, ref, simX, simU):
     plt.ylabel("Angular Velocity [rad/s]")
     plt.grid()
 
-    print(np.shape(y_axis))
     x_error = RMSE_calculation(y_axis, ref)
 
     # Error plots
     plt.figure()
-    plt.subplot(4,3,1)
+    plt.subplot(2,3,1)
     plt.plot(x_axis, x_error[:, 0] )
     plt.legend(["X"])
     plt.ylabel("Position RMSE [m]")
     plt.grid()
 
-    plt.subplot(4,3,2)
+    plt.subplot(2,3,2)
     plt.plot(x_axis, x_error[:, 1] )
     plt.legend(["Y"])
+    plt.title("Errors")
     plt.ylabel("Position RMSE [m]")
     plt.grid()
 
-    plt.subplot(4,3,3)
+    plt.subplot(2,3,3)
     plt.plot(x_axis, x_error[:, 2])
     plt.legend(["Z"])
     plt.ylabel("Position RMSE [m]")
     plt.grid()
 
-    plt.subplot(4,3,4)
+    plt.subplot(2,3,4)
     plt.plot(x_axis, x_error[:, 3])
-    plt.legend([r"$\phi error$"])
+    plt.legend([r"$\phi$ error"])
     plt.ylabel("Roll [deg]")    
     plt.grid()
 
-    plt.subplot(4,3,5)
+    plt.subplot(2,3,5)
     plt.plot(x_axis, x_error[:, 4])
-    plt.legend([r"$\theta error$"])
+    plt.legend([r"$\theta$ error"])
     plt.ylabel("Pitch [deg]")
     plt.grid()
 
-    plt.subplot(4,3,6)
+    plt.subplot(2,3,6)
     plt.plot(x_axis, x_error[:, 5])
-    plt.legend([r"$\psi error$"])
+    plt.legend([r"$\psi$ error"])
     plt.ylabel("Yaw [deg]")
     plt.grid()
 
-    plt.subplot(4,3,7)
+    # Control Inputs
+    plt.figure()
+    plt.subplot(4,3,1)
     plt.plot(x_axis, simX[:, 13])
-    plt.legend([r"$VBS$"])
-    plt.title("Control inputs")
+    plt.legend([r"VBS"])
     plt.ylabel("VBS input") 
     plt.grid()
 
-    plt.subplot(4,3,8)
+    plt.subplot(4,3,2)
     plt.plot(x_axis, simX[:, 15])
-    plt.legend([r"$Stern angle$"])
-    plt.ylabel(r"Stern Input [$\degree$]")
+    plt.title("Control inputs")
+    plt.legend([r"Stern angle"])
+    plt.ylabel(r" Degrees [$\degree$]")
+    plt.grid()
+
+    plt.subplot(4,3,3)
+    plt.plot(x_axis, simX[:, 17])
+    plt.legend([r"RPM1"])
+    plt.ylabel("Motor RPM")
+    plt.grid()
+
+    plt.subplot(4,3,4)
+    plt.plot(x_axis[:-1], simU[:, 0])
+    plt.legend([r"VBS"])
+    plt.ylabel("VBS derivative") 
+    plt.grid()
+
+    plt.subplot(4,3,5)
+    plt.plot(x_axis[:-1], simU[:, 2])
+    plt.legend([r"Stern angle"])
+    plt.ylabel(r" Degree derivative [$\degree/s$]")
+    plt.grid()
+
+    plt.subplot(4,3,6)
+    plt.plot(x_axis[:-1], simU[:, 4])
+    plt.legend([r"RPM1"])
+    plt.ylabel("RPM1 derivative")
+    plt.grid()
+
+    plt.subplot(4,3,7)
+    plt.plot(x_axis, simX[:, 14])
+    plt.legend([r"LCG"])
+    plt.ylabel("LCG input")
+    plt.grid()
+
+    plt.subplot(4,3,8)
+    plt.plot(x_axis, simX[:, 16])
+    plt.legend([r"Rudder angle"])
+    plt.ylabel(r" degrees [$\degree$]")
     plt.grid()
 
     plt.subplot(4,3,9)
-    plt.plot(x_axis, simX[:, 17])
-    plt.legend([r"RPM1$"])
+    plt.plot(x_axis, simX[:, 18])
+    plt.legend([r"RPM2"])
     plt.ylabel("Motor RPM")
     plt.grid()
 
     plt.subplot(4,3,10)
-    plt.plot(x_axis, simX[:, 14])
-    plt.legend([r"$LCG$"])
-    plt.ylabel("LCG input")
+    plt.plot(x_axis[:-1], simU[:, 1])
+    plt.legend([r"LCG"])
+    plt.ylabel("LCG derivative") 
     plt.grid()
 
     plt.subplot(4,3,11)
-    plt.plot(x_axis, simX[:, 16])
-    plt.legend([r"$Rudder angle$"])
-    plt.ylabel(r"Rudder Input [$\degree$]")
+    plt.plot(x_axis[:-1], simU[:, 3])
+    plt.legend([r"Rudder angle"])
+    plt.ylabel(r" Degree derivative [$\degree/s$]")
     plt.grid()
 
     plt.subplot(4,3,12)
-    plt.plot(x_axis, simX[:, 18])
-    plt.legend([r"RPM2$"])
-    plt.ylabel("Motor RPM")
+    plt.plot(x_axis[:-1], simU[:, 5])
+    plt.legend([r"RPM2"])
+    plt.ylabel("RPM2 derivative")
     plt.grid()
 
     plt.show()
+
+    print(f"RMSE for each variable: {x_error[-1, :6]}")
 
 def RMSE_calculation(var, ref):
     cumulative_rmse = np.empty(np.shape(var))
