@@ -18,19 +18,23 @@ from smarc_modelling.lib import *
 from smarc_modelling.vehicles.SAM_casadi import SAM_casadi
 
 def plot(x_axis, ref, simX, simU):
-    ref = ref[:13]  
+    ref = ref[:,:13]  
 
-    q = [ref[3], ref[4], ref[5], ref[6]]
-    psi, theta, phi = gnc.quaternion_to_angles(q)
+    psi = np.zeros(np.size(ref, 0))
+    theta = np.zeros(np.size(ref, 0))
+    phi = np.zeros(np.size(ref, 0))
+    for i in range(np.size(ref, 0)):
+        q = [ref[i, 3], ref[i, 4], ref[i, 5], ref[i, 6]]
+        psi[i], theta[i], phi[i] = gnc.quaternion_to_angles(q)
 
-    reference = np.zeros(12)
-    reference[ :3] = ref[ :3]
-    reference[3:6] = np.array([phi, theta, psi])
-    reference[6:]  = ref[7:]
+    reference = np.zeros((np.size(ref, 0), 12))
+    reference[:, :3] = ref[:, :3]
+    reference[:, 3] = phi
+    reference[:, 4] = theta
+    reference[:, 5] = psi
+    reference[:, 6:]  = ref[:, 7:]
     
     ref = reference
-    for i in range(np.size(simX,0)-1):
-        ref = np.vstack((ref, reference))
 
     n = len(simX)
     psi = np.zeros(n)
@@ -183,81 +187,104 @@ def plot(x_axis, ref, simX, simU):
     # Control Inputs
     plt.figure()
     plt.subplot(4,3,1)
-    plt.plot(x_axis, simX[:, 13])
+    plt.step(x_axis, simX[:, 13])
     plt.legend([r"VBS"])
     plt.ylabel("VBS input") 
     plt.grid()
 
     plt.subplot(4,3,2)
-    plt.plot(x_axis, simX[:, 15])
+    plt.step(x_axis, simX[:, 15])
     plt.title("Control inputs")
     plt.legend([r"Stern angle"])
     plt.ylabel(r" Degrees [$\degree$]")
     plt.grid()
 
     plt.subplot(4,3,3)
-    plt.plot(x_axis, simX[:, 17])
+    plt.step(x_axis, simX[:, 17])
     plt.legend([r"RPM1"])
     plt.ylabel("Motor RPM")
     plt.grid()
 
     plt.subplot(4,3,4)
-    plt.plot(x_axis[:-1], simU[:, 0])
+    plt.step(x_axis[:-1], simU[:, 0])
     plt.legend([r"VBS"])
     plt.ylabel("VBS derivative") 
     plt.grid()
 
     plt.subplot(4,3,5)
-    plt.plot(x_axis[:-1], simU[:, 2])
+    plt.step(x_axis[:-1], simU[:, 2])
     plt.legend([r"Stern angle"])
     plt.ylabel(r" Degree derivative [$\degree/s$]")
     plt.grid()
 
     plt.subplot(4,3,6)
-    plt.plot(x_axis[:-1], simU[:, 4])
+    plt.step(x_axis[:-1], simU[:, 4])
     plt.legend([r"RPM1"])
     plt.ylabel("RPM1 derivative")
     plt.grid()
 
     plt.subplot(4,3,7)
-    plt.plot(x_axis, simX[:, 14])
+    plt.step(x_axis, simX[:, 14])
     plt.legend([r"LCG"])
     plt.ylabel("LCG input")
     plt.grid()
 
     plt.subplot(4,3,8)
-    plt.plot(x_axis, simX[:, 16])
+    plt.step(x_axis, simX[:, 16])
     plt.legend([r"Rudder angle"])
     plt.ylabel(r" degrees [$\degree$]")
     plt.grid()
 
     plt.subplot(4,3,9)
-    plt.plot(x_axis, simX[:, 18])
+    plt.step(x_axis, simX[:, 18])
     plt.legend([r"RPM2"])
     plt.ylabel("Motor RPM")
     plt.grid()
 
     plt.subplot(4,3,10)
-    plt.plot(x_axis[:-1], simU[:, 1])
+    plt.step(x_axis[:-1], simU[:, 1])
     plt.legend([r"LCG"])
     plt.ylabel("LCG derivative") 
     plt.grid()
 
     plt.subplot(4,3,11)
-    plt.plot(x_axis[:-1], simU[:, 3])
+    plt.step(x_axis[:-1], simU[:, 3])
     plt.legend([r"Rudder angle"])
     plt.ylabel(r" Degree derivative [$\degree/s$]")
     plt.grid()
 
     plt.subplot(4,3,12)
-    plt.plot(x_axis[:-1], simU[:, 5])
+    plt.step(x_axis[:-1], simU[:, 5])
     plt.legend([r"RPM2"])
     plt.ylabel("RPM2 derivative")
     plt.grid()
 
-    plt.show()
-
     print(f"RMSE for each variable: {x_error[-1, :6]}")
+
+
+    # State vectors
+    # down-sampling the xyz data points
+    x = simX[:,0]
+    y = simX[:,1]
+    z = simX[:,2]
+
+    # Create a figure and a 3D axis
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+
+    # Plot the trajectory
+    ax.plot3D(x, y, z, label='Trajectory', lw=2, c='r')
+    ax.plot3D(ref[:, 0], ref[:, 1], ref[:, 2], linestyle='--', label='Reference', lw=1, c='black')
+
+
+    # Add labels
+    ax.set_xlabel('X / East')
+    ax.set_ylabel('Y / North')
+    ax.set_zlabel('Z / Down')
+    ax.legend()
+
+    # Show the plot
+    plt.show()
 
 def RMSE_calculation(var, ref):
     cumulative_rmse = np.empty(np.shape(var))
@@ -295,21 +322,16 @@ def main():
     x0[3] = 1       # Must be 1 (quaternions)
     x0[17:] = 1e-6
     x0[7]   = 1e-6
-    # x0[13] = 50
-    # x0[14] = 50
+    x0[13] = 50
+    x0[14] = 50
     simX[0,:] = x0
 
     # Declare the reference state - Static point in this tests
-    # Define the sinusoidal function
-    time = ca.MX.sym('t')
-    sinus_function = ca.Function('sinus', [time], [10 * ca.sin(time)])
-
     # Initialize ref
     ref = np.zeros((nx + nu,))
-    ref[1] = 0.0
-    ref[2] = 0.0
     ref[3] = 1
- 
+    ref[13:15] = 50
+    references = ref
     ocp_solver, integrator = nmpc.setup(x0)
     # Initialize the state and control vector as David does
     for stage in range(N_horizon + 1):
@@ -324,10 +346,13 @@ def main():
     for i in range(Nsim):
         # Update reference vector
         for stage in range(N_horizon):
-            ref[0] = sinus_function((i+stage)*0.01).full().item()
             ocp_solver.set(stage, "yref", ref)
+            ref[0] = np.cos((i+stage)*0.01)*10 - 10
+            ref[1] = -np.sin((i+stage)*0.01+ np.pi)*10
+            ref[3] = 1
+        references = np.vstack([references, ref])
         ocp_solver.set(N_horizon, "yref", ref[:nx])
-
+ 
         # Set current state
         ocp_solver.set(0, "lbx", simX[i, :])
         ocp_solver.set(0, "ubx", simX[i, :])
@@ -342,7 +367,7 @@ def main():
         t[i] = ocp_solver.get_stats('time_tot')
         simU[i, :] = ocp_solver.get(0, "u")
         X_eval = ocp_solver.get(0, "x")
-        print(f"Nsim: {i}\nX_opt {X_eval[13:]}")
+        print(f"Nsim: {i}")
         simX[i+1, :] = integrator.simulate(x=simX[i, :], u=simU[i, :])
 
     # evaluate timings
@@ -352,7 +377,9 @@ def main():
 
     # plot results
     x_axis = np.linspace(0, (Ts)*Nsim, Nsim+1)
-    plot(x_axis, ref, simX, simU)
+    print(np.shape(simX))
+    print(np.shape(references))
+    plot(x_axis, references, simX, simU)
 
     ocp_solver = None
 

@@ -25,23 +25,23 @@ class NMPC:
         # --------------------------- Cost setup ---------------------------------
         # State weight matrix
         Q_diag = np.ones(nx)
-        Q_diag[ 0:3 ] = 4e3
+        Q_diag[ 0:3 ] = 10e3
         Q_diag[ 3:7 ] = 4e3
         Q_diag[ 7:10] = 500
         Q_diag[10:13] = 500
 
         # Control weight matrix - Costs set according to Bryson's rule (MPC course)
-        Q_diag[13:15] = 1e-6
+        Q_diag[13:15] = 1e-2
         Q_diag[15:17] = 1/50
         Q_diag[17:  ] = 1e-6
         Q = np.diag(Q_diag)
 
         # Control rate of change weight matrix - control inputs as [x_vbs, x_lcg, delta_s, delta_r, rpm1, rpm2]
         R_diag = np.ones(nu)
-        R_diag[ :2] = 4e-2
+        R_diag[ :2] = 1e-1
         R_diag[2:4] = 1
         R_diag[4: ] = 1e-5
-        R = np.diag(R_diag)
+        R = np.diag(R_diag)*10
 
         # Stage costs
         ref = np.zeros((nx + nu,))
@@ -114,3 +114,4 @@ class NMPC:
         acados_integrator = AcadosSimSolver(self.ocp, json_file = solver_json)
 
         return acados_ocp_solver, acados_integrator
+    
