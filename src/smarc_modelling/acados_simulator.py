@@ -300,29 +300,31 @@ def main():
     simX[0,:] = x0
 
     # Declare the reference state - Static point in this tests
+    # Define the sinusoidal function
+    time = ca.MX.sym('t')
+    sinus_function = ca.Function('sinus', [time], [10 * ca.sin(time)])
+
+    # Initialize ref
     ref = np.zeros((nx + nu,))
-    ref[0] = 0.2
     ref[1] = 0.0
     ref[2] = 0.0
     ref[3] = 1
-
-    # Setup of the solver and integrator
+ 
     ocp_solver, integrator = nmpc.setup(x0)
-
-    # Array to store the time values
-    t = np.zeros((Nsim))
-
     # Initialize the state and control vector as David does
     for stage in range(N_horizon + 1):
         ocp_solver.set(stage, "x", x0)
     for stage in range(N_horizon):
         ocp_solver.set(stage, "u", np.zeros(nu,))
 
+    # Array to store the time values
+    t = np.zeros((Nsim))
 
     # closed loop - simulation
     for i in range(Nsim):
         # Update reference vector
         for stage in range(N_horizon):
+            ref[0] = sinus_function((i+stage)*0.01).full().item()
             ocp_solver.set(stage, "yref", ref)
         ocp_solver.set(N_horizon, "yref", ref[:nx])
 
