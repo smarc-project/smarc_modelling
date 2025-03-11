@@ -274,7 +274,6 @@ def RMSE_calculation(var, ref):
         cumulative_rmse[:,i] = rmse_k
     return cumulative_rmse
 
-
 def setup(x0, N_horizon, Tf, model, ocp):
     nx = model.x.rows()
     nu = model.u.rows()

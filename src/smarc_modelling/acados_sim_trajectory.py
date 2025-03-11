@@ -117,64 +117,92 @@ def setup(x0, N_horizon, Tf, model, ocp):
     nx = model.x.rows()
     nu = model.u.rows()
 
-    # -------------------- Set costs ---------------------------
-
+    # --------------------------- Cost setup ---------------------------------
     # State weight matrix
     Q_diag = np.ones(nx)
-    Q_diag[ 0:3 ] = 2000
-    Q_diag[ 3:7 ] = 1000
+    Q_diag[ 0:3 ] = 4e3
+    Q_diag[ 3:7 ] = 4e3
     Q_diag[ 7:10] = 500
     Q_diag[10:13] = 500
-    Q_diag[13:15] = 1e-2
+
+    # Control weight matrix - Costs set according to Bryson's rule (MPC course)
+    Q_diag[13:15] = 1e-6
     Q_diag[15:17] = 1/50
     Q_diag[17:  ] = 1e-6
     Q = np.diag(Q_diag)
 
-    # Control weight matrix - Costs set according to Bryson's rule (MPC course)
+    # Control rate of change weight matrix - control inputs as [x_vbs, x_lcg, delta_s, delta_r, rpm1, rpm2]
     R_diag = np.ones(nu)
-    R_diag[ :2] = 1/(100**2)
-    R_diag[2:4] = 1/(7**2)
-    R_diag[4: ] = 1/(1000**2)
+    R_diag[ :2] = 4e-2
+    R_diag[2:4] = 1
+    R_diag[4: ] = 1e-5
     R = np.diag(R_diag)
 
     # Stage costs
+    ref = np.zeros((nx + nu,))
+    ocp.cost.yref  = ref        # Init ref point. The true references are declared in the sim. for-loop
     ocp.cost.cost_type = 'NONLINEAR_LS'
     ocp.cost.W = ca.diagcat(Q, R).full()
-    # Set reference point - used only in the setup. The true references are declared in the sim. for-loop
-    ref = np.zeros((nx + nu,))
-    ocp.cost.yref  = ref
     ocp.model.cost_y_expr = ca.vertcat(model.x, model.u)
     
 
     # Terminal cost
     ocp.cost.cost_type_e = 'NONLINEAR_LS'
-    ocp.cost.W_e = Q#np.zeros(np.shape(Q))
+    ocp.cost.W_e = np.zeros(np.shape(Q))
     ocp.model.cost_y_expr_e = model.x
     ocp.cost.yref_e = ref[:nx]
 
 
-    # ---------------- Constraints ---------------------
+    # --------------------- Constraint Setup --------------------------
+    vbs_dot = 10    # Maximum rate of change for the VBS
+    lcg_dot = 15    # Maximum rate of change for the LCG
+    ds_dot  = 7     # Maximum rate of change for stern angle
+    dr_dot  = 7     # Maximum rate of change for rudder angle
+    rpm_dot = 1000  # Maximum rate of change for rpm
+
+    # Declare initial state
     ocp.constraints.x0 = x0
-    ocp.constraints.lbu = np.array([0, 0, -7, -7, -1000, -1000])
-    ocp.constraints.ubu = np.array([100, 100, 7, 7, 1000, 1000])
+
+    # Set constraints on the control rate of change
+    ocp.constraints.lbu = np.array([-vbs_dot,-lcg_dot, -ds_dot, -dr_dot, -rpm_dot, -rpm_dot])
+    ocp.constraints.ubu = np.array([ vbs_dot, lcg_dot,  ds_dot,  dr_dot,  rpm_dot,  rpm_dot])
     ocp.constraints.idxbu = np.arange(nu)
 
-    # --------------- Solver options -------------------
+    # Set constraints on the states (no constraints)
+    x_ubx = np.ones(nx)
+    x_ubx[  :13] = 1000
+
+    # Set constraints on the control
+    x_ubx[13:15] = 100 
+    x_ubx[15:17] = 7
+    x_ubx[17:  ] = 1000
+
+    x_lbx = -x_ubx
+    x_lbx[13:15] = 0
+
+    ocp.constraints.lbx = x_lbx
+    ocp.constraints.ubx = x_ubx
+    ocp.constraints.idxbx = np.arange(nx)
+
+    # ----------------------- Solver Setup --------------------------
     # set prediction horizon
     ocp.solver_options.N_horizon = N_horizon
     ocp.solver_options.tf = Tf
 
     ocp.solver_options.qp_solver = 'PARTIAL_CONDENSING_HPIPM'
+    ocp.solver_options.hpipm_mode = 'ROBUST'
     ocp.solver_options.hessian_approx = 'GAUSS_NEWTON'
     ocp.solver_options.integrator_type = 'IRK'
-    ocp.solver_options.sim_method_newton_iter = 10
+    ocp.solver_options.sim_method_newton_iter = 3 #3 default
 
     ocp.solver_options.nlp_solver_type = 'SQP_RTI'
-    ocp.solver_options.globalization = 'MERIT_BACKTRACKING'
     ocp.solver_options.nlp_solver_max_iter = 80
-    ocp.solver_options.tol    = 1e-6       # NLP tolerance
+    ocp.solver_options.tol    = 1e-6       # NLP tolerance. 1e-6 is default for tolerances
     ocp.solver_options.qp_tol = 1e-6       # QP tolerance
-    #ocp.solver_options.nlp_solver_tol_eq = 1e-6
+
+    ocp.solver_options.globalization = 'MERIT_BACKTRACKING'
+    ocp.solver_options.regularize_method = 'NO_REGULARIZE'
+
 
     solver_json = 'acados_ocp_' + model.name + '.json'
     acados_ocp_solver = AcadosOcpSolver(ocp, json_file = solver_json)
@@ -199,18 +227,18 @@ def main():
     # load trajectory
     rtf_file_path = "/home/admin/smarc_modelling/src/smarc_modelling/sam_example_trajectory.rtf"  # Replace with your actual file path
     trajectory = extract_arrays_from_rtf(rtf_file_path)
-
-
+    trajectory[-1][7:13] = 0
+    print(trajectory)
     # Horizon parameters 
     Tf = 1
-    N_horizon = 20
-    update_factor = 15 # Update the reference every n:th iteration
+    N_horizon = 10
+    update_factor = 6 # Update the reference every n:th iteration
     Nsim = np.size(trajectory, 0)*update_factor +400 # Simulation duration (no. of iterations)
 
     # Declare the initial state
     x0 = trajectory[0]
     u0 = np.zeros(nu)
-    u0[:2] = x0[13:15]
+    
     
     # Setup of the solver and integrator
     ocp_solver, integrator = setup(x0, N_horizon, Tf, ocp.model, ocp)
@@ -227,11 +255,6 @@ def main():
         ocp_solver.set(stage, "x", x0)
     for stage in range(N_horizon):
         ocp_solver.set(stage, "u", u0)
-
-    # do some initial iterations to start with a good initial guess - from the example
-    # num_iter_initial = 5
-    # for _ in range(num_iter_initial):
-    #     ocp_solver.solve_for_x0(x0_bar = x0)
 
     # closed loop - simulation
     Uref = np.zeros(nu)
@@ -250,14 +273,14 @@ def main():
 
         # solve ocp and get next control input
         status = ocp_solver.solve()
-        ocp_solver.print_statistics()
+        #ocp_solver.print_statistics()
         if status != 0:
             print(f" Note: acados_ocp_solver returned status: {status}")
 
         # simulate system
         t[i] = ocp_solver.get_stats('time_tot')
         simU[i, :]   = ocp_solver.get(0, "u")
-        print(f"Nsim: {i}\n{np.round(simU[i, :],3)}")
+        print(f"Nsim: {i}")
         simX[i+1, :] = integrator.simulate(x=simX[i, :], u=simU[i, :])
 
     # evaluate timings
