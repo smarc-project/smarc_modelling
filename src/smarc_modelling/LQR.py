@@ -15,13 +15,13 @@ class LQR:
         pass
 
     def compute_lqr_gain(self, A, B, Q, R):
-        P = scipy.linalg.solve_continuous_are(A, B, Q, R)
-        self.K = np.linalg.inv(R + B.T @ P @ B) @ B.T @ P @ A
+        P = scipy.linalg.solve_discrete_are(A, B, Q, R)
+        self.L = np.linalg.inv(R + B.T @ P @ B) @ B.T @ P @ A
 
     def solve(self, x):
-        u = self.K @ x
+        u = -self.L @ x
 
-        x_dot = linearized_dynamics(x, u)
+        x_dot = linearized_discrete_dynamics(x, u)
         x += x_dot * dt  # Update the state (Euler method)
         return x
 
