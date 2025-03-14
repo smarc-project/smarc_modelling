@@ -1,0 +1,9 @@
+LICENSE
+README.md
+pyproject.toml
+setup.cfg
+src/smarc_modelling.egg-info/PKG-INFO
+src/smarc_modelling.egg-info/SOURCES.txt
+src/smarc_modelling.egg-info/dependency_links.txt
+src/smarc_modelling.egg-info/requires.txt
+src/smarc_modelling.egg-info/top_level.txt

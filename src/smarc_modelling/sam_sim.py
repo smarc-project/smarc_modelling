@@ -1,7 +1,9 @@
+
 import numpy as np
 from smarc_modelling.vehicles import *
 from smarc_modelling.lib import *
 from smarc_modelling.vehicles.SAM import SAM
+
 import matplotlib
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
@@ -23,6 +25,7 @@ t_span = (0, 30)  # 20 seconds simulation
 n_sim = int(t_span[1]/dt)
 t_eval = np.linspace(t_span[0], t_span[1], n_sim)
 
+
 # Create SAM instance
 sam = SAM(dt)
 
@@ -34,13 +37,13 @@ class Sol():
         self.t = t
         self.y = data
 
-
 # FIXME: consider removing the dynamics wrapper and just call the dynamics straight away.
 def run_simulation(t_span, x0, sam):
     """
     Run SAM simulation using solve_ivp.
     """
     def dynamics_wrapper(t, x):
+
         """
         u: control inputs as [x_vbs, x_lcg, delta_s, delta_r, rpm1, rpm2]
         """
@@ -66,11 +69,11 @@ def run_simulation(t_span, x0, sam):
     #   performance we see.
     for i in range(n_sim-1):
         data[:,i+1] = data[:,i] + dynamics_wrapper(i, data[:,i]) * (t_span[1]/n_sim)
+
     sol = Sol(t_eval,data)
     print(f" Simulation complete!")
 
     return sol
-
 
 def plot_results(sol):
     """
@@ -203,7 +206,6 @@ def plot_trajectory(sol, numDataPoints, generate_gif=False, filename="3d.gif", F
         
         # Save the 3D animation as a gif file
         ani.save(filename, writer=animation.PillowWriter(fps=FPS))  
-
 
 # Run simulation and plot results
 sol = run_simulation(t_span, x0, sam)
