@@ -1,7 +1,7 @@
 # SAM
 
 `SAM` provides a lightweight analytical model of the SAM AUV based on
-Fossen's python vehicle simulator.
+Fossen's python vehicle simulator:).
 
 ## Running Things:
 To run the simulator, call `sam_sim.py`. It instantiates a SAM
