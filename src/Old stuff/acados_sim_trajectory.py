@@ -7,6 +7,7 @@
 import sys
 import os
 import re 
+import csv
 # Add the src directory to the system path
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', 'src'))
 import numpy as np
@@ -48,12 +49,30 @@ def extract_arrays_from_rtf(rtf_file_path):
         numpy_arrays.append(np.array(array_list))
     return numpy_arrays
 
+def read_csv_to_array(file_path):
+    """
+    Reads a CSV file and converts the elements to a NumPy array.
+
+    Parameters:
+    file_path (str): The path to the CSV file.
+
+    Returns:
+    np.array: A NumPy array containing the CSV data.
+    """
+    data = []
+    with open(file_path, 'r') as csvfile:
+        csvreader = csv.reader(csvfile)
+        next(csvreader)
+        for row in csvreader:
+            data.append([float(element) for element in row])
+    return np.array(data)
+
 def plot(x_axis, simX, simU, ref):
     plt.figure()
     plt.subplot(4,2,1)
     plt.plot(x_axis, simX[:,:3])
     plt.plot(x_axis, ref[:,:3], linestyle='--')
-    plt.legend(["X", "Y", "Z"])
+    plt.legend(["X", "Y", "Z", r"$X_{ref}$", r"$Y_{ref}$", r"$Z_{ref}$"])
     plt.ylabel("Position [m]")
     plt.grid()
 
@@ -67,9 +86,18 @@ def plot(x_axis, simX, simU, ref):
         psi[i], theta[i], phi[i] = gnc.quaternion_to_angles(q)
 
 
+    psi_ref = np.zeros(n)
+    theta_ref = np.zeros(n)
+    phi_ref = np.zeros(n)
+    for i in range(n):
+        q = [ref[i, 3], ref[i, 4], ref[i, 5], ref[i, 6]]
+        psi_ref[i], theta_ref[i], phi_ref[i] = gnc.quaternion_to_angles(q)
+
     plt.subplot(4,2,2)
     plt.plot(x_axis, np.rad2deg(phi), x_axis, np.rad2deg(theta), x_axis, np.rad2deg(psi))
-    plt.legend(["roll", "pitch", "yaw"])
+    plt.plot(x_axis, np.rad2deg(phi_ref), x_axis, np.rad2deg(theta_ref), x_axis, np.rad2deg(psi_ref), linestyle='--')
+
+    plt.legend(["roll", "pitch", "yaw", r"$roll_{ref}$", r"$pitch_{ref}$", r"$yaw_{ref}$"])
     plt.ylabel("Angle [deg]")
     plt.grid()
 
@@ -120,10 +148,10 @@ def setup(x0, N_horizon, Tf, model, ocp):
     # --------------------------- Cost setup ---------------------------------
     # State weight matrix
     Q_diag = np.ones(nx)
-    Q_diag[ 0:3 ] = 4e3
-    Q_diag[ 3:7 ] = 4e3
-    Q_diag[ 7:10] = 500
-    Q_diag[10:13] = 500
+    Q_diag[ 0:3 ] = 10e3
+    Q_diag[ 3:7 ] = 10e3
+    Q_diag[ 7:10] = 1000
+    Q_diag[10:13] = 1000
 
     # Control weight matrix - Costs set according to Bryson's rule (MPC course)
     Q_diag[13:15] = 1e-6
@@ -225,18 +253,22 @@ def main():
     nu = model.u.rows()
 
     # load trajectory
-    rtf_file_path = "/home/admin/smarc_modelling/src/smarc_modelling/sam_example_trajectory.rtf"  # Replace with your actual file path
-    trajectory = extract_arrays_from_rtf(rtf_file_path)
-    trajectory[-1][7:13] = 0
+    file_path = "/home/admin/smarc_modelling/src/smarc_modelling/trajectory1.csv"  # Replace with your actual file path
+    trajectory = read_csv_to_array(file_path)
     print(trajectory)
     # Horizon parameters 
     Tf = 1
     N_horizon = 10
-    update_factor = 6 # Update the reference every n:th iteration
-    Nsim = np.size(trajectory, 0)*update_factor +400 # Simulation duration (no. of iterations)
+    update_factor = 60 # Update the reference every n:th iteration or 0.1*update_factor second
+    print(np.size(trajectory,0))
+    Nsim = np.size(trajectory, 0)*update_factor # Simulation duration (no. of iterations)
 
     # Declare the initial state
     x0 = trajectory[0]
+    trajectory = np.delete(trajectory, 0, 0)
+    #trajectory[:, 13:] = 0
+    print(trajectory)
+
     u0 = np.zeros(nu)
     
     

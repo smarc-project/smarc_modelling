@@ -278,9 +278,9 @@ def plot(x_axis, ref, simX, simU):
 
 
     # Add labels
-    ax.set_xlabel('X / East')
-    ax.set_ylabel('Y / North')
-    ax.set_zlabel('Z / Down')
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    ax.set_zlabel('Z')
     ax.legend()
 
     # Show the plot
@@ -307,7 +307,7 @@ def main():
     model = sam.export_dynamics_model()
     nx = model.x.rows()
     nu = model.u.rows()
-    Nsim = 1000          # Simulation duration (no. of iterations) - sim. length is Ts*Nsim
+    Nsim = 800          # Simulation duration (no. of iterations) - sim. length is Ts*Nsim
     simU = np.zeros((Nsim, nu))     # Matrix to store the optimal control sequence
     simX = np.zeros((Nsim+1, nx))   # Matrix to store the simulated state
 
