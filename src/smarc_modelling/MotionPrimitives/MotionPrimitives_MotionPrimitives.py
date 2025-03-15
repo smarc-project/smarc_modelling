@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import math
+import smarc_modelling.MotionPrimitives.GlobalVariables_MotionPrimitives as glbv
 import sys
 sys.path.append('~/Desktop/smarc_modelling-master')
 from smarc_modelling.vehicles.SAM import SAM
@@ -13,8 +14,8 @@ class SAM_PRIMITIVES():
     def __init__(self):
 
         # 1 # select the duration of 1 step within a primitive 
-        self.dt = 0.1
-
+        self.dt = glbv.DT_PRIMITIVES
+        
         # 2 # select the duration of 1 primitive 
         self.t_span = (0, 3)
 

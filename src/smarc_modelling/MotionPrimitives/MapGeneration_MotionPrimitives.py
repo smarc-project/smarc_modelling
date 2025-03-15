@@ -65,15 +65,15 @@ def generationFirstMap():
     startrCell = random.randrange(numberVerticalTiles)  #random CELL
     startcCell = random.randrange(numberHorizontalTiles-2)+1 
     startrCell = 5
-    startcCell = 3
-    startzCell = 3
+    startcCell = 2
+    startzCell = 5
     map1[startzCell][startrCell][startcCell] = 2
 
         #goal
     goalrCell = random.randrange(numberVerticalTiles)    #random CELL
     goalcCell = random.randrange(numberHorizontalTiles)    #random CELL
     goalrCell = 10
-    goalcCell = 5
+    goalcCell = 9
     goalzCell = 5
     map1[goalzCell][goalrCell][goalcCell] = 3
 

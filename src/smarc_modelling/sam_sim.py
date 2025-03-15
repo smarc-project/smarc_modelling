@@ -3,7 +3,7 @@ import numpy as np
 from smarc_modelling.vehicles import *
 from smarc_modelling.lib import *
 from smarc_modelling.vehicles.SAM import SAM
-
+from smarc_modelling.MotionPrimitives.PlotResults_Motionprimitives import MotionPlanningAlgorithm
 import matplotlib
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
@@ -212,3 +212,6 @@ sol = run_simulation(t_span, x0, sam)
 plot_results(sol)
 plot_trajectory(sol, 50, False, "3d.gif", 10)
 plt.show()
+
+# Get MotionPlans
+MotionPlanningAlgorithm()

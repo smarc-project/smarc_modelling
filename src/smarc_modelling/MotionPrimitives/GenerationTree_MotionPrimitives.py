@@ -1,17 +1,14 @@
 import heapq
-import math
 import numpy as np
 import sys
 import random
-#from smarc_modelling.MotionPrimitives.MapGeneration_MotionPrimitives import TILESIZE, map_instance
 from smarc_modelling.MotionPrimitives.MotionPrimitives_MotionPrimitives import SAM_PRIMITIVES
+import smarc_modelling.MotionPrimitives.GlobalVariables_MotionPrimitives as glbv
 from joblib import Parallel, delayed
 from threading import Lock
 from scipy.spatial.transform import Rotation as R
-from matplotlib.patches import Ellipse
 import time
 import multiprocessing
-from concurrent.futures import ProcessPoolExecutor
 
 # Global variables
 lock = Lock()
@@ -56,7 +53,7 @@ def body_to_global_velocity(quaternion, body_velocity):
     
     return global_velocity
 
-def reconstruct_path(current, parents_dict):
+def reconstruct_path(current, parents_dict, resolution_dict):
     """
     This function reconstructs the path from the goal to the start. 
     It will return a list of states.
@@ -64,12 +61,37 @@ def reconstruct_path(current, parents_dict):
 
     # Initialize the variables
     final_path = []
+    start_node = False
+    
+    while current is not None:
 
-    # Find the path from goal to start
+        # Check if we are the starting node
+        if parents_dict[current] is None:
+            start_node = True
+
+        # Add starting node to the list (not included in resolution dictionary)
+        if start_node:
+            final_path.append(current.state)
+            current = None 
+            continue
+        
+        # Get the list of vertices from resolution_dictionary
+        res_list = resolution_dict[current]
+
+        # Append vertices to the final list (reverted order)
+        for vertex in res_list[::-1]:
+            final_path.append(vertex)
+
+        # Update current 
+        current = parents_dict[current]
+    
+    '''
+    # Find the path from goal to start (OLD ONE)
     while current is not None:
         final_path.append(current.state)
         current = parents_dict[current]
-    
+    '''
+
     # Return reversed path
     return final_path[::-1] 
 
@@ -394,6 +416,29 @@ def calculate_f(neighbor, map_instance, tentative_g, heuristic_cost, dec, typeF)
         
     return total_f
 
+def getResolution(reached_states, dt_reference):
+    # Change to global
+    dt_primitives = glbv.DT_PRIMITIVES
+    dt_current = 0
+    list_vertices = []
+
+    if dt_reference < dt_primitives:
+        print("!! The reference dt for resolution is less than the dt used for generating the primitives !!")
+        return list_vertices.append(reached_states[:, -1])
+    
+    # Get resolution
+    for index in range(reached_states.shape[1]):
+        vertex = reached_states[:, index]
+        if not np.array_equal(vertex, reached_states[:, 0]) and not np.array_equal(vertex, reached_states[:, -1]):
+            if dt_current >= dt_reference:
+                list_vertices.append(vertex)
+                dt_current = 0
+
+        dt_current += dt_primitives
+    list_vertices.append(reached_states[:, -1])
+
+    return list_vertices
+
 def a_star_search(ax, plt, map_instance, realTimeDraw, typeF_function, dec):
     """
     This is the main function of the algorithm. This function runs the main loop for generating the path.
@@ -427,11 +472,13 @@ def a_star_search(ax, plt, map_instance, realTimeDraw, typeF_function, dec):
     open_set = []                   # (cost_node, Node)
     parents_dictionary = {}         # (Node_current: Node_parent)
     g_cost = {start: 0}             # keeps track of the costs of the nodes, useful to understand more convenient paths
+    resolution_dictionary = {}
     heapq.heappush(open_set, (0, start))
     parents_dictionary[start] = None
     flag = 0
     nMaxIterations = 1000
     arrivedPoint = False
+    dt_resolution = glbv.RESOLUTION_DT
 
     # Start the search
     while (open_set):
@@ -439,7 +486,7 @@ def a_star_search(ax, plt, map_instance, realTimeDraw, typeF_function, dec):
         # Reconstruct the path if arrived to the goal
         if arrivedPoint:
             print("Algorithm ended successfully!")
-            return reconstruct_path(Node(finalLast), parents_dictionary), 1, finalCost
+            return reconstruct_path(Node(finalLast), parents_dictionary, resolution_dictionary), 1, finalCost
         
         # Print the iteration number
         flag = flag + 1
@@ -461,15 +508,21 @@ def a_star_search(ax, plt, map_instance, realTimeDraw, typeF_function, dec):
         # If all the generated primitives are not in the free space, then continue with the next vertex
         if len(reached_states) == 0: 
             continue
+        
+        # Analyze the single steps within the primitives (each dt)
+        for sequence_states in reached_states:
 
-        # Plot the found motion primitives
-        if realTimeDraw:
-            for sequence_states in reached_states:
+            # Save specific points for resolution of the trajectory
+            list_vertices = getResolution(sequence_states, dt_resolution)
+            resolution_dictionary[Node(sequence_states[:,-1])] = list_vertices
+
+            # Plot the found motion primitives
+            if realTimeDraw:
                 x_vals = sequence_states[0, :]
                 y_vals = sequence_states[1, :]
                 z_vals = sequence_states[2, :]
-                #ax.plot(x_vals, y_vals, z_vals, color='c', linewidth=0.5)
                 ax.plot(x_vals, y_vals, z_vals, 'c+', linewidth=0.5)
+        if realTimeDraw:
             plt.draw()
             plt.pause(0.01)
 
