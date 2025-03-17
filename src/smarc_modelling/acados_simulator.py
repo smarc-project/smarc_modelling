@@ -103,21 +103,21 @@ def plot(x_axis, ref, simX, simU):
 
     plt.subplot(4,3,7)
     plt.plot(x_axis, np.rad2deg(phi))
-    plt.plot(x_axis, ref[:, 3], linestyle='--', color='r')
+    plt.plot(x_axis, np.rad2deg(ref[:, 3]), linestyle='--', color='r')
     plt.legend([r"$\phi$", r"$\phi_{ref}$"])
     plt.ylabel("Roll [deg]")    
     plt.grid()
 
     plt.subplot(4,3,8)
     plt.plot(x_axis, np.rad2deg(theta))
-    plt.plot(x_axis, ref[:, 4], linestyle='--', color='r')
+    plt.plot(x_axis, np.rad2deg(ref[:, 4]), linestyle='--', color='r')
     plt.legend([r"$\theta$", r"$\theta_{ref}$"])
     plt.ylabel("Pitch [deg]")
     plt.grid()
 
     plt.subplot(4,3,9)
     plt.plot(x_axis, np.rad2deg(psi))
-    plt.plot(x_axis, ref[:, 5], linestyle='--', color='r')
+    plt.plot(x_axis, np.rad2deg(ref[:, 5]), linestyle='--', color='r')
     plt.legend([r"$\psi$", r"$\psi_{ref}$"])
     plt.ylabel("Yaw [deg]")
     plt.grid()
@@ -301,6 +301,32 @@ def RMSE_calculation(var, ref):
         cumulative_rmse[:,i] = rmse_k
     return cumulative_rmse
 
+def euler_to_quaternion(roll: float, pitch: float, yaw: float):
+    """
+    Converts Euler angles (roll, pitch, yaw) to a quaternion (x, y, z, w).
+
+    Args:
+        roll: Rotation around the X-axis (in degreees)
+        pitch: Rotation around the Y-axis (in degreees)
+        yaw: Rotation around the Z-axis (in degreees)
+
+    Returns:
+        A tuple (q_x, q_y, q_z, q_w) representing the quaternion.
+    """
+    cr = np.cos(np.deg2rad(roll) / 2)
+    sr = np.sin(np.deg2rad(roll) / 2)
+    cp = np.cos(np.deg2rad(pitch) / 2)
+    sp = np.sin(np.deg2rad(pitch) / 2)
+    cy = np.cos(np.deg2rad(yaw) / 2)
+    sy = np.sin(np.deg2rad(yaw) / 2)
+
+    q_w = cr * cp * cy + sr * sp * sy
+    q_x = sr * cp * cy - cr * sp * sy
+    q_y = cr * sp * cy + sr * cp * sy
+    q_z = cr * cp * sy - sr * sp * cy
+
+    return (q_w, q_x, q_y, q_z)
+
 def main():
     # Extract the CasADi model
     sam = SAM_casadi()
@@ -320,8 +346,8 @@ def main():
     x0 = np.zeros(nx)
     x0[0] = 0 
     x0[3] = 1       # Must be 1 (quaternions)
-    x0[17:] = 1e-6
-    x0[7]   = 1e-6
+    x0[17:] = 1e-9
+    x0[7]   = 1e-9
     x0[13] = 50
     x0[14] = 50
     simX[0,:] = x0
@@ -329,6 +355,7 @@ def main():
     # Declare the reference state - Static point in this tests
     # Initialize ref
     ref = np.zeros((nx + nu,))
+    ref[0] = 0
     ref[3] = 1
     ref[13:15] = 50
     references = ref
@@ -346,9 +373,10 @@ def main():
     for i in range(Nsim):
         # Update reference vector
         for stage in range(N_horizon):
-            ocp_solver.set(stage, "yref", ref)
+            ocp_solver.set(stage, "p", ref)
             ref[0] = np.cos((i+stage)*0.01)*10 - 10
             ref[1] = -np.sin((i+stage)*0.01+ np.pi)*10
+            #ref[3:7] = euler_to_quaternion(0, 0, np.rad2deg(np.arctan2(ref[1], ref[0])))
             ref[3] = 1
         references = np.vstack([references, ref])
         ocp_solver.set(N_horizon, "yref", ref[:nx])

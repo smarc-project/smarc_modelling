@@ -44,17 +44,19 @@ class NMPC:
         R = np.diag(R_diag)*10
 
         # Stage costs
-        ref = np.zeros((nx + nu,))
-        self.ocp.cost.yref  = ref        # Init ref point. The true references are declared in the sim. for-loop
+        self.model.p = ca.MX.sym('ref_param', nx+nu,1)
+        self.ocp.parameter_values = np.zeros((nx+nu,))
+
+        self.ocp.cost.yref  = np.zeros((nx+nu,))        # Init ref point. The true references are declared in the sim. for-loop
         self.ocp.cost.cost_type = 'NONLINEAR_LS'
         self.ocp.cost.W = ca.diagcat(Q, R).full()
-        self.ocp.model.cost_y_expr = self.x_error(self.model.x, self.model.u, ref, terminal=False) #ca.vertcat(self.model.x, self.model.u)
+        self.ocp.model.cost_y_expr = self.x_error(self.model.x, self.model.u, self.model.p, terminal=False) #ca.vertcat(self.model.x, self.model.u)
         
         # Terminal cost
         self.ocp.cost.cost_type_e = 'NONLINEAR_LS'
         self.ocp.cost.W_e = Q #np.zeros(np.shape(Q))
-        self.ocp.model.cost_y_expr_e = self.x_error(self.model.x, self.model.u, ref, terminal=True)
-        self.ocp.cost.yref_e = ref[:nx]
+        self.ocp.model.cost_y_expr_e = self.x_error(self.model.x, self.model.u, self.ocp.model.p, terminal=True)
+        self.ocp.cost.yref_e = np.zeros((nx,))
 
         # --------------------- Constraint Setup --------------------------
         vbs_dot = 10    # Maximum rate of change for the VBS
@@ -106,7 +108,6 @@ class NMPC:
         self.ocp.solver_options.globalization = 'MERIT_BACKTRACKING'
         self.ocp.solver_options.regularize_method = 'NO_REGULARIZE'
 
-
         solver_json = 'acados_ocp_' + self.model.name + '.json'
         acados_ocp_solver = AcadosOcpSolver(self.ocp, json_file = solver_json)
 
@@ -126,7 +127,6 @@ class NMPC:
         """
         q1 = ref[3:7]
         q2 = x[3:7]
-
         # Sice unit quaternion, quaternion inverse is equal to its conjugate
         q_conj = ca.vertcat(q2[0], -q2[1], -q2[2], -q2[3])
         q2 = q_conj/ca.norm_2(q2)
@@ -139,7 +139,7 @@ class NMPC:
 
         q_error = ca.vertcat(q_w, q_x, q_y, q_z)
 
-        pos_error = x[:3]
+        pos_error = x[:3] - ref[:3]
         vel_error = x[7:13] - ref[7:13]
         u_error   = x[13:19] - ref[13:19]
         
@@ -148,6 +148,5 @@ class NMPC:
         if terminal:
             x_error = ca.vertcat(pos_error, q_error, vel_error, u_error)
         else:
-            delta_u   = u - ref[19:]
-            x_error = ca.vertcat(pos_error, q_error, vel_error, u_error, u)
+            x_error = ca.vertcat(pos_error, q_error, vel_error, u_error, u) #delta_u(u))
         return x_error
