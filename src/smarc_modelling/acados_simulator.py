@@ -375,7 +375,7 @@ def main():
         for stage in range(N_horizon):
             ocp_solver.set(stage, "p", ref)
             ref[0] = np.cos((i+stage)*0.01)*10 - 10
-            ref[1] = -np.sin((i+stage)*0.01+ np.pi)*10
+            ref[1] = np.sin((i+stage)*0.01)*10
             #ref[3:7] = euler_to_quaternion(0, 0, np.rad2deg(np.arctan2(ref[1], ref[0])))
             ref[3] = 1
         references = np.vstack([references, ref])
