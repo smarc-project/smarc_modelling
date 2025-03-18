@@ -396,52 +396,7 @@ class SAM_casadi():
         model.f_impl_expr = f_impl
 
         return model
-    
-    def linear_dynamics(self, x, u_ref, x_lin, u_lin):
-        """
-        Function to create A and B matrices
-        """
-        x_sym = ca.MX.sym('x', 19, 1)
-        u_sym = ca.MX.sym('u', 6, 1)
-        
-        # Create Casadi functions to calculate jacobian
-        self.Ac_sym = ca.Function('Ac', [x_sym, u_sym], [ca.jacobian(self.dynamics(x_sym, u_sym), x_sym)])
-        self.Bc_sym = ca.Function('Bc', [x_sym, u_sym], [ca.jacobian(self.dynamics(x_sym, u_sym), u_sym)])
-        # A_d_sym, Bd_sym = self.continuous_to_discrete(self.Ac_sym, self.Bc_sym, dt = 0.01)
-        self.Ac = self.Ac_sym(x, u_ref)
-        self.Bc = self.Bc_sym(x, u_ref)
-        self.const = self.dynamics(x_lin, u_lin) - self.Ac @ x_lin - self.Bc @ u_lin
 
-        return self.Ac, self.Bc, self.const
-        
-    def continuous_to_discrete(self, A, B, dt):
-        """
-        Convert continuous-time system matrices (A, B) to discrete-time (A_d, B_d) using zero-order hold.
-        
-        Parameters:
-        A (ca.MX): Continuous-time state matrix
-        B (ca.MX): Continuous-time input matrix
-        dt (float): Sampling time
-        
-        Returns:
-        A_d (ca.MX): Discrete-time state matrix
-        B_d (ca.MX): Discrete-time input matrix
-        """
-        # Augmented matrix
-        n = A.size1()
-        m = B.size2()
-        M = ca.vertcat(ca.horzcat(A, B), ca.horzcat(ca.MX.zeros(m, n), ca.MX.eye(m)))
-        
-        # Matrix exponential
-        M_exp = ca.expm(M * dt)
-        
-        # Extract discrete-time matrices
-        A_d = M_exp[:n, :n]
-        A_d2 = ca.expm(A * dt)
-        print(A_d, A_d2)
-        B_d = M_exp[:n, n:]
-        
-        return A_d, B_d
     
     def calculate_system_state(self, nu, eta, u_control):
         """
