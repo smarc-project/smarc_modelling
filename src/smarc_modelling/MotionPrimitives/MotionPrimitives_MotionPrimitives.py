@@ -72,7 +72,7 @@ class SAM_PRIMITIVES():
         # 1-Using the distance from node(k-1) and node(k)
         cost = np.sqrt((x0[0] - x1[0])**2 + (x0[1] - x1[1])**2 + (x0[2] - x1[2])**2)
         
-        # 2-Using the angular acceleration 
+        # 2-Using the current acceleration 
         #v0 = np.sqrt(x0[7]**2 + x0[8]**2 + x0[9]**2)
         #v1 = np.sqrt(x1[7]**2 + x1[8]**2 + x1[9]**2)
         #cost = ((v1 + v0) * self.dt) * 0.5
@@ -197,8 +197,8 @@ if __name__ == "__main__":
     #2# WHAT ARE THE INPUTS THAT YOU ARE USING? ###
     rudder_inputs = np.arange(-max_input, max_input, step_input)
     stern_inputs = np.array([-7, 0, 7])
-    vbs_inputs = np.array([0])
-    lcg_inputs = np.array([0])
+    vbs_inputs = np.array([10, 50, 90])
+    lcg_inputs = np.array([0, 50, 100])
     rpm_inputs = np.arange(-1000, 1000, 200)
 
     #3# ADD THE NAME OF YOUR INPUT INSIDE np.meshgrid() ###

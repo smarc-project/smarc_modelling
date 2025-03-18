@@ -74,7 +74,7 @@ def generationFirstMap():
     goalcCell = random.randrange(numberHorizontalTiles)    #random CELL
     goalrCell = 10
     goalcCell = 9
-    goalzCell = 5
+    goalzCell = 2
     map1[goalzCell][goalrCell][goalcCell] = 3
 
     """Create the map-size"""

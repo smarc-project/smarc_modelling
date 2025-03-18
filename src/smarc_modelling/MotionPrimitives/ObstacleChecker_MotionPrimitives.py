@@ -69,7 +69,7 @@ def IsOutsideTheMap(x,y,z, map_instance):
     radius = 0.095
     
     # Check if we are inside the map
-    if (x > xMin +  radius and y > yMin + radius and z > zMin + radius) and (x < xMax - radius and y < yMax - radius and z < zMax - radius):   # Inside the map
+    if (x > xMin + radius and y > yMin + radius and z > zMin + radius) and (x < xMax - radius and y < yMax - radius and z < zMax - radius):   # Inside the map
         return False
     
     return True

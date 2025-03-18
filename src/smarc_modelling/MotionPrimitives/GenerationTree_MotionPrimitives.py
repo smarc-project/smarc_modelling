@@ -492,7 +492,7 @@ def a_star_search(ax, plt, map_instance, realTimeDraw, typeF_function, dec):
         flag = flag + 1
         print(f"Iteration {flag:.0f}.")
 
-        # Get the current node (the one with cheapest cost in open_set)
+        # Get the current node (the one with cheapest f_cost in open_set)
         _, current_node = heapq.heappop(open_set)   #removes and returns the node with lowest f value
         current_g = g_cost[current_node]
 
@@ -522,6 +522,7 @@ def a_star_search(ax, plt, map_instance, realTimeDraw, typeF_function, dec):
                 y_vals = sequence_states[1, :]
                 z_vals = sequence_states[2, :]
                 ax.plot(x_vals, y_vals, z_vals, 'c+', linewidth=0.5)
+
         if realTimeDraw:
             plt.draw()
             plt.pause(0.01)
