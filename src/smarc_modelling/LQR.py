@@ -5,9 +5,9 @@ import casadi as ca
 
 # Add the LQR below
 class LQR:
-    def __init__(self, model):
-        Q = np.eye(19)
-        R = np.eye(6)
+    def __init__(self, model, Ts):
+        self.P = 0
+        self.Ts = Ts
         self.model = model
 
 
@@ -15,24 +15,29 @@ class LQR:
         """
         Function to create continuous-time linearized dynamics.
         """
-        x_sym = ca.MX.sym('x', 19, 1)
-        u_sym = ca.MX.sym('u', 6, 1)
+        nx = np.size(x_lin, 0)
+        nu = np.size(u_lin, 0)    
+        x_sym = ca.MX.sym('x', nx, 1)
+        u_sym = ca.MX.sym('u', nu, 1)
         
         # Create Casadi functions to calculate jacobian
-        self.dfdx = ca.Function('dfdx', [x_sym, u_sym], [ca.jacobian(self.model.dynamics(x_sym, u_sym), x_sym)])
-        self.dfdu = ca.Function('dfdu', [x_sym, u_sym], [ca.jacobian(self.model.dynamics(x_sym, u_sym), u_sym)])
+        # self.dfdx = ca.Function('dfdx', [x_sym, u_sym], [ca.jacobian(self.model(x_sym, u_sym), x_sym)])
+        # self.dfdu = ca.Function('dfdu', [x_sym, u_sym], [ca.jacobian(self.model(x_sym, u_sym), u_sym)])
         # A_d_sym, Bd_sym = self.continuous_to_discrete(self.Ac_sym, self.Bc_sym, dt = 0.01)
+        self.dfdx = ca.jacobian(self.model(x_sym, u_sym), x_sym)
+        self.dfdu = ca.jacobian(self.model(x_sym, u_sym), u_sym)
+
 
         # f(x_lin, u_lin) is the same as self.model.dynamics(x_lin, u_lin)
-        A = ca.horzcat(self.dfdx(x_lin, u_lin), self.model.dynamics(x_lin, u_lin) - self.dfdx(x_lin, u_lin) @ x_lin)
+        A_top = ca.horzcat(self.dfdx(x_lin, u_lin), self.model(x_lin, u_lin) - self.dfdx(x_lin, u_lin) @ x_lin)
         
         # To construct the A and B matrices following the procedure, a zeros and a ones matrices needs to be declared
-        A_zero = ca.MX.zeros(self.dfdx.size1_out(), self.dfdx.size2_out())
-        A_ones = ca.MX.ones(self.model.dynamics.size1_out(), self.model.dynamics.size2_out())
-        B_zero = ca.MX.zeros(self.dfdu.size1_out(), self.dfdu.size2_out())
+        A_zero = ca.MX.zeros(nx ,nx)
+        A_ones = ca.MX.ones(nx, 1)
+        B_zero = ca.MX.zeros(nu, nu)
 
-        bottom = ca.horzcat(A_zero, A_ones)
-        self.Ac = ca.vertcat(A, bottom)
+        A_bottom = ca.horzcat(A_zero, A_ones)
+        self.Ac = ca.vertcat(A_top, A_bottom)
         self.Bc = ca.vertcat(self.dfdu(x_lin, u_lin), B_zero)
 
         return self.Ac, self.Bc
@@ -68,20 +73,19 @@ class LQR:
 
     def compute_lqr_gain(self, A, B, Q, R):
         P = scipy.linalg.solve_continuous_are(A, B, Q, R)
-        self.L = -np.linalg.inv(R + B.T @ P @ B) @ B.T @ P @ A
+        self.L = np.linalg.inv(R + B.T @ P @ B) @ B.T @ P @ A
 
     def solve(self, x):
-        dt = 0.1
         Q = np.eye(19)
         R = np.eye(6)
         A, B = self.create_linearized_dynamics(x, u)
         self.compute_lqr_gain(A, B, Q, R)
-        u = self.L @ x
+        u = -self.L @ x
 
         x_dot = A @ x + B @ u
-        x += x_dot * dt  # Update the state (Euler method)
+        x += x_dot * self.Ts  # Update the state (Euler method)
 
-        return x
+        return u
     
     
 

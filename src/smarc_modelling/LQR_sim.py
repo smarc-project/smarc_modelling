@@ -11,7 +11,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', 'src'))
 import numpy as np
 import casadi as ca
 import matplotlib.pyplot as plt
-from control import *
+from LQR import *
 
 from smarc_modelling.vehicles import *
 from smarc_modelling.lib import *
@@ -330,17 +330,18 @@ def euler_to_quaternion(roll: float, pitch: float, yaw: float):
 def main():
     # Extract the CasADi model
     sam = SAM_casadi()
-    model = sam.export_dynamics_model()
-    nx = model.x.rows()
-    nu = model.u.rows()
-    Nsim = 800          # Simulation duration (no. of iterations) - sim. length is Ts*Nsim
+
+    model = sam.dynamics()
+    nx   = 19
+    nu   = 6
+    Nsim = 100                      # Simulation duration (no. of iterations) - sim. length is Ts*Nsim
     simU = np.zeros((Nsim, nu))     # Matrix to store the optimal control sequence
     simX = np.zeros((Nsim+1, nx))   # Matrix to store the simulated state
 
     # create ocp object to formulate the OCP
     Ts = 0.1
     N_horizon = 10
-    nmpc = NMPC(model, Ts, N_horizon)
+    lqr = LQR(model, Ts)
 
     # Declare the initial state
     x0 = np.zeros(nx)
@@ -359,13 +360,9 @@ def main():
     ref[3] = 1
     ref[13:15] = 50
     references = ref
-    ocp_solver, integrator = nmpc.setup(x0)
-    # Initialize the state and control vector as David does
-    for stage in range(N_horizon + 1):
-        ocp_solver.set(stage, "x", x0)
-    for stage in range(N_horizon):
-        ocp_solver.set(stage, "u", np.zeros(nu,))
 
+    A, B = lqr.create_linearized_dynamics(x0, ref[13:19])
+    print(A, B)
     # Array to store the time values
     t = np.zeros((Nsim))
 
@@ -373,30 +370,15 @@ def main():
     for i in range(Nsim):
         # Update reference vector
         for stage in range(N_horizon):
-            ocp_solver.set(stage, "p", ref)
             ref[0] = np.cos((i+stage)*0.01)*10 - 10
             ref[1] = np.sin((i+stage)*0.01)*10
             #ref[3:7] = euler_to_quaternion(0, 0, np.rad2deg(np.arctan2(ref[1], ref[0])))
             ref[3] = 1
         references = np.vstack([references, ref])
-        ocp_solver.set(N_horizon, "yref", ref[:nx])
  
-        # Set current state
-        ocp_solver.set(0, "lbx", simX[i, :])
-        ocp_solver.set(0, "ubx", simX[i, :])
-
-        # solve ocp and get next control input
-        status = ocp_solver.solve()
-        #ocp_solver.print_statistics()
-        if status != 0:
-            print(f" Note: acados_ocp_solver returned status: {status}")
-
         # simulate system
-        t[i] = ocp_solver.get_stats('time_tot')
-        simU[i, :] = ocp_solver.get(0, "u")
-        X_eval = ocp_solver.get(0, "x")
         print(f"Nsim: {i}")
-        simX[i+1, :] = integrator.simulate(x=simX[i, :], u=simU[i, :])
+
 
     # evaluate timings
     t *= 1000  # scale to milliseconds
@@ -405,12 +387,7 @@ def main():
 
     # plot results
     x_axis = np.linspace(0, (Ts)*Nsim, Nsim+1)
-    print(np.shape(simX))
-    print(np.shape(references))
     plot(x_axis, references, simX, simU)
-
-    ocp_solver = None
-
 
 if __name__ == '__main__':
     main()
