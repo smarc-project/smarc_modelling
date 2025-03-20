@@ -360,7 +360,7 @@ def main():
     references = x_ref
 
     u_ref = np.zeros(nu)
-    u_ref[:2] = 50
+    u_ref[:2] = 0 
 
     A, B = lqr.create_linearized_dynamics(x_ref, u_ref)
 

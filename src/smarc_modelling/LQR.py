@@ -89,25 +89,16 @@ class LQR:
 
         # Control rate of change weight matrix - control inputs as [x_vbs, x_lcg, delta_s, delta_r, rpm1, rpm2]
         R_diag = np.ones(6)
-        # R_diag[ :2] = 1e-1
-        # R_diag[2:4] = 1
-        # R_diag[4: ] = 1e-5
+        R_diag[ :2] = 1e-2
+        R_diag[2:4] = 1/50
+        R_diag[4: ] = 1e-6
         R = np.diag(R_diag)
 
-        print(np.array(A))
+        
         # Set print options for better readability
         np.set_printoptions(precision=3, suppress=True)
+        print(np.array(A))
 
-        # Print the matrix
-        print("Formatted matrix:")
-
-
-        A = A + np.eye(14)*1e-4
-        A = np.eye(14)
-        print(A)
-        B = np.zeros((14, 6))
-        condition_number = np.linalg.cond(A)
-        print("Condition number:", condition_number)
         P = scipy.linalg.solve_continuous_are(A, B, Q, R)
         self.L = np.linalg.inv(R + B.T @ P @ B) @ B.T @ P @ A
         return self.L
