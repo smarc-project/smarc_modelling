@@ -347,6 +347,7 @@ class SAM_casadi():
             self.x_dot_sym = ca.Function('x_dot', [x_sym, u_ref_sym], [x_dot])
             self.create_model = False
 
+        # Export the casadi model to acados or for the LQR
         elif export == True:
             x_sym = ca.MX.sym('x', 13,1)
             u_ref_sym = ca.MX.sym('u_ref', 6,1)
