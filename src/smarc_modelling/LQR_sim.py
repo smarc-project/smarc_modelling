@@ -333,8 +333,8 @@ def main():
     # Extract the CasADi model
     sam = SAM_casadi()
 
-    model = sam.dynamics()
-    nx   = 19
+    dynamics_function = sam.dynamics(export=True)
+    nx   = 13
     nu   = 6
     Nsim = 10                      # Simulation duration (no. of iterations) - sim. length is Ts*Nsim
     simU = np.zeros((Nsim, nu))     # Matrix to store the optimal control sequence
@@ -342,28 +342,27 @@ def main():
 
     # create ocp object to formulate the OCP
     Ts = 0.1
-    lqr = LQR(model, Ts)
+    lqr = LQR(dynamics_function, Ts)
 
     # Declare the initial state
     x0 = np.zeros(nx+1)
-    x0[0] = 0 
+    x0[0] = 1   
     x0[3] = 1       # Must be 1 (quaternions)
-    x0[17:] = 1e-9
-    x0[7]   = 1e-9
-    x0[13] = 50
-    x0[14] = 50
-    x0[19] = 1
+    x0[7] = 1e-9
     simX[0,:] = x0
 
     # Declare the reference state - Static point in this tests
     # Initialize ref
-    ref = np.zeros((nx + nu,))
-    ref[0] = 0
-    ref[3] = 1
-    ref[13:15] = 50
-    references = ref
+    x_ref = np.zeros(nx)
+    #x_ref[0] = 0
+    x_ref[3:7] = np.array([1, 0, 0, 0])
+    x_ref[-1]= 1
+    references = x_ref
 
-    A, B = lqr.create_linearized_dynamics(ref[:19], ref[13:19])
+    u_ref = np.zeros(nu)
+    u_ref[:2] = 50
+
+    A, B = lqr.create_linearized_dynamics(x_ref, u_ref)
 
     # Array to store the time values
     x = x0
@@ -374,10 +373,10 @@ def main():
         print(f"Nsim: {i}")
 
         # Update reference vector
-        A_lin = A(ref[:19], ref[13:19])
-        B_lin = B(ref[:19], ref[13:19])
+        A_lin = A(x_ref, u_ref)
+        B_lin = B(x_ref, u_ref)
         L = lqr.compute_lqr_gain(A_lin, B_lin)
-        u  = -L @ x[:19]
+        u  = -L @ x
         xdot = A_lin @ x + B_lin @ u
 
         # TODO: MAKE A PURE casadi model where the input is u and x only 0:13
@@ -387,7 +386,7 @@ def main():
         # ref[1] = np.sin((i+stage)*0.01)*10
         # #ref[3:7] = euler_to_quaternion(0, 0, np.rad2deg(np.arctan2(ref[1], ref[0])))
         # ref[3] = 1
-        references = np.vstack([references, ref])
+        references = np.vstack([references, x_ref])
  
         # simulate system
 

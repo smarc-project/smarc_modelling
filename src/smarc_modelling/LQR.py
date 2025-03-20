@@ -5,10 +5,10 @@ import casadi as ca
 
 # Add the LQR below
 class LQR:
-    def __init__(self, model, Ts):
+    def __init__(self, dynamics, Ts):
         self.P = 0
         self.Ts = Ts
-        self.model = model
+        self.dynamics = dynamics
 
 
     def create_linearized_dynamics(self, x_lin, u_lin):
@@ -21,24 +21,24 @@ class LQR:
         u_sym = ca.MX.sym('u', nu, 1)
         
         # Create Casadi functions to calculate jacobian
-        # self.dfdx = ca.Function('dfdx', [x_sym, u_sym], [ca.jacobian(self.model(x_sym, u_sym), x_sym)])
-        # self.dfdu = ca.Function('dfdu', [x_sym, u_sym], [ca.jacobian(self.model(x_sym, u_sym), u_sym)])
+        # self.dfdx = ca.Function('dfdx', [x_sym, u_sym], [ca.jacobian(self.dynamics(x_sym, u_sym), x_sym)])
+        # self.dfdu = ca.Function('dfdu', [x_sym, u_sym], [ca.jacobian(self.dynamics(x_sym, u_sym), u_sym)])
         # print(self.dfdx)
         # A_d_sym, Bd_sym = self.continuous_to_discrete(self.Ac_sym, self.Bc_sym, dt = 0.01)
 
 
-        # f(x_lin, u_lin) is the same as self.model.dynamics(x_lin, u_lin)
+        # f(x_lin, u_lin) is the same as self.dynamics.dynamics(x_lin, u_lin)
         
         # To construct the A and B matrices following the procedure, a zeros and a ones matrices needs to be declared
         A_zero = ca.MX.zeros(1 ,nx)
         A_ones = ca.MX.ones(1)
         B_zero = ca.MX.zeros(1, nu)
 
-        self.Ac = ca.Function('Ac', [x_sym, u_sym], [ca.vertcat(ca.horzcat(ca.jacobian(self.model(x_sym, u_sym), x_sym), 
-                                                                           self.model(x_sym, u_sym) - ca.jacobian(self.model(x_sym, u_sym), x_sym) @ x_sym),
+        self.Ac = ca.Function('Ac', [x_sym, u_sym], [ca.vertcat(ca.horzcat(ca.jacobian(self.dynamics(x_sym, u_sym), x_sym), 
+                                                                self.dynamics(x_sym, u_sym) - ca.jacobian(self.dynamics(x_sym, u_sym), x_sym) @ x_sym),
                                                                 ca.horzcat(A_zero, A_ones))
                                                                 ])
-        self.Bc = ca.Function('Bc', [x_sym, u_sym], [ca.vertcat(ca.jacobian(self.model(x_sym, u_sym), u_sym), B_zero)])
+        self.Bc = ca.Function('Bc', [x_sym, u_sym], [ca.vertcat(ca.jacobian(self.dynamics(x_sym, u_sym), u_sym), B_zero)])
 
         print(self.Ac(np.ones(nx), np.ones(nu)).size())
         return self.Ac, self.Bc
@@ -74,9 +74,38 @@ class LQR:
         return A_d, B_d
 
     def compute_lqr_gain(self, A, B):
-        Q = np.eye(20)
-        R = np.eye(6)*1e-6
+        # State weight matrix
+        Q_diag = np.ones(14)
+        # Q_diag[ 0:3 ] = 10e3
+        # Q_diag[ 3:7 ] = 4e3
+        # Q_diag[ 7:10] = 500
+        # Q_diag[10:13] = 500
+        Q = np.diag(Q_diag)
 
+        # Control weight matrix - Costs set according to Bryson's rule (MPC course)
+        # Q_diag[13:15] = 1e-2
+        # Q_diag[15:17] = 1/50
+        # Q_diag[17:  ] = 1e-6
+
+        # Control rate of change weight matrix - control inputs as [x_vbs, x_lcg, delta_s, delta_r, rpm1, rpm2]
+        R_diag = np.ones(6)
+        # R_diag[ :2] = 1e-1
+        # R_diag[2:4] = 1
+        # R_diag[4: ] = 1e-5
+        R = np.diag(R_diag)
+
+        print(np.array(A))
+        # Set print options for better readability
+        np.set_printoptions(precision=3, suppress=True)
+
+        # Print the matrix
+        print("Formatted matrix:")
+
+
+        A = A + np.eye(14)*1e-4
+        A = np.eye(14)
+        print(A)
+        B = np.zeros((14, 6))
         condition_number = np.linalg.cond(A)
         print("Condition number:", condition_number)
         P = scipy.linalg.solve_continuous_are(A, B, Q, R)
