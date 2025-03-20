@@ -43,6 +43,8 @@ def plot(x_axis, ref, simX, simU):
 
     for i in range(n):
         q = [simX[i, 3], simX[i, 4], simX[i, 5], simX[i, 6]]
+        print(i)
+        print(q)
         psi[i], theta[i], phi[i] = gnc.quaternion_to_angles(q)
     
     y_axis = np.zeros(np.shape(simX))
@@ -334,23 +336,23 @@ def main():
     model = sam.dynamics()
     nx   = 19
     nu   = 6
-    Nsim = 100                      # Simulation duration (no. of iterations) - sim. length is Ts*Nsim
+    Nsim = 10                      # Simulation duration (no. of iterations) - sim. length is Ts*Nsim
     simU = np.zeros((Nsim, nu))     # Matrix to store the optimal control sequence
-    simX = np.zeros((Nsim+1, nx))   # Matrix to store the simulated state
+    simX = np.zeros((Nsim+1, nx+1))   # Matrix to store the simulated state
 
     # create ocp object to formulate the OCP
     Ts = 0.1
-    N_horizon = 10
     lqr = LQR(model, Ts)
 
     # Declare the initial state
-    x0 = np.zeros(nx)
+    x0 = np.zeros(nx+1)
     x0[0] = 0 
     x0[3] = 1       # Must be 1 (quaternions)
     x0[17:] = 1e-9
     x0[7]   = 1e-9
     x0[13] = 50
     x0[14] = 50
+    x0[19] = 1
     simX[0,:] = x0
 
     # Declare the reference state - Static point in this tests
@@ -361,23 +363,33 @@ def main():
     ref[13:15] = 50
     references = ref
 
-    A, B = lqr.create_linearized_dynamics(x0, ref[13:19])
-    print(A, B)
+    A, B = lqr.create_linearized_dynamics(ref[:19], ref[13:19])
+
     # Array to store the time values
+    x = x0
     t = np.zeros((Nsim))
 
     # closed loop - simulation
     for i in range(Nsim):
+        print(f"Nsim: {i}")
+
         # Update reference vector
-        for stage in range(N_horizon):
-            ref[0] = np.cos((i+stage)*0.01)*10 - 10
-            ref[1] = np.sin((i+stage)*0.01)*10
-            #ref[3:7] = euler_to_quaternion(0, 0, np.rad2deg(np.arctan2(ref[1], ref[0])))
-            ref[3] = 1
+        A_lin = A(ref[:19], ref[13:19])
+        B_lin = B(ref[:19], ref[13:19])
+        L = lqr.compute_lqr_gain(A_lin, B_lin)
+        u  = -L @ x[:19]
+        xdot = A_lin @ x + B_lin @ u
+
+        # TODO: MAKE A PURE casadi model where the input is u and x only 0:13
+        x = np.array(x + xdot*Ts).flatten()
+        simX[i+1,:] = x
+        # ref[0] = np.cos((i+stage)*0.01)*10 - 10
+        # ref[1] = np.sin((i+stage)*0.01)*10
+        # #ref[3:7] = euler_to_quaternion(0, 0, np.rad2deg(np.arctan2(ref[1], ref[0])))
+        # ref[3] = 1
         references = np.vstack([references, ref])
  
         # simulate system
-        print(f"Nsim: {i}")
 
 
     # evaluate timings

@@ -23,25 +23,27 @@ class LQR:
         # Create Casadi functions to calculate jacobian
         # self.dfdx = ca.Function('dfdx', [x_sym, u_sym], [ca.jacobian(self.model(x_sym, u_sym), x_sym)])
         # self.dfdu = ca.Function('dfdu', [x_sym, u_sym], [ca.jacobian(self.model(x_sym, u_sym), u_sym)])
+        # print(self.dfdx)
         # A_d_sym, Bd_sym = self.continuous_to_discrete(self.Ac_sym, self.Bc_sym, dt = 0.01)
-        self.dfdx = ca.jacobian(self.model(x_sym, u_sym), x_sym)
-        self.dfdu = ca.jacobian(self.model(x_sym, u_sym), u_sym)
 
 
         # f(x_lin, u_lin) is the same as self.model.dynamics(x_lin, u_lin)
-        A_top = ca.horzcat(self.dfdx(x_lin, u_lin), self.model(x_lin, u_lin) - self.dfdx(x_lin, u_lin) @ x_lin)
         
         # To construct the A and B matrices following the procedure, a zeros and a ones matrices needs to be declared
-        A_zero = ca.MX.zeros(nx ,nx)
-        A_ones = ca.MX.ones(nx, 1)
-        B_zero = ca.MX.zeros(nu, nu)
+        A_zero = ca.MX.zeros(1 ,nx)
+        A_ones = ca.MX.ones(1)
+        B_zero = ca.MX.zeros(1, nu)
 
-        A_bottom = ca.horzcat(A_zero, A_ones)
-        self.Ac = ca.vertcat(A_top, A_bottom)
-        self.Bc = ca.vertcat(self.dfdu(x_lin, u_lin), B_zero)
+        self.Ac = ca.Function('Ac', [x_sym, u_sym], [ca.vertcat(ca.horzcat(ca.jacobian(self.model(x_sym, u_sym), x_sym), 
+                                                                           self.model(x_sym, u_sym) - ca.jacobian(self.model(x_sym, u_sym), x_sym) @ x_sym),
+                                                                ca.horzcat(A_zero, A_ones))
+                                                                ])
+        self.Bc = ca.Function('Bc', [x_sym, u_sym], [ca.vertcat(ca.jacobian(self.model(x_sym, u_sym), u_sym), B_zero)])
 
+        print(self.Ac(np.ones(nx), np.ones(nu)).size())
         return self.Ac, self.Bc
         
+
     def continuous_to_discrete(self, A, B, dt):
         """
         Convert continuous-time system matrices (A, B) to discrete-time (A_d, B_d) using zero-order hold.
@@ -71,9 +73,15 @@ class LQR:
         
         return A_d, B_d
 
-    def compute_lqr_gain(self, A, B, Q, R):
+    def compute_lqr_gain(self, A, B):
+        Q = np.eye(20)
+        R = np.eye(6)*1e-6
+
+        condition_number = np.linalg.cond(A)
+        print("Condition number:", condition_number)
         P = scipy.linalg.solve_continuous_are(A, B, Q, R)
         self.L = np.linalg.inv(R + B.T @ P @ B) @ B.T @ P @ A
+        return self.L
 
     def solve(self, x):
         Q = np.eye(19)
