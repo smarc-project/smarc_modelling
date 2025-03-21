@@ -28,7 +28,7 @@ class NMPC:
         Q_diag[ 0:3 ] = 4e3         # Position
         Q_diag[ 3:7 ] = 4e3         # Quaternion
         Q_diag[ 7:10] = 0           # linear velocity
-        Q_diag[10:13] = 300        # Angular velocity
+        Q_diag[10:13] = 100         # Angular velocity
 
         # Control weight matrix - Costs set according to Bryson's rule (MPC course)
         Q_diag[13:15] = 1e-2        # VBS, LCG

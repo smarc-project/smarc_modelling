@@ -353,8 +353,8 @@ def main():
     x0 = np.zeros(nx)
     x0[0] = 0 
     x0[3] = 1       # Must be 1 (quaternions)
-    x0[17:] = 1e-6
-    x0[7]   = 1e-6
+    x0[17:] = 1e-9
+    x0[7]   = 1e-9
     x0[13] = 50
     x0[14] = 50
     simX[0,:] = x0
@@ -384,6 +384,7 @@ def main():
             ref[0] = np.cos((i+stage)*0.005)*10 - 10
             ref[1] = np.sin((i+stage)*0.005)*10
             ref[3] = 1
+            #ref[3:7] = euler_to_quaternion(0, 0, np.rad2deg(np.arctan2(ref[1], ref[0])))
         references = np.vstack([references, ref])
         ocp_solver.set(N_horizon, "yref", ref[:nx])
  
