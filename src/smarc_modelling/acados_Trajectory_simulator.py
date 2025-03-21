@@ -45,7 +45,6 @@ def plot(x_axis, ref, simX, simU):
 
     for i in range(n):
         q = [simX[i, 3], simX[i, 4], simX[i, 5], simX[i, 6]]
-        print(q)
         psi[i], theta[i], phi[i] = gnc.quaternion_to_angles(q)
     
     y_axis = np.zeros(np.shape(simX))
@@ -367,7 +366,7 @@ def main():
     # create ocp object to formulate the OCP
     Ts = 0.1
     N_horizon = 10
-    nmpc = NMPC(model, Ts, N_horizon)
+    nmpc = NMPC_trajectory(model, Ts, N_horizon)
 
     # load trajectory
     file_path = "/home/admin/smarc_modelling/src/smarc_modelling/simonTrajectory.csv"  # Replace with your actual file path
@@ -408,7 +407,6 @@ def main():
     for i in range(Nsim):
         # Update reference vector
         if i % update_factor == 0 and int(i/update_factor) < np.size(trajectory, 0):
-            print(i/update_factor, np.size(trajectory, 0))
             ref = np.concatenate((trajectory[int(i/update_factor)+1], Uref))
         ocp_solver.set(stage, "p", ref)
 
