@@ -272,16 +272,23 @@ def plot(x_axis, ref, simX, simU):
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
 
+    # Set axis limits
+    ax.set_xlim([-21, 1])
+    ax.set_ylim([-11, 11])
+    ax.set_zlim([-1, 1])
+
     # Plot the trajectory
     ax.plot3D(x, y, z, label='Trajectory', lw=2, c='r')
     ax.plot3D(ref[:, 0], ref[:, 1], ref[:, 2], linestyle='--', label='Reference', lw=1, c='black')
-
 
     # Add labels
     ax.set_xlabel('X')
     ax.set_ylabel('Y')
     ax.set_zlabel('Z')
     ax.legend()
+
+    # Invert the z_axis
+    ax.invert_zaxis()
 
     # Show the plot
     plt.show()
@@ -333,7 +340,7 @@ def main():
     model = sam.export_dynamics_model()
     nx = model.x.rows()
     nu = model.u.rows()
-    Nsim = 800          # Simulation duration (no. of iterations) - sim. length is Ts*Nsim
+    Nsim = 1200          # Simulation duration (no. of iterations) - sim. length is Ts*Nsim
     simU = np.zeros((Nsim, nu))     # Matrix to store the optimal control sequence
     simX = np.zeros((Nsim+1, nx))   # Matrix to store the simulated state
 
@@ -346,8 +353,8 @@ def main():
     x0 = np.zeros(nx)
     x0[0] = 0 
     x0[3] = 1       # Must be 1 (quaternions)
-    x0[17:] = 1e-9
-    x0[7]   = 1e-9
+    x0[17:] = 1e-6
+    x0[7]   = 1e-6
     x0[13] = 50
     x0[14] = 50
     simX[0,:] = x0
@@ -374,9 +381,8 @@ def main():
         # Update reference vector
         for stage in range(N_horizon):
             ocp_solver.set(stage, "p", ref)
-            ref[0] = np.cos((i+stage)*0.01)*10 - 10
-            ref[1] = np.sin((i+stage)*0.01)*10
-            #ref[3:7] = euler_to_quaternion(0, 0, np.rad2deg(np.arctan2(ref[1], ref[0])))
+            ref[0] = np.cos((i+stage)*0.005)*10 - 10
+            ref[1] = np.sin((i+stage)*0.005)*10
             ref[3] = 1
         references = np.vstack([references, ref])
         ocp_solver.set(N_horizon, "yref", ref[:nx])
