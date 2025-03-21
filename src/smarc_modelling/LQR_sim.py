@@ -43,8 +43,6 @@ def plot(x_axis, ref, simX, simU):
 
     for i in range(n):
         q = [simX[i, 3], simX[i, 4], simX[i, 5], simX[i, 6]]
-        print(i)
-        print(q)
         psi[i], theta[i], phi[i] = gnc.quaternion_to_angles(q)
     
     y_axis = np.zeros(np.shape(simX))
@@ -186,77 +184,77 @@ def plot(x_axis, ref, simX, simU):
     plt.ylabel("Yaw [deg]")
     plt.grid()
 
-    # Control Inputs
+    # # Control Inputs
     plt.figure()
-    plt.subplot(4,3,1)
-    plt.step(x_axis, simX[:, 13])
-    plt.legend([r"VBS"])
-    plt.ylabel("VBS input") 
-    plt.grid()
+    # plt.subplot(4,3,1)
+    # plt.step(x_axis, simX[:, 13])
+    # plt.legend([r"VBS"])
+    # plt.ylabel("VBS input") 
+    # plt.grid()
 
-    plt.subplot(4,3,2)
-    plt.step(x_axis, simX[:, 15])
-    plt.title("Control inputs")
-    plt.legend([r"Stern angle"])
-    plt.ylabel(r" Degrees [$\degree$]")
-    plt.grid()
+    # plt.subplot(4,3,2)
+    # plt.step(x_axis, simX[:, 15])
+    # plt.title("Control inputs")
+    # plt.legend([r"Stern angle"])
+    # plt.ylabel(r" Degrees [$\degree$]")
+    # plt.grid()
 
-    plt.subplot(4,3,3)
-    plt.step(x_axis, simX[:, 17])
-    plt.legend([r"RPM1"])
-    plt.ylabel("Motor RPM")
-    plt.grid()
+    # plt.subplot(4,3,3)
+    # plt.step(x_axis, simX[:, 17])
+    # plt.legend([r"RPM1"])
+    # plt.ylabel("Motor RPM")
+    # plt.grid()
 
     plt.subplot(4,3,4)
-    plt.step(x_axis[:-1], simU[:, 0])
+    plt.step(x_axis, simU[:, 0])
     plt.legend([r"VBS"])
     plt.ylabel("VBS derivative") 
     plt.grid()
 
     plt.subplot(4,3,5)
-    plt.step(x_axis[:-1], simU[:, 2])
+    plt.step(x_axis, simU[:, 2])
     plt.legend([r"Stern angle"])
     plt.ylabel(r" Degree derivative [$\degree/s$]")
     plt.grid()
 
     plt.subplot(4,3,6)
-    plt.step(x_axis[:-1], simU[:, 4])
+    plt.step(x_axis, simU[:, 4])
     plt.legend([r"RPM1"])
     plt.ylabel("RPM1 derivative")
     plt.grid()
 
-    plt.subplot(4,3,7)
-    plt.step(x_axis, simX[:, 14])
-    plt.legend([r"LCG"])
-    plt.ylabel("LCG input")
-    plt.grid()
+    # plt.subplot(4,3,7)
+    # plt.step(x_axis, simX[:, 14])
+    # plt.legend([r"LCG"])
+    # plt.ylabel("LCG input")
+    # plt.grid()
 
-    plt.subplot(4,3,8)
-    plt.step(x_axis, simX[:, 16])
-    plt.legend([r"Rudder angle"])
-    plt.ylabel(r" degrees [$\degree$]")
-    plt.grid()
+    # plt.subplot(4,3,8)
+    # plt.step(x_axis, simX[:, 16])
+    # plt.legend([r"Rudder angle"])
+    # plt.ylabel(r" degrees [$\degree$]")
+    # plt.grid()
 
-    plt.subplot(4,3,9)
-    plt.step(x_axis, simX[:, 18])
-    plt.legend([r"RPM2"])
-    plt.ylabel("Motor RPM")
-    plt.grid()
+    # plt.subplot(4,3,9)
+    # plt.step(x_axis, simX[:, 18])
+    # plt.legend([r"RPM2"])
+    # plt.ylabel("Motor RPM")
+    # plt.grid()
 
     plt.subplot(4,3,10)
-    plt.step(x_axis[:-1], simU[:, 1])
+    plt.step(x_axis, simU[:, 1])
     plt.legend([r"LCG"])
     plt.ylabel("LCG derivative") 
     plt.grid()
 
     plt.subplot(4,3,11)
-    plt.step(x_axis[:-1], simU[:, 3])
+    plt.step(x_axis, simU[:, 3])
     plt.legend([r"Rudder angle"])
     plt.ylabel(r" Degree derivative [$\degree/s$]")
     plt.grid()
 
     plt.subplot(4,3,12)
-    plt.step(x_axis[:-1], simU[:, 5])
+    plt.step(x_axis, simU[:, 5])
     plt.legend([r"RPM2"])
     plt.ylabel("RPM2 derivative")
     plt.grid()
@@ -336,52 +334,70 @@ def main():
     dynamics_function = sam.dynamics(export=True)
     nx   = 13
     nu   = 6
-    Nsim = 10                      # Simulation duration (no. of iterations) - sim. length is Ts*Nsim
-    simU = np.zeros((Nsim, nu))     # Matrix to store the optimal control sequence
-    simX = np.zeros((Nsim+1, nx+1))   # Matrix to store the simulated state
+    Nsim = 100                      # Simulation duration (no. of iterations) - sim. length is Ts*Nsim
+    simU = np.zeros((Nsim+1, nu))     # Matrix to store the optimal control sequence
+    simX = np.zeros((Nsim+1, nx))   # Matrix to store the simulated state
 
     # create ocp object to formulate the OCP
     Ts = 0.1
     lqr = LQR(dynamics_function, Ts)
 
     # Declare the initial state
-    x0 = np.zeros(nx+1)
-    x0[0] = 1   
+    x0 = np.zeros(nx)
+    x0[0] = 0.1   
     x0[3] = 1       # Must be 1 (quaternions)
     x0[7] = 1e-9
     simX[0,:] = x0
+
+    u0 = np.zeros(nu)
+    u0[:2] = 50
+    u0[2:4] = 0
+    u0[4:6] = 1e-9
+    simU[0,:] = u0
 
     # Declare the reference state - Static point in this tests
     # Initialize ref
     x_ref = np.zeros(nx)
     #x_ref[0] = 0
     x_ref[3:7] = np.array([1, 0, 0, 0])
-    x_ref[-1]= 1
     references = x_ref
 
     u_ref = np.zeros(nu)
-    u_ref[:2] = 0 
+    u_ref[:2] = 50 
 
     A, B = lqr.create_linearized_dynamics(x_ref, u_ref)
 
     # Array to store the time values
-    x = x0
     t = np.zeros((Nsim))
 
+
+    x_lin =np.zeros(nx)
+    x_lin[3] = 1
+    x_lin[7] = 0
+    u_lin = np.zeros(nu)
+    u_lin[0:2] = 50
+    u_lin[2:4] = 0
+    u_lin[4:6] = 0
+
     # closed loop - simulation
+    x = x0
+    u = u0
+    xdot_prev = np.zeros(nx)
     for i in range(Nsim):
         print(f"Nsim: {i}")
-
-        # Update reference vector
-        A_lin = A(x_ref, u_ref)
-        B_lin = B(x_ref, u_ref)
-        L = lqr.compute_lqr_gain(A_lin, B_lin)
-        u  = -L @ x
-        xdot = A_lin @ x + B_lin @ u
-
-        # TODO: MAKE A PURE casadi model where the input is u and x only 0:13
+        A_lin = A(x_lin, u_lin)
+        B_lin = B(x_lin, u_lin)
+        A_lin, B_lin = lqr.continuous_to_discrete(A_lin, B_lin, Ts)
+        xdot = A_lin @ (x-x_lin) + B_lin @ (u-u_lin)
         x = np.array(x + xdot*Ts).flatten()
+
+        L = lqr.compute_lqr_gain(A_lin, B_lin)
+        u  = -L @ (x - x_lin)
+        
+        xdot_prev = xdot
+        # TODO: MAKE A PURE casadi model where the input is u and x only 0:13
         simX[i+1,:] = x
+        simU[i+1,:] = np.array(u).flatten()
         # ref[0] = np.cos((i+stage)*0.01)*10 - 10
         # ref[1] = np.sin((i+stage)*0.01)*10
         # #ref[3:7] = euler_to_quaternion(0, 0, np.rad2deg(np.arctan2(ref[1], ref[0])))

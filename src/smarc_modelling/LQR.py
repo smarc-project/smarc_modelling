@@ -34,13 +34,9 @@ class LQR:
         A_ones = ca.MX.ones(1)
         B_zero = ca.MX.zeros(1, nu)
 
-        self.Ac = ca.Function('Ac', [x_sym, u_sym], [ca.vertcat(ca.horzcat(ca.jacobian(self.dynamics(x_sym, u_sym), x_sym), 
-                                                                self.dynamics(x_sym, u_sym) - ca.jacobian(self.dynamics(x_sym, u_sym), x_sym) @ x_sym),
-                                                                ca.horzcat(A_zero, A_ones))
-                                                                ])
-        self.Bc = ca.Function('Bc', [x_sym, u_sym], [ca.vertcat(ca.jacobian(self.dynamics(x_sym, u_sym), u_sym), B_zero)])
+        self.Ac = ca.Function('Ac', [x_sym, u_sym], [ca.jacobian(self.dynamics(x_sym, u_sym), x_sym)])
+        self.Bc = ca.Function('Bc', [x_sym, u_sym], [ca.jacobian(self.dynamics(x_sym, u_sym), u_sym)])
 
-        print(self.Ac(np.ones(nx), np.ones(nu)).size())
         return self.Ac, self.Bc
         
 
@@ -57,49 +53,49 @@ class LQR:
         A_d (ca.MX): Discrete-time state matrix
         B_d (ca.MX): Discrete-time input matrix
         """
-        # Augmented matrix
-        n = A.size1()
-        m = B.size2()
-        M = ca.vertcat(ca.horzcat(A, B), ca.horzcat(ca.MX.zeros(m, n), ca.MX.eye(m)))
+        # Convert to numpy matrices (Problem with casadi plugin)
+        A = np.array(A)
+        B = np.array(B)
+
+        print(scipy.linalg.det(A))
+        # Discretize the A matrix (A_d = exp(A * dt))
+        A_d = scipy.linalg.expm(A * dt)
+
+        # Trapezoidal rule for B_d: B_d = dt * (exp(A*dt) + I) / 2 * B
+        I = np.eye(A.shape[0])  # Identity matrix of the same size as A
+
+        # Discretize B using the trapezoidal rule (more accurate than Euler method)
+        B_d = scipy.integrate.quad_vec(lambda x: scipy.linalg.expm(A * x) @ B, 0, self.Ts)
+        #B_d = scipy.integrate.quad(A_d @ B, dx=dt)
+        B_d2 = dt * np.dot(0.5 * (A_d + I), B)
+
+        # Output the discretized matrices A_d and B_d
+        np.set_printoptions(precision=3, suppress=True, linewidth=120)
+
+        print("Discretized A matrix (A_d):")
+        print(A)
+        print("Discretized B matrix (B_d) using the trapezoidal rule:")
         
-        # Matrix exponential
-        M_exp = ca.expm(M * dt)
-        
-        # Extract discrete-time matrices
-        A_d = M_exp[:n, :n]
-        A_d2 = ca.expm(A * dt)
-        print(A_d, A_d2)
-        B_d = M_exp[:n, n:]
-        
-        return A_d, B_d
+        return A_d, B_d2
 
     def compute_lqr_gain(self, A, B):
         # State weight matrix
-        Q_diag = np.ones(14)
-        # Q_diag[ 0:3 ] = 10e3
-        # Q_diag[ 3:7 ] = 4e3
-        # Q_diag[ 7:10] = 500
-        # Q_diag[10:13] = 500
+        Q_diag = np.ones(13)
+        Q_diag[ 0:3 ] = 1
+        Q_diag[ 3:7 ] = 1
+        Q_diag[ 7:10] = 1
+        Q_diag[10:13] = 1
         Q = np.diag(Q_diag)
 
-        # Control weight matrix - Costs set according to Bryson's rule (MPC course)
-        # Q_diag[13:15] = 1e-2
-        # Q_diag[15:17] = 1/50
-        # Q_diag[17:  ] = 1e-6
 
         # Control rate of change weight matrix - control inputs as [x_vbs, x_lcg, delta_s, delta_r, rpm1, rpm2]
         R_diag = np.ones(6)
-        R_diag[ :2] = 1e-2
-        R_diag[2:4] = 1/50
-        R_diag[4: ] = 1e-6
+        #R_diag[ :2] = 1e-2
+        # R_diag[2:4] = 1/50
+        # R_diag[4: ] = 1e-6
         R = np.diag(R_diag)
 
-        
-        # Set print options for better readability
-        np.set_printoptions(precision=3, suppress=True)
-        print(np.array(A))
-
-        P = scipy.linalg.solve_continuous_are(A, B, Q, R)
+        P = scipy.linalg.solve_discrete_are(A, B, Q, R)
         self.L = np.linalg.inv(R + B.T @ P @ B) @ B.T @ P @ A
         return self.L
 
@@ -115,8 +111,3 @@ class LQR:
 
         return u
     
-    
-
-# u = -k*x
-# x_dot = auv_dynamics(x, u)
-# x += x_dot * dt  # Update the state (Euler method)
