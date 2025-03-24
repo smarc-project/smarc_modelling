@@ -173,10 +173,10 @@ class NMPC_trajectory:
         # --------------------------- Cost setup ---------------------------------
         # State weight matrix
         Q_diag = np.ones(nx)
-        Q_diag[ 0:3 ] = 6e3         # Position
-        Q_diag[ 3:7 ] = 4e3         # Quaternion
-        Q_diag[ 7:10] = 4000           # linear velocity
-        Q_diag[10:13] = 500         # Angular velocity
+        Q_diag[ 0:3 ] = 1e1         # Position
+        Q_diag[ 3:7 ] = 1e1         # Quaternion
+        Q_diag[ 7:10] = 5e1           # linear velocity
+        Q_diag[10:13] = 5e1         # Angular velocity
 
         # Control weight matrix - Costs set according to Bryson's rule (MPC course)
         Q_diag[13:15] = 1e-2        # VBS, LCG

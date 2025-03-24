@@ -282,6 +282,9 @@ def plot(x_axis, ref, simX, simU):
     # Plot the trajectory
     ax.plot3D(x, y, z, label='Trajectory', lw=2, c='r')
     ax.plot3D(ref[:, 0], ref[:, 1], ref[:, 2], linestyle='--', label='Reference', lw=1, c='black')
+    #ax.scatter(ref[:, 0], ref[:, 1], ref[:, 2], c='black')
+
+
 
     # Add labels
     ax.set_xlabel('X')
@@ -371,8 +374,8 @@ def main():
     # load trajectory
     file_path = "/home/admin/smarc_modelling/src/smarc_modelling/simonTrajectory.csv"  # Replace with your actual file path
     trajectory = read_csv_to_array(file_path)
-    update_factor = 5
-    Nsim = (trajectory.shape[0]-1)*update_factor
+    update_factor = 2
+    Nsim = (trajectory.shape[0]-1)*update_factor + 100
     simU = np.zeros((Nsim, nu))     # Matrix to store the optimal control sequence
     simX = np.zeros((Nsim+1, nx))   # Matrix to store the simulated state
     # Declare the initial state
@@ -406,8 +409,13 @@ def main():
     Uref = np.zeros((nu,))
     for i in range(Nsim):
         # Update reference vector
-        if i % update_factor == 0 and int(i/update_factor) < np.size(trajectory, 0):
+        if i % update_factor == 0 and int(i/update_factor) < np.size(trajectory, 0)-2:
             ref = np.concatenate((trajectory[int(i/update_factor)+1], Uref))
+        if int(i/update_factor) > np.size(trajectory, 0)-2:
+            ref_pos = trajectory[-1, :7]
+            ref_pos[4:6] = 0
+            ref = np.concatenate((ref_pos, np.zeros(18)))
+            ref[13:15] = 50
         ocp_solver.set(stage, "p", ref)
 
         # for stage in range(N_horizon):
