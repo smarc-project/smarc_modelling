@@ -20,6 +20,7 @@ from smarc_modelling.lib import *
 from smarc_modelling.vehicles.SAM_casadi import SAM_casadi
 
 def plot(x_axis, ref, simX, simU):
+    Uref = ref[:, 13:]
     ref = ref[:,:13]  
 
     psi = np.zeros(np.size(ref, 0))
@@ -190,20 +191,24 @@ def plot(x_axis, ref, simX, simU):
     plt.figure()
     plt.subplot(4,3,1)
     plt.step(x_axis, simX[:, 13])
-    plt.legend([r"VBS"])
+    plt.step(x_axis, Uref[:, 0], linestyle='--', color='r')
+    plt.legend([r"VBS", r"VBS_{ref}"])
     plt.ylabel("VBS input") 
     plt.grid()
 
     plt.subplot(4,3,2)
     plt.step(x_axis, simX[:, 15])
+    plt.step(x_axis, Uref[:, 2], linestyle='--', color='r')
     plt.title("Control inputs")
-    plt.legend([r"Stern angle"])
+    plt.legend([r"Stern angle", r"s_{ref}"])
     plt.ylabel(r" Degrees [$\degree$]")
     plt.grid()
 
     plt.subplot(4,3,3)
     plt.step(x_axis, simX[:, 17])
-    plt.legend([r"RPM1"])
+    plt.step(x_axis, Uref[:, 4], linestyle='--', color='r')
+
+    plt.legend([r"RPM1", r"RPM1_{ref}"])
     plt.ylabel("Motor RPM")
     plt.grid()
 
@@ -227,19 +232,25 @@ def plot(x_axis, ref, simX, simU):
 
     plt.subplot(4,3,7)
     plt.step(x_axis, simX[:, 14])
-    plt.legend([r"LCG"])
+    plt.step(x_axis, Uref[:, 1], linestyle='--', color='r')
+
+    plt.legend([r"LCG", r"LCG_{ref}"])
     plt.ylabel("LCG input")
     plt.grid()
 
     plt.subplot(4,3,8)
     plt.step(x_axis, simX[:, 16])
-    plt.legend([r"Rudder angle"])
+    plt.step(x_axis, Uref[:, 3], linestyle='--', color='r')
+
+    plt.legend([r"Rudder angle", r"r_{ref}"])
     plt.ylabel(r" degrees [$\degree$]")
     plt.grid()
 
     plt.subplot(4,3,9)
     plt.step(x_axis, simX[:, 18])
-    plt.legend([r"RPM2"])
+    plt.step(x_axis, Uref[:, 5], linestyle='--', color='r')
+
+    plt.legend([r"RPM2", r"RPM2_{ref}"])
     plt.ylabel("Motor RPM")
     plt.grid()
 
@@ -283,6 +294,14 @@ def plot(x_axis, ref, simX, simU):
     ax.plot3D(x, y, z, label='Trajectory', lw=2, c='r')
     ax.plot3D(ref[:, 0], ref[:, 1], ref[:, 2], linestyle='--', label='Reference', lw=1, c='black')
     #ax.scatter(ref[:, 0], ref[:, 1], ref[:, 2], c='black')
+
+    # Add directional arrows
+    arrow_step = 20  # Adjust this value to control the spacing of the arrows
+    for i in range(0, len(simX) - arrow_step, arrow_step):
+        ax.quiver(simX[i,0], simX[i, 1], simX[i, 2], 
+                  simX[i + arrow_step, 0] - simX[i, 0], 
+                  simX[i + arrow_step, 1] - simX[i, 1], 
+                  simX[i + arrow_step, 2] - simX[i, 2], color='b', length=1, normalize=True)
 
 
 
@@ -339,7 +358,7 @@ def euler_to_quaternion(roll: float, pitch: float, yaw: float):
 
     return (q_w, q_x, q_y, q_z)
 
-def read_csv_to_array(file_path):
+def read_csv_to_array(file_path: str):
     """
     Reads a CSV file and converts the elements to a NumPy array.
 
@@ -355,8 +374,28 @@ def read_csv_to_array(file_path):
         next(csvreader)
         for row in csvreader:
             data.append([float(element) for element in row])
+
+    
     return np.array(data)
 
+def interpolate_trajectory(trajectory, update_factor):
+    factors = np.linspace(0, 1, 3) # Create a reference between two current references. depends on upd_rate
+    print(factors)
+    for i in range(trajectory.shape[0]-1):
+        if i != trajectory.shape[0]-1:
+            for factor in factors[:-1]:
+                if i == 0:
+                    interpolated_vectors = trajectory[i] + factor * (trajectory[i+1] - trajectory[i])
+                else:
+                    interpolated_vectors = np.vstack([interpolated_vectors, trajectory[i] + factor * (trajectory[i+1] - trajectory[i])])
+        else:
+           for factor in factors:
+                if i == 0:
+                    interpolated_vectors = trajectory[i] + factor * (trajectory[i+1] - trajectory[i])
+                else:
+                    interpolated_vectors = np.vstack([interpolated_vectors, trajectory[i] + factor * (trajectory[i+1] - trajectory[i])])
+
+    return interpolated_vectors
 def main():
     # Extract the CasADi model
     sam = SAM_casadi()
@@ -367,15 +406,34 @@ def main():
 
 
     # create ocp object to formulate the OCP
-    Ts = 0.1
-    N_horizon = 10
+    Ts = 0.1            # Sampling time
+    N_horizon = 10      # Prediction horizon
     nmpc = NMPC_trajectory(model, Ts, N_horizon)
 
-    # load trajectory
+    # load trajectory 
+    # [0.80779432 1.64096852 0.8117352  0.00623    0.11800339 0.76366669
+    # [0.52973178 0.81225335 0.57256579 0.00540797 0.08945072 0.41948276]
+    # [0.64864755 1.00683907 1.12793013 0.0052     0.05246716 0.25850169] 10x control penalty
+    # [1.1692489  1.91961439 0.70380629 0.00593018 0.14206731 0.49720138] /100 control penalty
+    # [0.42714966 0.81929637 0.84859249 0.00537457 0.09147801 0.37887213] 100x vbs and lcg
+    # [1.09375398 1.05878095 0.37370258 0.00616043 0.05144144 0.34736231] /100 derivate
+    # [1.09723773 1.06001512 0.44346927 0.00699306 0.05119554 0.27290873] /100 der + 10x vbs lcg
+    # [1.03565606 1.09993834 0.39973722 0.00540114 0.09502776 0.14782899] /100 der + 0x vbs/lcg/rudder/stern
+    # [0.71582471 0.89654997 0.66824081 0.00532129 0.05577648 0.38805477] /100 der + 1x s/r
+    # [0.71655526 0.89967733 0.66741772 0.00539746 0.05602826 0.38711439] .--. + lcgvbs*10
+    # [0.74633982 0.87006956 0.53070041 0.00597113 0.06011602 0.35121533] .--. + lcgvbs/100
+    # [2.06306741 2.33319433 1.98029225 0.00543503 0.05127192 1.02081118] .--. + rpm ==1e-3
+    # [0.81739943 0.80816713 0.64554324 0.00550643 0.06286725 0.34560717] .--. + rpm ==1e-9
+    # [0.73091542 0.89330547 0.61835125 0.00588127 0.06450611 0.57389722] rot and vel rot /2
     file_path = "/home/admin/smarc_modelling/src/smarc_modelling/simonTrajectory.csv"  # Replace with your actual file path
     trajectory = read_csv_to_array(file_path)
     update_factor = 2
+
     Nsim = (trajectory.shape[0]-1)*update_factor + 100
+    x_axis = np.linspace(0, (Ts)*Nsim, Nsim+1)
+    print(f"Trajectory shape: {trajectory.shape}")
+    #trajectory = interpolate_trajectory(trajectory, update_factor)
+
     simU = np.zeros((Nsim, nu))     # Matrix to store the optimal control sequence
     simX = np.zeros((Nsim+1, nx))   # Matrix to store the simulated state
     # Declare the initial state
@@ -449,7 +507,6 @@ def main():
 
 
     # plot results
-    x_axis = np.linspace(0, (Ts)*Nsim, Nsim+1)
     print(np.shape(simX))
     print(np.shape(references))
     plot(x_axis, references, simX, simU)
