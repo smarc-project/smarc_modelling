@@ -425,12 +425,16 @@ def main():
     # [1.0524109  0.35414572 0.15510585 0.00553364 0.0620624  0.33590795] best above + R stern and rudder == 1e-1 and rudder stern == 1/10
     # [0.42547966 0.59333252 0.19126773 0.01012134 0.07806261 0.35600244] best above + R stern and rudder == 1e-1 and rudder stern == 1/10, terminal weight 100 for states
 
+    # Best so far:
+    # [0.18855295 0.28167868 0.14491978 0.00526312 0.05129348 0.1313632 ], 0.3686 After updated terminal weight 
+    #  0.2987456253720445 for the trajectory*
+
     #file_path = "/home/admin/smarc_modelling/src/smarc_modelling/resolution01.csv"  # Replace with your actual file path
     file_path = "/home/admin/smarc_modelling/src/smarc_modelling/simonTrajectory.csv"
     trajectory = read_csv_to_array(file_path)
     update_factor = 2
 
-    Nsim = (trajectory.shape[0]-1)*update_factor + 100
+    Nsim = (trajectory.shape[0]-1)*update_factor
     x_axis = np.linspace(0, (Ts)*Nsim, Nsim+1)
     print(f"Trajectory shape: {trajectory.shape}")
     #trajectory = interpolate_trajectory(trajectory, update_factor)

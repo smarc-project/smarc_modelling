@@ -206,7 +206,8 @@ class NMPC_trajectory:
         Q_e = np.zeros(nx)
         Q_e[ :3] = 100
         Q_e[3:7] = 100
-        Q_e[7:13]= 100
+        Q_e[7:10]= 100
+        Q_e[10:13]= 100
         Q_e[13:] = 100
         Q_e = np.diag(Q_e)
         self.ocp.cost.W_e = Q_e #np.zeros(np.shape(Q))
@@ -294,7 +295,7 @@ class NMPC_trajectory:
 
         q_error = ca.vertcat(q_w, q_x, q_y, q_z)
 
-        pos_error = x[:3] - ref[:3]
+        pos_error = x[:3] - ref[:3] #+ np.array([(np.random.random()-0.5),(np.random.random()-0.5), (np.random.random()-0.5)])
         vel_error = x[7:13] - ref[7:13]
         u_error   = x[13:19] - ref[13:19]
         
