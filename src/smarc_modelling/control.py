@@ -175,20 +175,20 @@ class NMPC_trajectory:
         Q_diag = np.ones(nx)
         Q_diag[ 0:3 ] = 1e1         # Position
         Q_diag[ 3:7 ] = 1e1         # Quaternion
-        Q_diag[ 7:10] = 5e1           # linear velocity
+        Q_diag[ 7:10] = 5e1         # linear velocity
         Q_diag[10:13] = 5e1         # Angular velocity
 
         # Control weight matrix - Costs set according to Bryson's rule (MPC course)
-        Q_diag[13:15] = 1e-2        # VBS, LCG
-        Q_diag[15:17] = 1/50        # stern_angle, rudder_angle
+        Q_diag[13:15] = 1e-4        # VBS, LCG
+        Q_diag[15:17] = 1/200        # stern_angle, rudder_angle
         Q_diag[17:  ] = 1e-6        # RPM1 And RPM2
         Q_diag[13:  ] = Q_diag[13:  ]
         Q = np.diag(Q_diag)
 
         # Control rate of change weight matrix - control inputs as [x_vbs, x_lcg, delta_s, delta_r, rpm1, rpm2]
         R_diag = np.ones(nu)
-        R_diag[ :2] = 1e-1
-        R_diag[2:4] = 1
+        R_diag[ :2] = 1e-3
+        R_diag[2:4] = 1e0
         R_diag[4: ] = 1e-5
         R = np.diag(R_diag)
 
