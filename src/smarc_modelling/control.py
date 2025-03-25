@@ -203,7 +203,13 @@ class NMPC_trajectory:
         
         # Terminal cost
         self.ocp.cost.cost_type_e = 'NONLINEAR_LS'
-        self.ocp.cost.W_e = Q #np.zeros(np.shape(Q))
+        Q_e = np.zeros(nx)
+        Q_e[ :3] = 100
+        Q_e[3:7] = 100
+        Q_e[7:13]= 100
+        Q_e[13:] = 100
+        Q_e = np.diag(Q_e)
+        self.ocp.cost.W_e = Q_e #np.zeros(np.shape(Q))
         self.ocp.model.cost_y_expr_e = self.x_error(self.model.x, self.model.u, self.ocp.model.p, terminal=True)
         self.ocp.cost.yref_e = np.zeros((nx,))
 

@@ -298,7 +298,7 @@ def plot(x_axis, ref, simX, simU):
 
     # Add directional arrows
     arrow_step = 10  # Adjust this value to control the spacing of the arrows
-    for i in range(0, len(simX) - arrow_step, 50):
+    for i in range(0, len(simX) - arrow_step, 25):
         c = np.sqrt((simX[i + arrow_step, 0] - simX[i, 0])**2 + (simX[i + arrow_step, 1] - simX[i, 1])**2 + (simX[i + arrow_step, 2] - simX[i, 2])**2)
         ax.quiver(simX[i,0], simX[i, 1], simX[i, 2], 
                   np.cos(psi[i])*np.cos(theta[i]), 
