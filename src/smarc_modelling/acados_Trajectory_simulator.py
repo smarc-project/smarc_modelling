@@ -296,8 +296,8 @@ def plot(x_axis, ref, simX, simU):
     #ax.scatter(ref[:, 0], ref[:, 1], ref[:, 2], c='black')
 
     # Add directional arrows
-    arrow_step = 20  # Adjust this value to control the spacing of the arrows
-    for i in range(0, len(simX) - arrow_step, arrow_step):
+    arrow_step = 10  # Adjust this value to control the spacing of the arrows
+    for i in range(0, len(simX) - arrow_step, 50):
         ax.quiver(simX[i,0], simX[i, 1], simX[i, 2], 
                   simX[i + arrow_step, 0] - simX[i, 0], 
                   simX[i + arrow_step, 1] - simX[i, 1], 
@@ -425,9 +425,12 @@ def main():
     # [2.06306741 2.33319433 1.98029225 0.00543503 0.05127192 1.02081118] .--. + rpm ==1e-3
     # [0.81739943 0.80816713 0.64554324 0.00550643 0.06286725 0.34560717] .--. + rpm ==1e-9
     # [0.73091542 0.89330547 0.61835125 0.00588127 0.06450611 0.57389722] rot and vel rot /2
-    file_path = "/home/admin/smarc_modelling/src/smarc_modelling/simonTrajectory.csv"  # Replace with your actual file path
+    # [0.3516651  0.4596261  0.62134679 0.00637616 0.06540021 0.16591628 standard
+    # [0.35336025 0.45991562 0.62129134 0.00637666 0.06539938 0.16662311] angle *5
+    # [0.35144681 0.45958724 0.6213529  0.0063761  0.06540032 0.1658257 ]
+    file_path = "/home/admin/smarc_modelling/src/smarc_modelling/resolution01.csv"  # Replace with your actual file path
     trajectory = read_csv_to_array(file_path)
-    update_factor = 2
+    update_factor = 1
 
     Nsim = (trajectory.shape[0]-1)*update_factor + 100
     x_axis = np.linspace(0, (Ts)*Nsim, Nsim+1)
