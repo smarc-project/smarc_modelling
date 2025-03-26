@@ -23,7 +23,7 @@ def plot_map(map_data, typePlot):
     """
     This function creates the map to be shown. It colors the cells, create the tank and set the initial view with the axis limit.
     """
-
+    #line
     # Extract map properties
     map_x_max = map_data["x_max"]   #number of column-wise
     map_y_max = map_data["y_max"]   #number of row-wise
