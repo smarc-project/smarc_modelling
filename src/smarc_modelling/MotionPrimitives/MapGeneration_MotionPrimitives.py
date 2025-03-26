@@ -61,20 +61,23 @@ def generationFirstMap():
     # (0,3) and (9,2)
     # (3,3) and (5,0)
 
+    # Map with issues when optimizing:
+    # (4, 2, 2) and (9, 9, 4)
+
         #start
     startrCell = random.randrange(numberVerticalTiles)  #random CELL
     startcCell = random.randrange(numberHorizontalTiles-2)+1 
-    startrCell = 5
+    startrCell = 4
     startcCell = 2
-    startzCell = 5
+    startzCell = 1
     map1[startzCell][startrCell][startcCell] = 2
 
         #goal
     goalrCell = random.randrange(numberVerticalTiles)    #random CELL
     goalcCell = random.randrange(numberHorizontalTiles)    #random CELL
-    goalrCell = 10
+    goalrCell = 4
     goalcCell = 9
-    goalzCell = 2
+    goalzCell = 1
     map1[goalzCell][goalrCell][goalcCell] = 3
 
     """Create the map-size"""
@@ -98,7 +101,7 @@ def generationFirstMap():
     arrivalPixel = (goalcCell * TILESIZE + 0.5 * TILESIZE, goalrCell * TILESIZE + 0.5 * TILESIZE, goalzCell * TILESIZE + 0.5 * TILESIZE)    #ATTENTION! is (x,y,z), not row, column and z
 
     ## Restricted area (where the velocity will be constrained)
-    bound = 3
+    bound = 1
     restr_x_min = max(0, arrivalPixel[0] - bound)
     restr_x_max = min(mapWidth, arrivalPixel[0] + bound)
     restr_y_min = max(0, arrivalPixel[1] - bound)

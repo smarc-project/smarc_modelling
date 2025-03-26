@@ -3,6 +3,8 @@ import numpy as np
 import sys
 import random
 from smarc_modelling.MotionPrimitives.MotionPrimitives_MotionPrimitives import SAM_PRIMITIVES
+from smarc_modelling.MotionPrimitives.ObstacleChecker_MotionPrimitives import calculate_angle_betweenVectors, calculate_angle_goalVector
+from smarc_modelling.MotionPrimitives.OptimizationTrust_MotionPrimitives import testOptimization
 import smarc_modelling.MotionPrimitives.GlobalVariables_MotionPrimitives as glbv
 from joblib import Parallel, delayed
 from threading import Lock
@@ -53,7 +55,93 @@ def body_to_global_velocity(quaternion, body_velocity):
     
     return global_velocity
 
-def reconstruct_path(current, parents_dict, resolution_dict):
+def process_result(result, shared_data, lock):
+    data, last_state, inObstacle, arrived = result
+    
+    #if arrived:
+    if not inObstacle:
+        last = last_state[0]
+        q0, q1, q2, q3, v1, v2, v3 = last[3:10]
+        final_v_norm = np.linalg.norm(body_to_global_velocity((q0, q1, q2, q3), [v1, v2, v3]))
+
+        # First check outside lock to avoid unnecessary contention
+        if final_v_norm < shared_data.best_v_norm and not inObstacle:
+            with lock:  # Acquire lock only if condition is met
+                if final_v_norm < shared_data.best_v_norm:  # Double-check inside lock
+                    shared_data.best_v_norm = final_v_norm
+                    shared_data.bestData = data
+
+def parallel_process(results):
+    """ 
+    Set up multiprocessing pool to process results in parallel
+    """
+
+    manager = multiprocessing.Manager()
+    shared_data = manager.Namespace()  # Shared memory for best values
+    shared_data.best_v_norm = float('inf')  # Initialize with high value
+    shared_data.bestData = None  # Placeholder for best data
+
+    lock = manager.Lock()  # Lock for synchronization
+
+    # Use multiprocessing pool to parallelize
+    with multiprocessing.Pool() as pool:
+        pool.starmap(process_result, [(res, shared_data, lock) for res in results])
+
+    return shared_data.bestData  # Return best trajectory data
+
+def postProcessVelocity(list_vertices, map_instance, ax, plt):
+
+    print("post processing for reducing final velocity")
+    startT = time.time()
+    sim = SAM_PRIMITIVES()
+    len_list = len(list_vertices)
+    first_vertex = list_vertices[int((len_list / 10) * 3)]
+    #first_vertex = list_vertices[0]
+    q0, q1, q2, q3, v1, v2, v3 = first_vertex[3:10]
+
+    # 1 # Define the inputs 
+    rudder_inputs = np.arange(-7, 7, 3)
+    stern_inputs = np.array([-7, 0, 7])
+    vbs_inputs = np.array([10, 50, 90])
+    lcg_inputs = np.array([0, 50, 100])
+    rpm_inputs = np.arange(-1500, 1600, 100)
+
+    # 2 # Add the name of the input into np.meshgrid(), and change the second value of .reshape(., THIS)
+    input_pairs = np.array(np.meshgrid(rudder_inputs, rpm_inputs, vbs_inputs, lcg_inputs, stern_inputs)).T.reshape(-1,5)
+
+    # 3 # Add the index in u of the input you modified in np.tile([..., HERE], ...)
+    additional_values = np.tile([3, 4, 0, 1, 2], (input_pairs.shape[0], 1))
+
+    # 4 # Do not touch
+    full_input_pairs = np.hstack((input_pairs, additional_values))
+
+    # Generate primitives
+    st = time.time()
+    results = Parallel(n_jobs=multiprocessing.cpu_count())(
+    delayed(process_input_pair)(inputs, first_vertex, sim, map_instance, True) for inputs in full_input_pairs
+    ) 
+    end = time.time()
+    print(f"parallel time for generating primitives:...{end-st:.4f} seconds")
+
+    # Run parallel processing for evaluating primitives
+    st = time.time()
+    bestData = parallel_process(results)
+    end = time.time()
+    print(f"Parallel time for evaluating primitives:...{end-st:.4f} seconds")
+
+    # At least one successful trajectory
+    list_vertices1 = [first_vertex]
+    final_list_vertices = []
+    if bestData is not None:
+        list_vertices2 = getResolution(bestData, glbv.RESOLUTION_DT)
+        final_list_vertices = list_vertices1 + list_vertices2
+
+    stopT = time.time()
+    print(f"Post-processing time:...{stopT-startT:.4f} seconds")
+
+    return final_list_vertices
+
+def reconstruct_path(current, parents_dict, resolution_dict, map_instance, ax, plt):
     """
     This function reconstructs the path from the goal to the start. 
     It will return a list of states.
@@ -61,22 +149,38 @@ def reconstruct_path(current, parents_dict, resolution_dict):
 
     # Initialize the variables
     final_path = []
-    start_node = False
     
     while current is not None:
 
         # Check if we are the starting node
         if parents_dict[current] is None:
-            start_node = True
-
-        # Add starting node to the list (not included in resolution dictionary)
-        if start_node:
             final_path.append(current.state)
             current = None 
             continue
         
         # Get the list of vertices from resolution_dictionary
         res_list = resolution_dict[current]
+
+        '''
+        # Post processing velocity
+        if len(final_path) == 0:
+            result_list = postProcessVelocity(res_list, map_instance, ax, plt)
+            if len(result_list) > 0:
+                res_list = result_list
+        '''
+
+        # Optimization TRUST
+        
+        if len(final_path) == 0:
+            start_opti = time.time()
+            print("<starting optimization>")
+            x0 = res_list[0]
+            result_list = testOptimization(res_list, map_instance, ax, plt)
+            if len(result_list) > 0:
+                res_list = result_list
+            print("[     OK     ]")
+            end_opti = time.time()
+            print(f"optimization time:...{end_opti-start_opti:.4f} seconds")
 
         # Append vertices to the final list (reverted order)
         for vertex in res_list[::-1]:
@@ -95,7 +199,7 @@ def reconstruct_path(current, parents_dict, resolution_dict):
     # Return reversed path
     return final_path[::-1] 
 
-def process_input_pair(inputs, current_state, sim, map_instance):
+def process_input_pair(inputs, current_state, sim, map_instance, breaking=False):
     '''This is the function that is parallelized'''
 
     # Initialize variables
@@ -103,6 +207,7 @@ def process_input_pair(inputs, current_state, sim, map_instance):
 
     # If number of inputs is != from number of indices there is something wrong
     if inputLen % 2 != 0:
+        print(inputs)
         print("ERROR! INPUTS AND INDICES ARE NOT THE SAME LENGTH")
         sys.exit(1)
     
@@ -115,7 +220,7 @@ def process_input_pair(inputs, current_state, sim, map_instance):
     alpha = calculate_angle_goalVector(current_state, v_vector, map_instance)
 
     # Get all the points within one single input primitive
-    data, cost, inObs, arrived, finalState = sim.curvePrimitives(current_state, inputs[0 : inputLen//2], inputs[inputLen//2 : inputLen], map_instance, alpha)
+    data, cost, inObs, arrived, finalState = sim.curvePrimitives(current_state, inputs[0 : inputLen//2], inputs[inputLen//2 : inputLen], map_instance, alpha, breaking)
     if not inObs:
         neighbour = data[:,-1]
         cost_path = cost
@@ -282,65 +387,6 @@ def heuristic(state, goal_p):
     """
 
     return np.sqrt((state[0] - goal_p[0]) ** 2 + (state[1] - goal_p[1]) ** 2 + (state[2] - goal_p[2]) ** 2)
-    
-def calculate_angle_goalVector(state, vector, map_instance):
-    """
-    Compute the angle (in rad) between a vector and the goal vector from the current state
-    """
-
-    # Define current and goal positions
-    x = state[0]
-    y = state[1]
-    z = state[2]
-    x_goal = map_instance["goal_pixel"][0]
-    y_goal = map_instance["goal_pixel"][1]
-    z_goal = map_instance["goal_pixel"][2]
-
-    # Define the distance between position and goal
-    dx = x_goal - x
-    dy = y_goal - y
-    dz = z_goal - z
-
-    # Define cvector
-    vector_norm = np.linalg.norm(vector)
-    if vector_norm != 0:
-        vector /= vector_norm
-
-    # Define the goal vector
-    goal_vector = np.array([dx, dy, dz])
-    goal_vector_norm = np.linalg.norm(goal_vector)
-    goal_vector /= goal_vector_norm
-
-    # Boundary case
-    if vector_norm == 0 or goal_vector_norm == 0:
-        return 0 
-
-    # Compute the angle 
-    angle_between_vectors = calculate_angle_betweenVectors(vector, goal_vector) # both normalized
-
-    # Return the value
-    return angle_between_vectors    # in rad
-
-def calculate_angle_betweenVectors(vector1, vector2):
-    """
-    Computes the angle (rad) between two vectors : [0, pi]
-    """
-
-    # Computing the norms
-    vector1_norm = np.linalg.norm(vector1)
-    vector2_norm = np.linalg.norm(vector2)
-
-    # Extreme cases
-    if vector1_norm == 0 or vector2_norm == 0:
-        return 0
-    
-    # Computing the angle
-    cos_theta = np.dot(vector1, vector2) / (vector1_norm * vector2_norm)
-    cos_theta = np.clip(cos_theta, -1.0, 1.0)
-    angle_between_vectors = np.arccos(cos_theta)    # In rad [0, pi]
-
-    # Return the value
-    return angle_between_vectors
 
 def calculate_f(neighbor, map_instance, tentative_g, heuristic_cost, dec, typeF):
     """
@@ -485,8 +531,9 @@ def a_star_search(ax, plt, map_instance, realTimeDraw, typeF_function, dec):
         
         # Reconstruct the path if arrived to the goal
         if arrivedPoint:
-            print("Algorithm ended successfully!")
-            return reconstruct_path(Node(finalLast), parents_dictionary, resolution_dictionary), 1, finalCost
+            print("A star ended successfully!")
+            glbv.ARRIVED_PRIM = 0
+            return reconstruct_path(Node(finalLast), parents_dictionary, resolution_dictionary, map_instance, ax, plt), 1, finalCost
         
         # Print the iteration number
         flag = flag + 1

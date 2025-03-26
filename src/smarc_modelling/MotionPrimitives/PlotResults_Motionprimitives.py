@@ -10,10 +10,13 @@ from smarc_modelling.lib import *
 import smarc_modelling.MotionPrimitives.MapGeneration_MotionPrimitives as MapGen
 from smarc_modelling.MotionPrimitives.GenerationTree_MotionPrimitives import a_star_search, body_to_global_velocity
 from smarc_modelling.MotionPrimitives.ObstacleChecker_MotionPrimitives import compute_A_point_forward, compute_B_point_backward
+from smarc_modelling.vehicles.SAM import SAM 
 import matplotlib
 import matplotlib.pyplot as plt
 import time
 import pandas as pd
+import csv
+import matplotlib.animation as animation
 matplotlib.use('TkAgg')  # or 'Qt5Agg', depending on what you have installed
 
 def plot_map(map_data, typePlot):
@@ -109,7 +112,10 @@ def plot_map(map_data, typePlot):
             ax.view_init(elev=0, azim=0)  # right view
 
         case "rotated":
-            ax.view_init(elev=25, azim=80)  # top view
+            ax.view_init(elev=35, azim=70) 
+
+        case "gif":
+            ax.view_init(elev=40, azim=0)
 
         case _:
             ax.view_init(elev=75, azim=90)  # top view
@@ -124,9 +130,9 @@ def plot_map(map_data, typePlot):
     ax.set_box_aspect([map_x_max, map_y_max, map_z_max])
 
     # return the plot setup
-    return (ax, plt)
+    return (ax, plt, fig)
 
-def draw_torpedo(ax, vertex, colorr, length=1.5, radius=0.095, resolution=50):
+def draw_torpedo(ax, vertex, colorr, length=1.5, radius=0.095, resolution=20):
     """
     Draws a torpedo-like shape (cylinder) and a black actuator at the back (disk) at (x, y, z) with orientation from quaternion.
     """
@@ -194,11 +200,56 @@ def draw_torpedo(ax, vertex, colorr, length=1.5, radius=0.095, resolution=50):
     ax.plot_surface(x_cyl, y_cyl, z_cyl, color='y', alpha=colorr)
     ax.plot_surface(x_cap_rear, y_cap_rear, z_cap_rear, color='k', alpha=colorr)
 
-def MotionPlanningAlgorithm():
+def update(frame, ax, plt, trajectory):
+
+    # Get the current state
+    vertex = trajectory[frame]
+    colorr = frame / len(trajectory)  # Normalize color based on frame
+
+    # Draw torpedo
+    draw_torpedo(ax, vertex, colorr)
+
+def load_trajectory_from_csv(filename):
+    """
+    Reads trajectory data from a CSV file and returns it as a list of states.
+
+    Args:
+        filename (str): The path to the CSV file.
+
+    Returns:
+        list: A list of states, where each state is a list or tuple of the values
+              from a row in the CSV.
+    """
+    trajectory = []
+    with open(filename, 'r') as csvfile:
+        reader = csv.reader(csvfile)
+        # Skip the header row if it exists (optional)
+        header = next(reader, None)
+        if header:
+            print(f"Header row: {header}")
+        for row in reader:
+            # Convert the string values to appropriate data types (e.g., float, int)
+            # Assuming your states are numerical, you'll likely need to convert.
+            try:
+                state = [float(value) for value in row]
+            except ValueError:
+                print(f"Warning: Could not convert row to numbers: {row}. Skipping.")
+                continue
+            trajectory.append(state)
+    return trajectory
+
+def MotionPlanningAlgorithm(realTimeDraw):
+    """
+    realTimeDraw: plot the results, True or False
+    """
+    print("START")
     # Generate and draw the map
+    print("<<generating the map")
     map_instance = MapGen.generationFirstMap()
-    ax, plt = plot_map(map_instance, "top") # this is the one were the primitives are plotted
-    ax2, plt2 = plot_map(map_instance, "side")
+    if realTimeDraw:
+        ax, plt, fig = plot_map(map_instance, "top") # this is the one were the primitives are plotted
+        ax2, plt2, fig2 = plot_map(map_instance, "side")
+    print("ok>>")
 
     # Which cost function you want to use (1-Astar 2-AdaptiveAstar 3-HeadingConstraint) 
     typeFunction = 3
@@ -207,29 +258,37 @@ def MotionPlanningAlgorithm():
     dec = 0.1
 
     # Search the path
+    print("<<starting trajectory search")
     start_time = time.time()
-    trajectory, succesfulSearch, totalCost = a_star_search(ax, plt, map_instance, True, typeFunction, dec)
+    if not realTimeDraw:
+        ax = None 
+        plt = None
+    
+    onlyOptimization = False
+    if not onlyOptimization:
+        trajectory, succesfulSearch, totalCost = a_star_search(ax, plt, map_instance, realTimeDraw, typeFunction, dec)
+    else:
+        trajectory = load_trajectory_from_csv('saved_trajectory.csv')
+    print("ok>>")
     end_time = time.time()
 
-    print(trajectory)
-
-    # Post Processing
-    maximumDistanceWaypoints = 0.5    # meters
-    #results = increaseResolutionTrajectory(trajectory, maximumDistanceWaypoints)
-    #print(results)
-
+    print("<<a star analysis")
     # Computational time (seconds)
     print(f"total time for Astar:...{end_time-start_time:.4f} seconds")
     
     # Number of vertices in the trajectory
-    print(f"length of trajectory: {len(trajectory):.2f} vertices")
+    print(f"length of trajectory: {len(trajectory):.2f} vertices>>")
 
     # Save the trajectory into saved_trajectory.csv file
+    print("<<saving the trajectory in saved_trajectory.csv file")
     df = pd.DataFrame(trajectory, columns=["x", "y", "z", "q0", "q1", "q2", "q3", "u", "v", "w", "q", "p", "r", "V_bs", "l_cg", "ds", "dr", "rpm_1", "rpm_2"])
     df.to_csv("saved_trajectory.csv", index=False)
+    print("ok>>")
 
     # Draw SAM torpedo in the map 
     ind = 0
+    if realTimeDraw:
+        print("<<drawing SAM torpedo in the map")
     for vertex in trajectory:
 
         # Print the velocity for each vertex in the trajectory
@@ -237,25 +296,68 @@ def MotionPlanningAlgorithm():
         globalV = body_to_global_velocity((q0, q1, q2, q3), vertex[7:10])
         print(f"Velocity {ind:.0f} = {np.linalg.norm(globalV): .2f} m/s")
 
-        # Draw torpedo in the two created plots
-        norm_index = (ind / len(trajectory)) 
-        draw_torpedo(ax, vertex, norm_index)
-        draw_torpedo(ax2, vertex, norm_index)
+        if realTimeDraw:
+            # Draw torpedo in the two created plots
+            norm_index = (ind / len(trajectory)) 
+            draw_torpedo(ax, vertex, norm_index)
+            draw_torpedo(ax2, vertex, norm_index)
+
+            # Draw the velocity vector for each vertex (global velocity)
+            x,y,z = vertex[:3]
+            x_goal = map_instance["goal_pixel"][0]
+            y_goal = map_instance["goal_pixel"][1]
+            z_goal = map_instance["goal_pixel"][2]
+            vx, vy, vz = globalV
+            velocity_vector = np.array([vx, vy, vz])
+            velocity_vector_norm = np.linalg.norm(velocity_vector)
+            ax.quiver(x, y, z, vx, vy, vz, color='b', length=velocity_vector_norm, normalize=True)
+            ax2.quiver(x, y, z, vx, vy, vz, color='b', length=velocity_vector_norm, normalize=True)
+
         ind += 1
 
-        # Draw the velocity vector for each vertex (global velocity)
-        x,y,z = vertex[:3]
-        x_goal = map_instance["goal_pixel"][0]
-        y_goal = map_instance["goal_pixel"][1]
-        z_goal = map_instance["goal_pixel"][2]
-        vx, vy, vz = globalV
-        velocity_vector = np.array([vx, vy, vz])
-        velocity_vector_norm = np.linalg.norm(velocity_vector)
-        ax.quiver(x, y, z, vx, vy, vz, color='b', length=velocity_vector_norm, normalize=True)
-        ax2.quiver(x, y, z, vx, vy, vz, color='b', length=velocity_vector_norm, normalize=True)
-
     # Show the map, path and SAM 
-    plt.show()
+    if realTimeDraw:
+        plt.show()
+        print("ok>>")
+    
+    # Create the gif
+    gifOutput = False
+    if gifOutput:
+        print("<<generating the GIF")
+        # Set up figure and 3D axis
+        ax, plt, fig = plot_map(map_instance, "gif")
 
+        # Create animation
+        num_frames = len(trajectory)
+        ani = animation.FuncAnimation(fig, update, frames=num_frames, fargs=(ax, plt, trajectory), interval=100)
+
+        # Save as GIF
+        ani.save("torpedo_motion.gif", writer="ffmpeg", fps=5)
+
+        # Show animation
+        print("ok>>")
+    print("THE END")
+        
 if __name__ == "__main__":
-    MotionPlanningAlgorithm()
+
+    runAlgorithm = True
+
+    if runAlgorithm:
+        MotionPlanningAlgorithm(True)
+    else:
+        state = [3.61374917e+00  ,3.00336629e+00,  4.23122880e+00,  1.48878985e+04,
+                -1.35743270e+03,  4.65704471e+03,  4.48485089e+03,  6.08947939e+05,
+                -8.06165416e-01,  2.79500025e+05, -1.93056445e+04, -5.38586396e+11,
+                -2.36016030e+04,  8.60000000e+01,  9.70000000e+01,  1.22173048e-01,
+                1.22173048e-01, -9.12066979e+02, -9.12066979e+02]
+        
+        input = [ 8.80000000e+01,  0.00000000e+00  ,1.22173048e-01,  1.22173048e-01,
+                -7.23495579e+02, -7.23495579e+02]
+        
+        sam = SAM(0.1)
+        print(state + sam.dynamics(state, input)*0.1)
+
+        map_instance = MapGen.generationFirstMap()
+        ax, plt, fig = plot_map(map_instance, "gif")
+        draw_torpedo(ax, state, 1)
+        plt.show()

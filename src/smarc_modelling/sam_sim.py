@@ -214,4 +214,4 @@ plot_trajectory(sol, 50, False, "3d.gif", 10)
 plt.show()
 
 # Get MotionPlans
-MotionPlanningAlgorithm()
+MotionPlanningAlgorithm(False)
