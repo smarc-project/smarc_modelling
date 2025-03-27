@@ -57,7 +57,7 @@ class LQR:
         A = np.array(A)
         B = np.array(B)
 
-        print(scipy.linalg.det(A))
+        #print(scipy.linalg.det(A))
         # Discretize the A matrix (A_d = exp(A * dt))
         A_d = scipy.linalg.expm(A * dt)
 
@@ -72,9 +72,9 @@ class LQR:
         # Output the discretized matrices A_d and B_d
         np.set_printoptions(precision=3, suppress=True, linewidth=120)
 
-        print("Discretized A matrix (A_d):")
-        print(A)
-        print("Discretized B matrix (B_d) using the trapezoidal rule:")
+        # print("Discretized A matrix (A_d):")
+        # print(A)
+        # print("Discretized B matrix (B_d) using the trapezoidal rule:")
         
         return A_d, B_d2
 
