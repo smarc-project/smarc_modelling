@@ -173,10 +173,10 @@ class NMPC_trajectory:
         # --------------------------- Cost setup ---------------------------------
         # State weight matrix
         Q_diag = np.ones(nx)
-        Q_diag[ 0:3 ] = 1e1         # Position
-        Q_diag[ 3:7 ] = 1e1         # Quaternion
-        Q_diag[ 7:10] = 5e1         # linear velocity
-        Q_diag[10:13] = 5e1         # Angular velocity
+        Q_diag[ 0:3 ] = 12e1         # Position
+        Q_diag[ 3:7 ] = 12e1         # Quaternion
+        Q_diag[ 7:10] = 1e1         # linear velocity
+        Q_diag[10:13] = 1e1         # Angular velocity
 
         # Control weight matrix - Costs set according to Bryson's rule (MPC course)
         Q_diag[13:15] = 1e-4        # VBS, LCG
@@ -210,7 +210,7 @@ class NMPC_trajectory:
         Q_e[10:13]= 100
         Q_e[13:] = 100
         Q_e = np.diag(Q_e)
-        self.ocp.cost.W_e = Q_e #np.zeros(np.shape(Q))
+        self.ocp.cost.W_e = Q #np.zeros(np.shape(Q))
         self.ocp.model.cost_y_expr_e = self.x_error(self.model.x, self.model.u, self.ocp.model.p, terminal=True)
         self.ocp.cost.yref_e = np.zeros((nx,))
 
@@ -295,7 +295,7 @@ class NMPC_trajectory:
 
         q_error = ca.vertcat(q_w, q_x, q_y, q_z)
 
-        pos_error = x[:3] - ref[:3] #+ np.array([(np.random.random()-0.5),(np.random.random()-0.5), (np.random.random()-0.5)])
+        pos_error = x[:3] - ref[:3] #+ np.array([(np.random.random()-0.5)/5,(np.random.random()-0.5)/5, (np.random.random()-0.5)/5])
         vel_error = x[7:13] - ref[7:13]
         u_error   = x[13:19] - ref[13:19]
         

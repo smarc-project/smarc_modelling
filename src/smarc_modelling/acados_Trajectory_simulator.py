@@ -298,7 +298,7 @@ def plot(x_axis, ref, simX, simU):
 
     # Add directional arrows
     arrow_step = 10  # Adjust this value to control the spacing of the arrows
-    for i in range(0, len(simX) - arrow_step, 25):
+    for i in range(0, len(simX) - arrow_step, arrow_step):
         c = np.sqrt((simX[i + arrow_step, 0] - simX[i, 0])**2 + (simX[i + arrow_step, 1] - simX[i, 1])**2 + (simX[i + arrow_step, 2] - simX[i, 2])**2)
         ax.quiver(simX[i,0], simX[i, 1], simX[i, 2], 
                   np.cos(psi[i])*np.cos(theta[i]), 
@@ -408,56 +408,36 @@ def main():
 
 
     # create ocp object to formulate the OCP
-    Ts = 0.1            # Sampling time
+    Ts = 0.2            # Sampling time
     N_horizon = 10      # Prediction horizon
     nmpc = NMPC_trajectory(model, Ts, N_horizon)
 
     # load trajectory 
-    # [0.30280602 0.46318931 0.43363373 0.00615203 0.05883841 0.15489808] rudder stern == 1/200, VBS, LCG is 1e-4, VBS_lcg_dot is 1e-3
-    # [0.32759892 0.44786343 0.58361945 0.00644268 0.10557074 0.15593026] rudder stern == 1/200, VBS, LCG is 1e-4
-    # [0.33819335 0.45225748 0.58524359 0.0064404  0.1055408  0.15896104] standard but VBS, LCG is 1e-4
-    # [0.3516651  0.4596261  0.62134679 0.00637616 0.06540021 0.16591628] standard
-    # [0.57094631 0.42581414 0.57890367 0.00628982 0.10614831 0.20945277] control /100
-    # [0.89772245 2.70841535 2.12216177 0.00539151 0.05056108 0.36790336] control *100
-    # [0.97916308 1.95701369 0.7661755  0.00558481 0.10326966 0.3132636 ] rudder stern == 1/200, VBS, LCG is 1e-4, RPM is 1e-4
-
-    # [1.04222749 0.48010184 0.29657412 0.00641852 0.04964513 0.32859335] best above + R stern and rudder == 1e-1 and rudder stern == 1
-    # [1.0524109  0.35414572 0.15510585 0.00553364 0.0620624  0.33590795] best above + R stern and rudder == 1e-1 and rudder stern == 1/10
-    # [0.42547966 0.59333252 0.19126773 0.01012134 0.07806261 0.35600244] best above + R stern and rudder == 1e-1 and rudder stern == 1/10, terminal weight 100 for states
-
-    # Best so far:
-    # [0.18855295 0.28167868 0.14491978 0.00526312 0.05129348 0.1313632 ], 0.3686 After updated terminal weight 
-    #  0.2987456253720445 for the trajectory*
 
     #file_path = "/home/admin/smarc_modelling/src/smarc_modelling/resolution01.csv"  # Replace with your actual file path
     file_path = "/home/admin/smarc_modelling/src/smarc_modelling/simonTrajectory.csv"
     trajectory = read_csv_to_array(file_path)
-    update_factor = 2
+    update_factor = 1
 
-    Nsim = (trajectory.shape[0]-1)*update_factor
+    Nsim = (trajectory.shape[0]-1)
     x_axis = np.linspace(0, (Ts)*Nsim, Nsim+1)
     print(f"Trajectory shape: {trajectory.shape}")
     #trajectory = interpolate_trajectory(trajectory, update_factor)
 
     simU = np.zeros((Nsim, nu))     # Matrix to store the optimal control sequence
     simX = np.zeros((Nsim+1, nx))   # Matrix to store the simulated state
+    
     # Declare the initial state
-    x0 = trajectory[0] #np.zeros(nx)
-    # x0[0] = 0 
-    # x0[3] = 1       # Must be 1 (quaternions)
-    # x0[17:] = 1e-9
-    # x0[7]   = 1e-9
-    # x0[13] = 50
-    # x0[14] = 50
+    x0 = trajectory[0] 
     simX[0,:] = x0
 
     # Declare the reference state - Static point in this tests
     # Initialize ref
     ref = trajectory[1] #np.zeros((nx + nu,))
-    # ref[0] = 0
-    # ref[3] = 1
-    # ref[13:15] = 50
-    references = trajectory[0] #ref
+    Uref = np.zeros((trajectory.shape[0], nu))
+
+    trajectory = np.concatenate((trajectory, Uref), axis=1)
+    references = trajectory[0, :19] #ref
     ocp_solver, integrator = nmpc.setup(x0)
     # Initialize the state and control vector as David does
     for stage in range(N_horizon + 1):
@@ -470,24 +450,27 @@ def main():
 
     # closed loop - simulation
     Uref = np.zeros((nu,))
-    for i in range(Nsim):
-        # Update reference vector
-        if i % update_factor == 0 and int(i/update_factor) < np.size(trajectory, 0)-2:
-            ref = np.concatenate((trajectory[int(i/update_factor)+1], Uref))
-        if int(i/update_factor) > np.size(trajectory, 0)-2:
-            ref_pos = trajectory[-1, :7]
-            ref_pos[4:6] = 0
-            ref = np.concatenate((ref_pos, np.zeros(18)))
-            ref[13:15] = 50
-        ocp_solver.set(stage, "p", ref)
 
-        # for stage in range(N_horizon):
-            # ref[0] = np.cos((i+stage)*0.005)*10 - 10
-            # ref[1] = np.sin((i+stage)*0.005)*10
-            # ref[3] = 1
-            #ref[3:7] = euler_to_quaternion(0, 0, np.rad2deg(np.arctan2(ref[1], ref[0])))
-        references = np.vstack([references, ref[:nx]])
-        ocp_solver.set(N_horizon, "yref", ref[:nx])
+    for i in range(Nsim):
+        print(f"Nsim: {i}")
+        if i < (Nsim - N_horizon/update_factor):
+            ref = trajectory[i:i+int(N_horizon/update_factor), :]
+        else:
+            ref = trajectory[i:, :]
+
+        # Update reference vector
+        for stage in range(N_horizon):
+            if stage % update_factor == 0: 
+                index = int(stage/update_factor)
+                print(ref.shape[0], index)
+                if ref.shape[0] < int(N_horizon/update_factor) and ref.shape[0] != 0:
+                    ocp_solver.set(stage, "p", ref[ref.shape[0]-1,:])
+                else:
+                    ocp_solver.set(stage, "p", ref[index,:])
+
+
+        references = np.vstack([references, ref[0,:nx]])
+        ocp_solver.set(N_horizon, "yref", ref[-1,:nx])
  
         # Set current state
         ocp_solver.set(0, "lbx", simX[i, :])
@@ -503,7 +486,6 @@ def main():
         t[i] = ocp_solver.get_stats('time_tot')
         simU[i, :] = ocp_solver.get(0, "u")
         X_eval = ocp_solver.get(0, "x")
-        print(f"Nsim: {i}")
         simX[i+1, :] = integrator.simulate(x=simX[i, :], u=simU[i, :])
 
     # evaluate timings
