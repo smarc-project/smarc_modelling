@@ -163,7 +163,7 @@ class Propellers:
 
 
 # Class Vehicle
-class SAM_casadi():
+class SAM_LQR():
     """
     SAM()
         Integrates all subsystems of the Small and Affordable Maritime AUV.
@@ -322,11 +322,11 @@ class SAM_casadi():
         
         # Create the dynamical model the first time this method is executed
         if self.create_model == True and export == False:
-            x_sym = ca.MX.sym('x', 19,1)
+            x_sym = ca.MX.sym('x', 18,1)
             u_ref_sym = ca.MX.sym('u_ref', 6,1)
             eta = x_sym[0:7]
-            nu = x_sym[7:13]
-            u = x_sym[13:19]
+            nu = x_sym[7:12]
+            u = x_sym[12:18]
 
             # Bound_actuators is removed -see SAM for reference
 
@@ -349,10 +349,10 @@ class SAM_casadi():
 
         # Export the casadi model to acados or for the LQR
         elif export == True:
-            x_sym = ca.MX.sym('x', 13,1)
+            x_sym = ca.MX.sym('x', 12,1)
             u_ref_sym = ca.MX.sym('u_ref', 6,1)
-            eta = x_sym[0:7]
-            nu = x_sym[7:13]
+            eta = x_sym[0:6]
+            nu = x_sym[6:12]
 
             # Bound_actuators is removed -see SAM for reference
 
@@ -405,9 +405,16 @@ class SAM_casadi():
         """
 
         # Extract Euler angles
-        quat = eta[3:7]
-        quat = quat/ca.norm_2(quat)
-        self.psi, self.theta, self.phi = quaternion_to_angles_ca(quat) 
+        quat = eta[3:6]
+
+        q1 = quat[0]
+        q2 = quat[1]
+        q3 = quat[2]
+        q0 = ca.sqrt(1 - q1**2 - q2**2 - q3**2)
+
+        q_to_ang = ca.vertcat(q0, q1, q2, q3)
+        q_to_ang = q_to_ang/ca.norm_2(q_to_ang)
+        self.psi, self.theta, self.phi = quaternion_to_angles_ca(q_to_ang) 
         # Relative velocities due to current
         u = nu[0]
         v = nu[1]
@@ -655,24 +662,25 @@ class SAM_casadi():
             eta_dot: [ẋ, ẏ, ż, q̇0, q̇1, q̇2, q̇3]
         """
         # Extract position and quaternion
-        q = eta[3:7]  # [q0, q1, q2, q3] where q0 is scalar part
-        q = q/ca.norm_2(q)
+        q = eta[3:6]  # [q1, q2, q3] where q0 is scalar part. not included in this. Check q0 below.
 
+        q1 = q[0]
+        q2 = q[1]
+        q3 = q[2]
+        q0 = ca.sqrt(1 - q1**2 - q2**2 - q3**2)
+
+        q_c = ca.vertcat(q0, q1, q2, q3)
+        q_c = q_c/ca.norm_2(q_c)
         # Convert quaternion to DCM for position kinematics
-        C = quaternion_to_dcm_ca(q)
+        C = quaternion_to_dcm_ca(q_c)
 
         # Position dynamics: ṗ = C * v
         pos_dot = C @ nu[0:3]
 
         ## From Fossen 2021, eq. 2.78:
         om = nu[3:6]  # Angular velocity
-        q0 = q[0]
-        q1 = q[1]
-        q2 = q[2]
-        q3 = q[3]
-
-        T_q_n_b = 0.5 * ca.vertcat(ca.horzcat(-q1, -q2, -q3),
-                                   ca.horzcat(q0, -q3, q2),
+        
+        T_q_n_b = 0.5 * ca.vertcat(ca.horzcat(q0, -q3, q2),
                                    ca.horzcat(q3, q0, -q1),
                                    ca.horzcat(-q2, q1, q0)
                                    )

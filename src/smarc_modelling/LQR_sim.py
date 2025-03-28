@@ -15,7 +15,9 @@ from LQR import *
 
 from smarc_modelling.vehicles import *
 from smarc_modelling.lib import *
+from smarc_modelling.vehicles.SAM_LQR import SAM_LQR
 from smarc_modelling.vehicles.SAM_casadi import SAM_casadi
+
 
 def plot(x_axis, ref, simX, simU, simX2, simU2):
     ref = ref[:,:13]  
@@ -349,10 +351,11 @@ def euler_to_quaternion(roll: float, pitch: float, yaw: float):
 
 def main():
     # Extract the CasADi model
-    sam = SAM_casadi()
-    original_function = sam.dynamics()              # The origial sam dynamics (verified with numpy model)
+    sam = SAM_LQR()
+    sam_org = SAM_casadi()
+    original_function = sam_org.dynamics()              # The origial sam dynamics (verified with numpy model)
     dynamics_function = sam.dynamics(export=True)   # The LQR model to be used.
-    nx   = 13
+    nx   = 12
     nu   = 6
     Nsim = 100                          # Simulation duration (no. of iterations) - sim. length is Ts*Nsim
     simU = np.zeros((Nsim+1, nu))       # Matrix to store the optimal control sequence
@@ -367,13 +370,13 @@ def main():
     # Declare the initial state
     x0 = np.zeros(nx)
     x0[0] = 0.10   
-    x0[3] = 1       # Must be 1 (quaternions)
     x0[7] = 1e-9
     simX[0,:] = x0
 
     # Declare initial state for the verified model
     x02 = np.zeros(19)
-    x02[:13] = x0
+    x02[3] = 1
+    x02[7] = 1e-9
     simX2[0,:] = x02
 
     # Declare control initial state
@@ -386,12 +389,11 @@ def main():
 
     # Declare the reference state - Static point in this tests -NOT USED CURRENTLY
     x_ref = np.zeros(nx)
-    #x_ref[0] = 0
-    x_ref[3:7] = np.array([1, 0, 0, 0])
     references = x_ref
 
     u_ref = np.zeros(nu)
     u_ref[:2] = 50 
+
 
     # Extract the jacobians for the linear dynamics
     A, B = lqr.create_linearized_dynamics(x_ref, u_ref)
@@ -404,7 +406,6 @@ def main():
     t = np.zeros((Nsim))
 
 
-
     # closed loop - simulation
     x = x0
     x2 = x02
@@ -413,24 +414,26 @@ def main():
 
     A_lin = A(x_lin, u_lin)
     B_lin = B(x_lin, u_lin)
-    print(A_lin)
+    print(f"A_lin shape: {np.shape(A_lin)}\n{A_lin}")
+    print(f"B_lin shape: {np.shape(B_lin)}\n{B_lin}")
     A_lin, B_lin = lqr.continuous_to_discrete(A_lin, B_lin, Ts)
+
+
     # Check of controllability - Not full rank --> not controllable
     ab = np.concatenate([A_lin @ B_lin, B_lin], axis=1)
     print(np.shape(ab))
     print("rank: ", np.linalg.matrix_rank(ab))
-    input("contin")
-    for i in range(B_lin.size1()):
-        print(B_lin[i,:])
+    print(f"COntrollability matrix:\n {ab}")
+
 
     # SIMULATION LOOP
     for i in range(Nsim):
         print(f"Nsim: {i}")
         A_lin = A(x_lin, u_lin)
         B_lin = B(x_lin, u_lin)
-        #A_lin, B_lin = lqr.continuous_to_discrete(A_lin, B_lin, Ts)
-        # L = lqr.compute_lqr_gain(A_lin, B_lin)
-        # u  = -L @ (x)
+        A_lin, B_lin = lqr.continuous_to_discrete(A_lin, B_lin, Ts)
+        L = lqr.compute_lqr_gain(A_lin, B_lin)
+        u  = -L @ (x)
         xdot = A_lin @ (x) + B_lin @ (u)
         x = np.array(x + xdot*Ts).flatten()
 

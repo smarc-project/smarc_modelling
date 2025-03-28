@@ -400,7 +400,7 @@ def interpolate_trajectory(trajectory, update_factor):
     return interpolated_vectors
 def main():
     # Extract the CasADi model
-    sam = SAM_casadi()
+    sam = SAM_casadi(dt=Ts)
     model = sam.export_dynamics_model()
     nx = model.x.rows()
     nu = model.u.rows()

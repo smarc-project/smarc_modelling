@@ -26,14 +26,6 @@ class LQR:
         # print(self.dfdx)
         # A_d_sym, Bd_sym = self.continuous_to_discrete(self.Ac_sym, self.Bc_sym, dt = 0.01)
 
-
-        # f(x_lin, u_lin) is the same as self.dynamics.dynamics(x_lin, u_lin)
-        
-        # To construct the A and B matrices following the procedure, a zeros and a ones matrices needs to be declared
-        A_zero = ca.MX.zeros(1 ,nx)
-        A_ones = ca.MX.ones(1)
-        B_zero = ca.MX.zeros(1, nu)
-
         self.Ac = ca.Function('Ac', [x_sym, u_sym], [ca.jacobian(self.dynamics(x_sym, u_sym), x_sym)])
         self.Bc = ca.Function('Bc', [x_sym, u_sym], [ca.jacobian(self.dynamics(x_sym, u_sym), u_sym)])
 
@@ -80,11 +72,11 @@ class LQR:
 
     def compute_lqr_gain(self, A, B):
         # State weight matrix
-        Q_diag = np.ones(13)
+        Q_diag = np.ones(12)
         Q_diag[ 0:3 ] = 1
         Q_diag[ 3:7 ] = 1
         Q_diag[ 7:10] = 1
-        Q_diag[10:13] = 1
+        Q_diag[10:] = 1
         Q = np.diag(Q_diag)
 
 
