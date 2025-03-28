@@ -400,7 +400,7 @@ def interpolate_trajectory(trajectory, update_factor):
     return interpolated_vectors
 def main():
     # Extract the CasADi model
-    sam = SAM_casadi(dt=Ts)
+    sam = SAM_casadi()
     model = sam.export_dynamics_model()
     nx = model.x.rows()
     nu = model.u.rows()
@@ -416,6 +416,7 @@ def main():
 
     #file_path = "/home/admin/smarc_modelling/src/smarc_modelling/resolution01.csv"  # Replace with your actual file path
     file_path = "/home/admin/smarc_modelling/src/smarc_modelling/simonTrajectory.csv"
+    #file_path = "/home/admin/smarc_modelling/src/smarc_modelling/straight_trajectory.csv"
     trajectory = read_csv_to_array(file_path)
     update_factor = 1
 
