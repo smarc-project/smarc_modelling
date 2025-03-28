@@ -73,18 +73,18 @@ class LQR:
     def compute_lqr_gain(self, A, B):
         # State weight matrix
         Q_diag = np.ones(12)
-        Q_diag[ 0:3 ] = 1
-        Q_diag[ 3:7 ] = 1
-        Q_diag[ 7:10] = 1
-        Q_diag[10:] = 1
+        Q_diag[ 0:3 ] = 100
+        Q_diag[ 3:6 ] = 1
+        Q_diag[ 6:9] = 1
+        Q_diag[9:] = 1
         Q = np.diag(Q_diag)
 
 
         # Control rate of change weight matrix - control inputs as [x_vbs, x_lcg, delta_s, delta_r, rpm1, rpm2]
         R_diag = np.ones(6)
-        #R_diag[ :2] = 1e-2
-        # R_diag[2:4] = 1/50
-        # R_diag[4: ] = 1e-6
+        R_diag[ :2] = 1e-2
+        R_diag[2:4] = 1/50
+        R_diag[4: ] = 1e-6
         R = np.diag(R_diag)
 
         P = scipy.linalg.solve_discrete_are(A, B, Q, R)

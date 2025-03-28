@@ -26,7 +26,11 @@ def plot(x_axis, ref, simX, simU, simX2, simU2):
     theta = np.zeros(np.size(ref, 0))
     phi = np.zeros(np.size(ref, 0))
     for i in range(np.size(ref, 0)):
-        q = [ref[i, 3], ref[i, 4], ref[i, 5], ref[i, 6]]
+        q1 = ref[i, 3]
+        q2 = ref[i, 4]
+        q3 = ref[i, 5]
+        q0 = np.sqrt(1 - q1**2 - q2**2 - q3**2)
+        q = [q0, q1, q2, q3]
         psi[i], theta[i], phi[i] = gnc.quaternion_to_angles(q)
 
     reference = np.zeros((np.size(ref, 0), 12))
@@ -34,7 +38,7 @@ def plot(x_axis, ref, simX, simU, simX2, simU2):
     reference[:, 3] = phi
     reference[:, 4] = theta
     reference[:, 5] = psi
-    reference[:, 6:]  = ref[:, 7:]
+    reference[:, 6:]  = ref[:, 6:]
     
     ref = reference
 
@@ -47,7 +51,11 @@ def plot(x_axis, ref, simX, simU, simX2, simU2):
     phi2 = np.zeros(n)
 
     for i in range(n):
-        q = [simX[i, 3], simX[i, 4], simX[i, 5], simX[i, 6]]
+        q1 = simX[i, 3]
+        q2 = simX[i, 4]
+        q3 = simX[i, 5]
+        q0 = np.sqrt(1 - q1**2 - q2**2 - q3**2)
+        q = [q0, q1, q2, q3]
         psi[i], theta[i], phi[i] = gnc.quaternion_to_angles(q)
 
     for i in range(n):
@@ -157,7 +165,7 @@ def plot(x_axis, ref, simX, simU, simX2, simU2):
     plt.grid()
 
     plt.subplot(4,3,12)
-    plt.plot(x_axis, simX[:, 12])
+    plt.plot(x_axis, simX[:, 11])
     plt.plot(x_axis,  ref[:, 11], linestyle='--', color='r')
     plt.legend([r"$\dot\psi$", r"$\dot\psi_{ref}$"])
     plt.ylabel("Angular Velocity [rad/s]")
@@ -369,7 +377,7 @@ def main():
 
     # Declare the initial state
     x0 = np.zeros(nx)
-    x0[0] = 0.10   
+    x0[0] = 0.1  
     x0[7] = 1e-9
     simX[0,:] = x0
 
@@ -383,7 +391,7 @@ def main():
     u0 = np.zeros(nu)
     u0[:2] = 50
     u0[2:4] = 0
-    u0[4:6] = 700
+    u0[4:6] = 10
     simU[0,:] = u0
     simU2[0,:] = u0
 
@@ -416,24 +424,24 @@ def main():
     B_lin = B(x_lin, u_lin)
     print(f"A_lin shape: {np.shape(A_lin)}\n{A_lin}")
     print(f"B_lin shape: {np.shape(B_lin)}\n{B_lin}")
+    print(f"----------------------- SIMULATION STARTS---------------------------------")
     A_lin, B_lin = lqr.continuous_to_discrete(A_lin, B_lin, Ts)
-
-
-    # Check of controllability - Not full rank --> not controllable
-    ab = np.concatenate([A_lin @ B_lin, B_lin], axis=1)
-    print(np.shape(ab))
-    print("rank: ", np.linalg.matrix_rank(ab))
-    print(f"COntrollability matrix:\n {ab}")
-
 
     # SIMULATION LOOP
     for i in range(Nsim):
+        print("-------------------------------------------------------------")
         print(f"Nsim: {i}")
+        print(f"X_lin: {x_lin}, \nU_lin: {u_lin}")
         A_lin = A(x_lin, u_lin)
         B_lin = B(x_lin, u_lin)
         A_lin, B_lin = lqr.continuous_to_discrete(A_lin, B_lin, Ts)
+        # ab = np.concatenate([A_lin @ B_lin, B_lin], axis=1)
+        # print("rank: ", np.linalg.matrix_rank(ab))
+        # print(f"Cntrollability matrix:\n {ab}")
+
         L = lqr.compute_lqr_gain(A_lin, B_lin)
         u  = -L @ (x)
+        print(f"u: {u}")
         xdot = A_lin @ (x) + B_lin @ (u)
         x = np.array(x + xdot*Ts).flatten()
 
