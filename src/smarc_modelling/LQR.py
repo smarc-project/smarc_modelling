@@ -11,12 +11,18 @@ class LQR:
         self.dynamics = dynamics
 
 
-    def create_linearized_dynamics(self, x_lin, u_lin):
+    def create_linearized_dynamics(self, nx: int, nu: int):
         """
-        Function to create continuous-time linearized dynamics.
+        Method to obtain the system jacobians.
+
+        Parameters:
+        nx: rows of x vector
+        nu: rows of u vector
+        
+        Returns:
+        A (ca.function): State Jacobian
+        B (ca.Function): Control Jacobian
         """
-        nx = np.size(x_lin, 0)
-        nu = np.size(u_lin, 0)    
         x_sym = ca.MX.sym('x', nx, 1)
         u_sym = ca.MX.sym('u', nu, 1)
         
@@ -26,12 +32,25 @@ class LQR:
         # print(self.dfdx)
         # A_d_sym, Bd_sym = self.continuous_to_discrete(self.Ac_sym, self.Bc_sym, dt = 0.01)
 
-        self.Ac = ca.Function('Ac', [x_sym, u_sym], [ca.jacobian(self.dynamics(x_sym, u_sym), x_sym)])
-        self.Bc = ca.Function('Bc', [x_sym, u_sym], [ca.jacobian(self.dynamics(x_sym, u_sym), u_sym)])
-
-        return self.Ac, self.Bc
+        self.A = ca.Function('Ac', [x_sym, u_sym], [ca.jacobian(self.dynamics(x_sym, u_sym), x_sym)])
+        self.B = ca.Function('Bc', [x_sym, u_sym], [ca.jacobian(self.dynamics(x_sym, u_sym), u_sym)])
         
+    def continuous_dynamics(self, x_lin, u_lin):
+        """
+        Method to obtain the continuous-time linearized dynamics.
 
+        Parameters:
+        x_lin (np.array): State to linearize around
+        u_lin (np.array): Control to linearize around
+        
+        Returns:
+        Ac (ca.function): Continuous-time state matrix
+        Bc (ca.Function): Continuous-time control matrix
+        """
+        Ac = self.A(x_lin, u_lin)
+        Bc = self.B(x_lin, u_lin)
+        return Ac, Bc
+       
     def continuous_to_discrete(self, A, B, dt):
         """
         Convert continuous-time system matrices (A, B) to discrete-time (A_d, B_d) using zero-order hold.
@@ -60,9 +79,9 @@ class LQR:
         #B_d = scipy.integrate.quad_vec(lambda x: scipy.linalg.expm(A * x) @ B, 0, self.Ts)
         #B_d = scipy.integrate.quad(A_d @ B, dx=dt)
         Ad_inv = np.linalg.inv(A_d)
-        #B_d2 = np.dot(Ad_inv * (A_d + I), B)
-        B_d2 = np.dot(0.5 * (A_d + I), B)
-        
+        B_d = np.dot(Ad_inv * (A_d + I), B)
+        B_d2 = np.dot(np.linalg.norm(Ad_inv) * (A_d + I), B)
+        print(np.linalg.norm(Ad_inv))
         return A_d, B_d2
     
     def continuous_to_discrete_appr(self, A, B, dt):
@@ -97,8 +116,8 @@ class LQR:
     def compute_lqr_gain(self, A, B):
         # State weight matrix
         Q_diag = np.ones(12)
-        Q_diag[ 0:3 ] = 100
-        Q_diag[ 3:6 ] = 10
+        Q_diag[ 0:3 ] = 1
+        Q_diag[ 3:6 ] = 1
         Q_diag[ 6:9] = 1
         Q_diag[9:] = 1
         Q = np.diag(Q_diag)
@@ -111,6 +130,7 @@ class LQR:
         R_diag[4: ] = 1e-6
         R = np.diag(R_diag)
 
+        
         P = scipy.linalg.solve_discrete_are(A, B, Q, R)
         self.L = np.linalg.inv(R + B.T @ P @ B) @ B.T @ P @ A
         return self.L

@@ -6,6 +6,8 @@
 #---------------------------------------------------------------------------------
 import sys
 import os
+import csv
+
 # Add the src directory to the system path
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', 'src'))
 import numpy as np
@@ -19,7 +21,7 @@ from smarc_modelling.vehicles.SAM_LQR import SAM_LQR
 from smarc_modelling.vehicles.SAM_casadi import SAM_casadi
 
 
-def plot(x_axis, ref, simX, simU, simX2, simU2):
+def plot(x_axis, ref, simX, simU):
     ref = ref[:,:13]  
 
     psi = np.zeros(np.size(ref, 0))
@@ -46,9 +48,6 @@ def plot(x_axis, ref, simX, simU, simX2, simU2):
     psi = np.zeros(n)
     theta = np.zeros(n)
     phi = np.zeros(n)
-    psi2 = np.zeros(n)
-    theta2 = np.zeros(n)
-    phi2 = np.zeros(n)
 
     for i in range(n):
         q1 = simX[i, 3]
@@ -58,10 +57,7 @@ def plot(x_axis, ref, simX, simU, simX2, simU2):
         q = [q0, q1, q2, q3]
         psi[i], theta[i], phi[i] = gnc.quaternion_to_angles(q)
 
-    for i in range(n):
-        q = [simX2[i, 3], simX2[i, 4], simX2[i, 5], simX2[i, 6]]
-        psi2[i], theta2[i], phi2[i] = gnc.quaternion_to_angles(q)
-    
+
     y_axis = np.zeros(np.shape(simX))
     for i in range(np.size(simX, 1)):
         if i in [3, 4, 5, 6]:
@@ -78,95 +74,86 @@ def plot(x_axis, ref, simX, simU, simX2, simU2):
     plt.figure()
     plt.subplot(4,3,1)
     plt.plot(x_axis, simX[:, 0] )
-    plt.plot(x_axis, simX2[:, 0] )
-    plt.plot(x_axis,  ref[:, 0], linestyle='--', color='r')
+    plt.plot(x_axis[:-1],  ref[:, 0], linestyle='--', color='r')
     plt.legend(["X", "X_org", "X_ref"])
     plt.ylabel("Position [m]")
     plt.grid()
 
     plt.subplot(4,3,2)
     plt.plot(x_axis, simX[:, 1] )
-    plt.plot(x_axis, simX2[:, 1] )
-    plt.plot(x_axis,  ref[:, 1], linestyle='--', color='r')
+    plt.plot(x_axis[:-1],  ref[:, 1], linestyle='--', color='r')
     plt.legend(["Y", "y_org" "Y_ref"])
     plt.ylabel("Position [m]")
     plt.grid()
 
     plt.subplot(4,3,3)
     plt.plot(x_axis, simX[:, 2])
-    plt.plot(x_axis, simX2[:, 2] )
-    plt.plot(x_axis,  ref[:, 2], linestyle='--', color='r')
+    plt.plot(x_axis[:-1],  ref[:, 2], linestyle='--', color='r')
     plt.legend(["Z","z_org", "Z_ref"])
     plt.ylabel("Position [m]")
     plt.grid()
 
     plt.subplot(4,3,4)
     plt.plot(x_axis, simX[:, 7])
-    plt.plot(x_axis, simX2[:, 7])
-    plt.plot(x_axis,  ref[:, 6], linestyle='--', color='r')
+    plt.plot(x_axis[:-1],  ref[:, 6], linestyle='--', color='r')
     plt.legend([r"$\dotX$",r"$\dotX_{org}$", r"$\dotX_{ref}$"])
     plt.ylabel("X Velocity [m/s]")
     plt.grid()
 
     plt.subplot(4,3,5)
     plt.plot(x_axis, simX[:, 8])
-    plt.plot(x_axis, simX2[:, 8])
 
-    plt.plot(x_axis,  ref[:, 7], linestyle='--', color='r')
+    plt.plot(x_axis[:-1],  ref[:, 7], linestyle='--', color='r')
     plt.legend([r"$\dotY$", r"$\dotY_{org}$", r"$\dotY_{ref}$"])
     plt.ylabel("Y Velocity [m/s]")
     plt.grid()
 
     plt.subplot(4,3,6)
     plt.plot(x_axis, simX[:, 9])
-    plt.plot(x_axis, simX2[:, 9])
 
-    plt.plot(x_axis,  ref[:, 8], linestyle='--', color='r')
+    plt.plot(x_axis[:-1],  ref[:, 8], linestyle='--', color='r')
     plt.legend([r"$\dotZ$", r"$\dotZ_{org}$", r"$\dotZ_{ref}$"])
     plt.ylabel("Z Velocity [m/s]")
     plt.grid()
 
     plt.subplot(4,3,7)
     plt.plot(x_axis, np.rad2deg(phi))
-    plt.plot(x_axis, np.rad2deg(phi2))
-    plt.plot(x_axis, np.rad2deg(ref[:, 3]), linestyle='--', color='r')
+    plt.plot(x_axis[:-1], np.rad2deg(ref[:, 3]), linestyle='--', color='r')
     plt.legend([r"$\phi$", r"$\phi_{org}$", r"$\phi_{ref}$"])
     plt.ylabel("Roll [deg]")    
     plt.grid()
 
     plt.subplot(4,3,8)
     plt.plot(x_axis, np.rad2deg(theta))
-    plt.plot(x_axis, np.rad2deg(theta2))
-    plt.plot(x_axis, np.rad2deg(ref[:, 4]), linestyle='--', color='r')
+    plt.plot(x_axis[:-1], np.rad2deg(ref[:, 4]), linestyle='--', color='r')
     plt.legend([r"$\theta$", r"$\theta_{org}$",r"$\theta_{ref}$"])
     plt.ylabel("Pitch [deg]")
     plt.grid()
 
     plt.subplot(4,3,9)
     plt.plot(x_axis, np.rad2deg(psi))
-    plt.plot(x_axis, np.rad2deg(psi2))
-    plt.plot(x_axis, np.rad2deg(ref[:, 5]), linestyle='--', color='r')
+    plt.plot(x_axis[:-1], np.rad2deg(ref[:, 5]), linestyle='--', color='r')
     plt.legend([r"$\psi$", r"$\psi_{org}$",r"$\psi_{ref}$"])
     plt.ylabel("Yaw [deg]")
     plt.grid()
 
     plt.subplot(4,3,10)
     plt.plot(x_axis, simX[:, 10])
-    plt.plot(x_axis,  ref[:, 9], linestyle='--', color='r')
+    plt.plot(x_axis[:-1],  ref[:, 9], linestyle='--', color='r')
     plt.legend([r"$\dot\phi$", r"$\dot\phi_{ref}$"])
     plt.ylabel("Angular Velocity [rad/s]")
     plt.grid()
 
     plt.subplot(4,3,11)
     plt.plot(x_axis, simX[:, 11])
-    plt.plot(x_axis,  ref[:, 10], linestyle='--', color='r')
+    plt.plot(x_axis[:-1],  ref[:, 10], linestyle='--', color='r')
     plt.legend([r"$\dot\theta$", r"$\dot\theta_{ref}$"])
     plt.ylabel("Angular Velocity [rad/s]")
     plt.grid()
 
     plt.subplot(4,3,12)
     plt.plot(x_axis, simX[:, 11])
-    plt.plot(x_axis,  ref[:, 11], linestyle='--', color='r')
+    plt.plot(x_axis[:-1],  ref[:, 11], linestyle='--', color='r')
     plt.legend([r"$\dot\psi$", r"$\dot\psi_{ref}$"])
     plt.ylabel("Angular Velocity [rad/s]")
     plt.grid()
@@ -302,8 +289,6 @@ def plot(x_axis, ref, simX, simU, simX2, simU2):
 
     # Plot the trajectory
     ax.plot3D(x, y, z, label='Linearized', lw=2, c='r')
-    ax.plot3D(simX2[:,0], simX2[:,1], simX2[:,2], label='True model', lw=2, c='b')
-
     ax.plot3D(ref[:, 0], ref[:, 1], ref[:, 2], linestyle='--', label='Reference', lw=1, c='black')
 
 
@@ -311,6 +296,7 @@ def plot(x_axis, ref, simX, simU, simX2, simU2):
     ax.set_xlabel('X')
     ax.set_ylabel('Y')
     ax.set_zlabel('Z')
+    ax.invert_zaxis()
     ax.legend()
 
     # Show the plot
@@ -357,105 +343,109 @@ def euler_to_quaternion(roll: float, pitch: float, yaw: float):
 
     return (q_w, q_x, q_y, q_z)
 
+def read_csv_to_array(file_path: str):
+    """
+    Reads a CSV file and converts the elements to a NumPy array.
+
+    Parameters:
+    file_path (str): The path to the CSV file.
+
+    Returns:
+    np.array: A NumPy array containing the CSV data.
+    """
+    data = []
+    with open(file_path, 'r') as csvfile:
+        csvreader = csv.reader(csvfile)
+        next(csvreader)
+        for row in csvreader:
+            data.append([float(element) for element in row])
+
+    
+    return np.array(data)
+
+
 def main():
     # Extract the CasADi model
     sam = SAM_LQR()
-    sam_org = SAM_casadi()
-    original_function = sam_org.dynamics()              # The origial sam dynamics (verified with numpy model)
     dynamics_function = sam.dynamics(export=True)   # The LQR model to be used.
     nx   = 12
     nu   = 6
     Nsim = 100                          # Simulation duration (no. of iterations) - sim. length is Ts*Nsim
     simU = np.zeros((Nsim+1, nu))       # Matrix to store the optimal control sequence
     simX = np.zeros((Nsim+1, nx))       # Matrix to store the simulated state
-    simU2 = np.zeros((Nsim+1, 6))       # Matrix to store the model's control sequence
-    simX2 = np.zeros((Nsim+1, 19))      # Matrix to store the model's simulated state
 
     # create LQR object to to access methods
     Ts = 0.1
     lqr = LQR(dynamics_function, Ts)
 
+
+    # Declare reference trajectory
+    #file_path = "/home/admin/smarc_modelling/src/smarc_modelling/resolution01.csv"  # Replace with your actual file path
+    file_path = "/home/admin/smarc_modelling/src/smarc_modelling/simonTrajectory.csv"
+    #file_path = "/home/admin/smarc_modelling/src/smarc_modelling/straight_trajectory.csv"
+    trajectory = read_csv_to_array(file_path)
+    x_ref = trajectory[:, 0:3]
+    x_ref = np.concatenate((x_ref, trajectory[:, 4:13]), axis=1)
+    u_ref = trajectory[:, 13:]
+
     # Declare the initial state
-    x0 = np.zeros(nx)
-    x0[0] = 1  
-    x0[1] = 0.5  
-
-    x0[7] = 1e-9
+    x0 = x_ref[0,:]
+    x0[6] = 1e-6
     simX[0,:] = x0
+    x_ref = np.delete(x_ref, 0, axis=0)
+    x_ref = np.delete(x_ref, 0, axis=0)
 
-    # Declare initial state for the verified model
-    x02 = np.zeros(19)
-    x02[3] = 1
-    x02[7] = 1e-9
-    simX2[0,:] = x02
 
     # Declare control initial state
-    u0 = np.zeros(nu)
-    u0[:2] = 50
-    u0[2:4] = 0
-    u0[4:6] = 10
+    u0 = u_ref[0,:]
+    u0[4:] = 10
     simU[0,:] = u0
-    simU2[0,:] = u0
+    u_ref = np.delete(u_ref, 0, axis=0)
 
-    # Declare the reference state - Static point in this tests -NOT USED CURRENTLY
-    x_ref = np.zeros(nx)
-    references = x_ref
-
-    u_ref = np.zeros(nu)
-    u_ref[:2] = 50 
-
-
-    # Extract the jacobians for the linear dynamics
-    A, B = lqr.create_linearized_dynamics(x_ref, u_ref)
-
-    # Initial linearization points
-    x_lin = x0
-    u_lin = u0  # np.zeros(nu)
 
     # Array to store the time values - NOT USED ATM
     t = np.zeros((Nsim))
 
-
     # closed loop - simulation
     x = x0
-    x2 = x02
     u = u0
-    u2 = u
 
-    A_lin = A(x_lin, u_lin)
-    B_lin = B(x_lin, u_lin)
-    print(f"A_lin shape: {np.shape(A_lin)}\n{A_lin}")
-    print(f"B_lin shape: {np.shape(B_lin)}\n{B_lin}")
-    print(f"----------------------- SIMULATION STARTS---------------------------------")
+    # Init the jacobians for the linear dynamics
+    lqr.create_linearized_dynamics(x_ref.shape[1], u_ref.shape[1])
+
+    # Initial linearization points
+    x_lin = x0
+    u_lin = u0
 
     # SIMULATION LOOP
+    print(f"----------------------- SIMULATION STARTS---------------------------------")
     for i in range(Nsim):
         print("-------------------------------------------------------------")
         print(f"Nsim: {i}")
-        print(f"X_lin: {x_lin}, \nU_lin: {u_lin}")
-        A_lin = A(x_lin, u_lin)
-        B_lin = B(x_lin, u_lin)
-        A_lin, B_lin = lqr.continuous_to_discrete(A_lin, B_lin, Ts)
-        # ab = np.concatenate([A_lin @ B_lin, B_lin], axis=1)
+        #print(f"X_lin: {x_lin}, \nU_lin: {u_lin}")
+        Ac, Bc = lqr.continuous_dynamics(x_lin, u_lin)
+        Ad, Bd = lqr.continuous_to_discrete(Ac, Bc, Ts)
+        # ab = np.concatenate([Ad @ Bd, Bd], axis=1)
         # print("rank: ", np.linalg.matrix_rank(ab))
-        # print(f"Cntrollability matrix:\n {ab}")
+        # print(f"Controllability matrix:\n {ab}")
 
-        L = lqr.compute_lqr_gain(A_lin, B_lin)
+        L = lqr.compute_lqr_gain(Ad, Bd)
         u  = -L @ (x)
-        print(f"u: {u}")
-        x = A_lin @ (x) + B_lin @ (u)
-
-        x2 = np.array(x2 + original_function(x2, u2)*Ts).flatten()
+        x = Ad @ (x-x_ref[i,:]) + Bd @ (u-u_ref[i,:]) + np.array(dynamics_function(x_ref[i,:], u_ref[i,:])).flatten()
 
         simX[i+1,:] = x
         simU[i+1,:] = np.array(u).flatten()
-        simX2[i+1,:] = x2
-        simU2[i+1,:] = np.array(u).flatten()
+
         if i % 1 == 0:
-            x_lin = x
-            u_lin = u
-        references = np.vstack([references, x_ref])
- 
+            x_lin = x_ref[i,:]
+            u_lin = u_ref[i,:]
+        if i == 0:
+            references = x0.reshape(1,12)
+        else:
+            references = np.vstack([references, x_ref[i,:]])
+
+        
+
 
     # evaluate timings
     t *= 1000  # scale to milliseconds
@@ -463,8 +453,9 @@ def main():
 
 
     # plot results
+    print(references.shape)
     x_axis = np.linspace(0, (Ts)*Nsim, Nsim+1)
-    plot(x_axis, references, simX, simU, simX2, simU2)
+    plot(x_axis, references, simX, simU)
 
 if __name__ == '__main__':
     main()
