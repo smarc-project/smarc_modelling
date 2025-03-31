@@ -377,7 +377,9 @@ def main():
 
     # Declare the initial state
     x0 = np.zeros(nx)
-    x0[0] = 0.1  
+    x0[0] = 1  
+    x0[1] = 0.5  
+
     x0[7] = 1e-9
     simX[0,:] = x0
 
@@ -425,7 +427,6 @@ def main():
     print(f"A_lin shape: {np.shape(A_lin)}\n{A_lin}")
     print(f"B_lin shape: {np.shape(B_lin)}\n{B_lin}")
     print(f"----------------------- SIMULATION STARTS---------------------------------")
-    A_lin, B_lin = lqr.continuous_to_discrete(A_lin, B_lin, Ts)
 
     # SIMULATION LOOP
     for i in range(Nsim):
@@ -442,8 +443,7 @@ def main():
         L = lqr.compute_lqr_gain(A_lin, B_lin)
         u  = -L @ (x)
         print(f"u: {u}")
-        xdot = A_lin @ (x) + B_lin @ (u)
-        x = np.array(x + xdot*Ts).flatten()
+        x = A_lin @ (x) + B_lin @ (u)
 
         x2 = np.array(x2 + original_function(x2, u2)*Ts).flatten()
 
