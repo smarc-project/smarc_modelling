@@ -422,20 +422,10 @@ def main():
     for i in range(Nsim):
         print("-------------------------------------------------------------")
         print(f"Nsim: {i}")
-        #print(f"X_lin: {x_lin}, \nU_lin: {u_lin}")
-        Ac, Bc = lqr.continuous_dynamics(x_lin, u_lin)
-        Ad, Bd = lqr.continuous_to_discrete(Ac, Bc, Ts)
-        # ab = np.concatenate([Ad @ Bd, Bd], axis=1)
-        # print("rank: ", np.linalg.matrix_rank(ab))
-        # print(f"Controllability matrix:\n {ab}")
 
-        L = lqr.compute_lqr_gain(Ad, Bd)
-        u  = -L @ (x)
-        #x = Ad @ (x-x_ref[i,:]) + Bd @ (u-u_ref[i,:]) + np.array(dynamics_function(x_ref[i,:], u_ref[i,:])).flatten()
-        x = Ad @ (x) + Bd @ (u)
-
+        x, u = lqr.solve(x, x_lin, u_lin)
         simX[i+1,:] = x
-        simU[i+1,:] = np.array(u).flatten()
+        simU[i+1,:] = u
 
         if i % 1 == 0:
             x_lin = x_ref[i,:]
@@ -443,10 +433,7 @@ def main():
         if i == 0:
             references = x0.reshape(1,12)
         else:
-            references = np.vstack([references, x_ref[i,:]])
-        print(x[3:6])
-
-        
+            references = np.vstack([references, x_ref[i,:]])        
 
 
     # evaluate timings

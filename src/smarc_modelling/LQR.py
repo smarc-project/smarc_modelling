@@ -47,11 +47,10 @@ class LQR:
         Ac (ca.function): Continuous-time state matrix
         Bc (ca.Function): Continuous-time control matrix
         """
-        Ac = self.A(x_lin, u_lin)
-        Bc = self.B(x_lin, u_lin)
-        return Ac, Bc
+        self.Ac = self.A(x_lin, u_lin)
+        self.Bc = self.B(x_lin, u_lin)
        
-    def continuous_to_discrete(self, A, B, dt):
+    def continuous_to_discrete(self, dt):
         """
         Convert continuous-time system matrices (A, B) to discrete-time (A_d, B_d) using zero-order hold.
         
@@ -65,24 +64,22 @@ class LQR:
         B_d (ca.MX): Discrete-time input matrix
         """
         # Convert to numpy matrices (Problem with casadi plugin)
-        A = np.array(A)
-        B = np.array(B)
+        A = np.array(self.Ac)
+        B = np.array(self.Bc)
 
         #print(scipy.linalg.det(A))
         # Discretize the A matrix (A_d = exp(A * dt))
-        A_d = scipy.linalg.expm(A * dt)
+        self.Ad = scipy.linalg.expm(A * dt)
 
-        # Trapezoidal rule for B_d: B_d = dt * (exp(A*dt) + I) / 2 * B
         I = np.eye(A.shape[0])  # Identity matrix of the same size as A
 
         # Discretize B using the trapezoidal rule (more accurate than Euler method)
         #B_d = scipy.integrate.quad_vec(lambda x: scipy.linalg.expm(A * x) @ B, 0, self.Ts)
         #B_d = scipy.integrate.quad(A_d @ B, dx=dt)
-        Ad_inv = np.linalg.inv(A_d)
-        B_d = np.dot(Ad_inv * (A_d + I), B)
-        B_d2 = np.dot(np.linalg.norm(Ad_inv) * (A_d + I), B)
+        Ad_inv = np.linalg.inv(self.Ad)
+        #B_d = np.dot(Ad_inv * (A_d + I), B)
+        self.Bd = np.dot(np.linalg.norm(Ad_inv) * (self.Ad + I), B)
         print(np.linalg.norm(Ad_inv))
-        return A_d, B_d2
     
     def continuous_to_discrete_appr(self, A, B, dt):
         """
@@ -113,7 +110,7 @@ class LQR:
 
         return A_d, B_d
 
-    def compute_lqr_gain(self, A, B):
+    def compute_lqr_gain(self):
         # State weight matrix
         Q_diag = np.ones(12)
         Q_diag[ 0:3 ] = 1
@@ -131,21 +128,22 @@ class LQR:
         R = np.diag(R_diag)
 
         
-        P = scipy.linalg.solve_discrete_are(A, B, Q, R)
-        self.L = np.linalg.inv(R + B.T @ P @ B) @ B.T @ P @ A
-        return self.L
+        P = scipy.linalg.solve_discrete_are(self.Ad, self.Bd, Q, R)
+        L = np.linalg.inv(R + self.Bd.T @ P @ self.Bd) @ self.Bd.T @ P @ self.Ad
 
-    def solve(self, x):
-        Q = np.eye(19)
-        R = np.eye(6)
-        A, B = self.create_linearized_dynamics(x, u)
-        self.compute_lqr_gain(A, B, Q, R)
-        u = -self.L @ x
+        return L
 
-        x_dot = A @ x + B @ u
-        x += x_dot * self.Ts  # Update the state (Euler method)
+    def solve(self, x, x_lin, u_lin):
+        self.create_linearized_dynamics(x_lin.shape[0], u_lin.shape[0])    # Get the symbolic Jacobians that describe the A and B matrices
+        self.continuous_dynamics(x_lin, u_lin)   # Create matrix A and B in continuous time
+        self.continuous_to_discrete(self.Ts)          # Discretize the continuous time matrices
+        L = self.compute_lqr_gain()              # Calculate the feedback gain
+        u = -L @ x
 
-        return u
+        x_next = self.Ad @ x + self.Bd @ u
+        #x = Ad @ (x-x_ref[i,:]) + Bd @ (u-u_ref[i,:]) + np.array(dynamics_function(x_ref[i,:], u_ref[i,:])).flatten()
+
+        return x_next, u
     
     def x_error(self, x, ref):
         """
