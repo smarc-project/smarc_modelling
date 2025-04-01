@@ -9,6 +9,7 @@ class LQR:
         self.P = 0
         self.Ts = Ts
         self.dynamics = dynamics
+        self.x_lin_prev = np.zeros((12,))
 
 
     def create_linearized_dynamics(self, nx: int, nu: int):
@@ -134,15 +135,24 @@ class LQR:
         return L
 
     def solve(self, x, x_lin, u_lin):
+        # Since the linearization points are along a trajectory, the reference points is chosen to be the same
+        x_ref = x_lin
+        u_ref = u_lin
         self.create_linearized_dynamics(x_lin.shape[0], u_lin.shape[0])    # Get the symbolic Jacobians that describe the A and B matrices
         self.continuous_dynamics(x_lin, u_lin)      # Create matrix A and B in continuous time
         self.continuous_to_discrete(self.Ts)        # Discretize the continuous time matrices
-        L = self.compute_lqr_gain()                 # Calculate the feedback gain
-        u = -L @ x
+        #if x_lin[0] != self.x_lin_prev[0] or self.x_lin_prev[0] == 0:
+        #    print("update L")
+        #    self.x_lin_prev = x_lin
+
+        self.L = self.compute_lqr_gain()                 # Calculate the feedback gain
+        u = -self.L @ x
 
         x_next = self.Ad @ x + self.Bd @ u
-        #x = Ad @ (x-x_ref[i,:]) + Bd @ (u-u_ref[i,:]) + np.array(dynamics(x_ref[i,:], u_ref[i,:])).flatten()
-
+        #x_next = self.Ad @ self.x_error(x, x_ref) + self.Bd @ (u-u_ref) #+ np.array(dynamics(x_ref[i,:], u_ref[i,:])).flatten()
+        
+        # Convert output from casadi.DM to np.array
+        #x_next = np.array(x_next).flatten()
         return x_next, u
     
     def x_error(self, x, ref):
@@ -171,8 +181,7 @@ class LQR:
 
         # Since unit quaternion, quaternion inverse is equal to its conjugate
         q_conj = ca.vertcat(q[0], -q[1], -q[2], -q[3])
-        q = q_conj/ca.norm_2(q)
-        
+        q = q_conj
         # q_error = q_ref @ q^-1
         q_w = q_ref[0] * q[0] - q_ref[1] * q[1] - q_ref[2] * q[2] - q_ref[3] * q[3]
         q_x = q_ref[0] * q[1] + q_ref[1] * q[0] + q_ref[2] * q[3] - q_ref[3] * q[2]
@@ -180,12 +189,16 @@ class LQR:
         q_z = q_ref[0] * q[3] + q_ref[1] * q[2] - q_ref[2] * q[1] + q_ref[3] * q[0]
 
         q_error = ca.vertcat(q_w, q_x, q_y, q_z)
+        print(f"qref  {q_ref}")
+        print(f"q: {q}")
+        print(f"q_error: {q_error}")
+        print(f"q_errorN: {q_error/ca.norm_2(q_error)}")
+
 
         pos_error = x[:3] - ref[:3] #+ np.array([(np.random.random()-0.5)/5,(np.random.random()-0.5)/5, (np.random.random()-0.5)/5])
-        vel_error = x[7:13] - ref[7:13]
-        u_error   = x[13:19] - ref[13:19]
+        vel_error = x[6:12] - ref[6:12]
         
-        x_error = ca.vertcat(pos_error, q_error, vel_error, u_error)
+        x_error = ca.vertcat(pos_error, q_error[1:], vel_error)
 
 
         return x_error

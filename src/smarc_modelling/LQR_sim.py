@@ -379,8 +379,8 @@ def main():
     x0[6] = 1e-6
     simX[0,:] = x0
     simNonlinear[0,:] = x0
-    x_ref = np.delete(x_ref, 0, axis=0)
-    x_ref = np.delete(x_ref, 0, axis=0)
+    x_ref = np.delete(x_ref, 0, axis=0)     # Remove the initial state from the reference
+    x_ref = np.delete(x_ref, 0, axis=0)     # approx. the same state (Ververy low ang. velocity in pitch 4e-3)
 
 
     # Declare control initial state
@@ -422,8 +422,10 @@ def main():
         if i == 0:
             references = x0.reshape(1,12)
         else:
-            references = np.vstack([references, x_ref[i,:]])        
+            references = np.vstack([references, x_ref[i,:]])    
         x=x2
+        print(x[3:6])    
+
 
     # evaluate timings
     t *= 1000  # scale to milliseconds
