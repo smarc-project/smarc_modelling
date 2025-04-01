@@ -21,7 +21,7 @@ from smarc_modelling.vehicles.SAM_LQR import SAM_LQR
 from smarc_modelling.vehicles.SAM_casadi import SAM_casadi
 
 
-def plot(x_axis, ref, simX, simU):
+def plot(x_axis, ref, simX, simNl, simU):
     ref = ref[:,:13]  
 
     psi = np.zeros(np.size(ref, 0))
@@ -48,6 +48,9 @@ def plot(x_axis, ref, simX, simU):
     psi = np.zeros(n)
     theta = np.zeros(n)
     phi = np.zeros(n)
+    psiNl = np.zeros(n)
+    thetaNl = np.zeros(n)
+    phiNl = np.zeros(n)
 
     for i in range(n):
         q1 = simX[i, 3]
@@ -56,6 +59,14 @@ def plot(x_axis, ref, simX, simU):
         q0 = np.sqrt(1 - q1**2 - q2**2 - q3**2)
         q = [q0, q1, q2, q3]
         psi[i], theta[i], phi[i] = gnc.quaternion_to_angles(q)
+
+    for i in range(n):
+        q1 = simNl[i, 3]
+        q2 = simNl[i, 4]
+        q3 = simNl[i, 5]
+        q0 = np.sqrt(1 - q1**2 - q2**2 - q3**2)
+        q = [q0, q1, q2, q3]
+        psiNl[i], thetaNl[i], phiNl[i] = gnc.quaternion_to_angles(q)
 
 
     y_axis = np.zeros(np.shape(simX))
@@ -74,6 +85,7 @@ def plot(x_axis, ref, simX, simU):
     plt.figure()
     plt.subplot(4,3,1)
     plt.plot(x_axis, simX[:, 0] )
+    plt.plot(x_axis, simNl[:, 0] )
     plt.plot(x_axis[:-1],  ref[:, 0], linestyle='--', color='r')
     plt.legend(["X", "X_org", "X_ref"])
     plt.ylabel("Position [m]")
@@ -81,6 +93,7 @@ def plot(x_axis, ref, simX, simU):
 
     plt.subplot(4,3,2)
     plt.plot(x_axis, simX[:, 1] )
+    plt.plot(x_axis, simNl[:, 1] )
     plt.plot(x_axis[:-1],  ref[:, 1], linestyle='--', color='r')
     plt.legend(["Y", "y_org" "Y_ref"])
     plt.ylabel("Position [m]")
@@ -88,6 +101,7 @@ def plot(x_axis, ref, simX, simU):
 
     plt.subplot(4,3,3)
     plt.plot(x_axis, simX[:, 2])
+    plt.plot(x_axis, simNl[:, 2])
     plt.plot(x_axis[:-1],  ref[:, 2], linestyle='--', color='r')
     plt.legend(["Z","z_org", "Z_ref"])
     plt.ylabel("Position [m]")
@@ -95,6 +109,7 @@ def plot(x_axis, ref, simX, simU):
 
     plt.subplot(4,3,4)
     plt.plot(x_axis, simX[:, 7])
+    plt.plot(x_axis, simNl[:, 7] )
     plt.plot(x_axis[:-1],  ref[:, 6], linestyle='--', color='r')
     plt.legend([r"$\dotX$",r"$\dotX_{org}$", r"$\dotX_{ref}$"])
     plt.ylabel("X Velocity [m/s]")
@@ -102,7 +117,7 @@ def plot(x_axis, ref, simX, simU):
 
     plt.subplot(4,3,5)
     plt.plot(x_axis, simX[:, 8])
-
+    plt.plot(x_axis, simNl[:, 8])
     plt.plot(x_axis[:-1],  ref[:, 7], linestyle='--', color='r')
     plt.legend([r"$\dotY$", r"$\dotY_{org}$", r"$\dotY_{ref}$"])
     plt.ylabel("Y Velocity [m/s]")
@@ -110,7 +125,7 @@ def plot(x_axis, ref, simX, simU):
 
     plt.subplot(4,3,6)
     plt.plot(x_axis, simX[:, 9])
-
+    plt.plot(x_axis, simNl[:, 9])
     plt.plot(x_axis[:-1],  ref[:, 8], linestyle='--', color='r')
     plt.legend([r"$\dotZ$", r"$\dotZ_{org}$", r"$\dotZ_{ref}$"])
     plt.ylabel("Z Velocity [m/s]")
@@ -118,6 +133,7 @@ def plot(x_axis, ref, simX, simU):
 
     plt.subplot(4,3,7)
     plt.plot(x_axis, np.rad2deg(phi))
+    plt.plot(x_axis, np.rad2deg(phiNl))
     plt.plot(x_axis[:-1], np.rad2deg(ref[:, 3]), linestyle='--', color='r')
     plt.legend([r"$\phi$", r"$\phi_{org}$", r"$\phi_{ref}$"])
     plt.ylabel("Roll [deg]")    
@@ -125,6 +141,7 @@ def plot(x_axis, ref, simX, simU):
 
     plt.subplot(4,3,8)
     plt.plot(x_axis, np.rad2deg(theta))
+    plt.plot(x_axis, np.rad2deg(thetaNl))
     plt.plot(x_axis[:-1], np.rad2deg(ref[:, 4]), linestyle='--', color='r')
     plt.legend([r"$\theta$", r"$\theta_{org}$",r"$\theta_{ref}$"])
     plt.ylabel("Pitch [deg]")
@@ -132,20 +149,23 @@ def plot(x_axis, ref, simX, simU):
 
     plt.subplot(4,3,9)
     plt.plot(x_axis, np.rad2deg(psi))
+    plt.plot(x_axis, np.rad2deg(psiNl))
     plt.plot(x_axis[:-1], np.rad2deg(ref[:, 5]), linestyle='--', color='r')
     plt.legend([r"$\psi$", r"$\psi_{org}$",r"$\psi_{ref}$"])
     plt.ylabel("Yaw [deg]")
     plt.grid()
 
     plt.subplot(4,3,10)
-    plt.plot(x_axis, simX[:, 10])
+    plt.plot(x_axis, simX[:, 9])
+    plt.plot(x_axis, simNl[:, 9])
     plt.plot(x_axis[:-1],  ref[:, 9], linestyle='--', color='r')
     plt.legend([r"$\dot\phi$", r"$\dot\phi_{ref}$"])
     plt.ylabel("Angular Velocity [rad/s]")
     plt.grid()
 
     plt.subplot(4,3,11)
-    plt.plot(x_axis, simX[:, 11])
+    plt.plot(x_axis, simX[:, 10])
+    plt.plot(x_axis, simNl[:, 10])
     plt.plot(x_axis[:-1],  ref[:, 10], linestyle='--', color='r')
     plt.legend([r"$\dot\theta$", r"$\dot\theta_{ref}$"])
     plt.ylabel("Angular Velocity [rad/s]")
@@ -153,6 +173,7 @@ def plot(x_axis, ref, simX, simU):
 
     plt.subplot(4,3,12)
     plt.plot(x_axis, simX[:, 11])
+    plt.plot(x_axis, simNl[:, 11])
     plt.plot(x_axis[:-1],  ref[:, 11], linestyle='--', color='r')
     plt.legend([r"$\dot\psi$", r"$\dot\psi_{ref}$"])
     plt.ylabel("Angular Velocity [rad/s]")
@@ -201,25 +222,6 @@ def plot(x_axis, ref, simX, simU):
 
     # # Control Inputs
     plt.figure()
-    # plt.subplot(4,3,1)
-    # plt.step(x_axis, simX[:, 13])
-    # plt.legend([r"VBS"])
-    # plt.ylabel("VBS input") 
-    # plt.grid()
-
-    # plt.subplot(4,3,2)
-    # plt.step(x_axis, simX[:, 15])
-    # plt.title("Control inputs")
-    # plt.legend([r"Stern angle"])
-    # plt.ylabel(r" Degrees [$\degree$]")
-    # plt.grid()
-
-    # plt.subplot(4,3,3)
-    # plt.step(x_axis, simX[:, 17])
-    # plt.legend([r"RPM1"])
-    # plt.ylabel("Motor RPM")
-    # plt.grid()
-
     plt.subplot(4,3,4)
     plt.step(x_axis, simU[:, 0])
     plt.legend([r"VBS"])
@@ -238,24 +240,6 @@ def plot(x_axis, ref, simX, simU):
     plt.ylabel("RPM1")
     plt.grid()
 
-    # plt.subplot(4,3,7)
-    # plt.step(x_axis, simX[:, 14])
-    # plt.legend([r"LCG"])
-    # plt.ylabel("LCG input")
-    # plt.grid()
-
-    # plt.subplot(4,3,8)
-    # plt.step(x_axis, simX[:, 16])
-    # plt.legend([r"Rudder angle"])
-    # plt.ylabel(r" degrees [$\degree$]")
-    # plt.grid()
-
-    # plt.subplot(4,3,9)
-    # plt.step(x_axis, simX[:, 18])
-    # plt.legend([r"RPM2"])
-    # plt.ylabel("Motor RPM")
-    # plt.grid()
-
     plt.subplot(4,3,10)
     plt.step(x_axis, simU[:, 1])
     plt.legend([r"LCG"])
@@ -265,7 +249,7 @@ def plot(x_axis, ref, simX, simU):
     plt.subplot(4,3,11)
     plt.step(x_axis, simU[:, 3])
     plt.legend([r"Rudder angle"])
-    plt.ylabel(r" Degree [$\degree/s$]")
+    plt.ylabel(r" Degree [$\degree$]")
     plt.grid()
 
     plt.subplot(4,3,12)
@@ -373,6 +357,8 @@ def main():
     Nsim = 100                          # Simulation duration (no. of iterations) - sim. length is Ts*Nsim
     simU = np.zeros((Nsim+1, nu))       # Matrix to store the optimal control sequence
     simX = np.zeros((Nsim+1, nx))       # Matrix to store the simulated state
+    simNonlinear = np.zeros((Nsim+1, nx))       # Matrix to store the simulated state
+
 
     # create LQR object to to access methods
     Ts = 0.1
@@ -392,6 +378,7 @@ def main():
     x0 = x_ref[0,:]
     x0[6] = 1e-6
     simX[0,:] = x0
+    simNonlinear[0,:] = x0
     x_ref = np.delete(x_ref, 0, axis=0)
     x_ref = np.delete(x_ref, 0, axis=0)
 
@@ -423,8 +410,10 @@ def main():
         print("-------------------------------------------------------------")
         print(f"Nsim: {i}")
 
-        x, u = lqr.solve(x, x_lin, u_lin)
-        simX[i+1,:] = x
+        x2, u = lqr.solve(x, x_lin, u_lin)
+        
+        simNonlinear[i+1,:] = np.array(dynamics_function(x, u)).flatten()
+        simX[i+1,:] = x2
         simU[i+1,:] = u
 
         if i % 1 == 0:
@@ -434,7 +423,7 @@ def main():
             references = x0.reshape(1,12)
         else:
             references = np.vstack([references, x_ref[i,:]])        
-
+        x=x2
 
     # evaluate timings
     t *= 1000  # scale to milliseconds
@@ -444,7 +433,7 @@ def main():
     # plot results
     print(references.shape)
     x_axis = np.linspace(0, (Ts)*Nsim, Nsim+1)
-    plot(x_axis, references, simX, simU)
+    plot(x_axis, references, simX, simNonlinear, simU)
 
 if __name__ == '__main__':
     main()

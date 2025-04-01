@@ -135,13 +135,13 @@ class LQR:
 
     def solve(self, x, x_lin, u_lin):
         self.create_linearized_dynamics(x_lin.shape[0], u_lin.shape[0])    # Get the symbolic Jacobians that describe the A and B matrices
-        self.continuous_dynamics(x_lin, u_lin)   # Create matrix A and B in continuous time
-        self.continuous_to_discrete(self.Ts)          # Discretize the continuous time matrices
-        L = self.compute_lqr_gain()              # Calculate the feedback gain
+        self.continuous_dynamics(x_lin, u_lin)      # Create matrix A and B in continuous time
+        self.continuous_to_discrete(self.Ts)        # Discretize the continuous time matrices
+        L = self.compute_lqr_gain()                 # Calculate the feedback gain
         u = -L @ x
 
         x_next = self.Ad @ x + self.Bd @ u
-        #x = Ad @ (x-x_ref[i,:]) + Bd @ (u-u_ref[i,:]) + np.array(dynamics_function(x_ref[i,:], u_ref[i,:])).flatten()
+        #x = Ad @ (x-x_ref[i,:]) + Bd @ (u-u_ref[i,:]) + np.array(dynamics(x_ref[i,:], u_ref[i,:])).flatten()
 
         return x_next, u
     
