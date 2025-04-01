@@ -147,3 +147,48 @@ class LQR:
 
         return u
     
+    def x_error(self, x, ref):
+        """
+        Calculates the state error.
+        
+        :param x: State vector
+        :param ref: Reference vector
+        :return: error vector
+        """
+        # Extract the reference quaternion
+        q_ref1 = ref[3]
+        q_ref2 = ref[4]
+        q_ref3 = ref[5]
+        q_ref0 = ca.sqrt(1 - q_ref1**2 - q_ref2**2 - q_ref3**2)
+
+        q_ref = ca.vertcat(q_ref0, q_ref1, q_ref2, q_ref3)
+
+        # Extract current quaternion
+        q1 = x[3]
+        q2 = x[4]
+        q3 = x[5]
+        q0 = ca.sqrt(1 - q1**2 - q2**2 - q3**2)
+
+        q = ca.vertcat(q0, q1, q2, q3)
+
+        # Since unit quaternion, quaternion inverse is equal to its conjugate
+        q_conj = ca.vertcat(q[0], -q[1], -q[2], -q[3])
+        q = q_conj/ca.norm_2(q)
+        
+        # q_error = q_ref @ q^-1
+        q_w = q_ref[0] * q[0] - q_ref[1] * q[1] - q_ref[2] * q[2] - q_ref[3] * q[3]
+        q_x = q_ref[0] * q[1] + q_ref[1] * q[0] + q_ref[2] * q[3] - q_ref[3] * q[2]
+        q_y = q_ref[0] * q[2] - q_ref[1] * q[3] + q_ref[2] * q[0] + q_ref[3] * q[1]
+        q_z = q_ref[0] * q[3] + q_ref[1] * q[2] - q_ref[2] * q[1] + q_ref[3] * q[0]
+
+        q_error = ca.vertcat(q_w, q_x, q_y, q_z)
+
+        pos_error = x[:3] - ref[:3] #+ np.array([(np.random.random()-0.5)/5,(np.random.random()-0.5)/5, (np.random.random()-0.5)/5])
+        vel_error = x[7:13] - ref[7:13]
+        u_error   = x[13:19] - ref[13:19]
+        
+        x_error = ca.vertcat(pos_error, q_error, vel_error, u_error)
+
+
+        return x_error
+

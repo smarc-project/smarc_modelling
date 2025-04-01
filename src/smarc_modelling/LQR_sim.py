@@ -431,7 +431,8 @@ def main():
 
         L = lqr.compute_lqr_gain(Ad, Bd)
         u  = -L @ (x)
-        x = Ad @ (x-x_ref[i,:]) + Bd @ (u-u_ref[i,:]) + np.array(dynamics_function(x_ref[i,:], u_ref[i,:])).flatten()
+        #x = Ad @ (x-x_ref[i,:]) + Bd @ (u-u_ref[i,:]) + np.array(dynamics_function(x_ref[i,:], u_ref[i,:])).flatten()
+        x = Ad @ (x) + Bd @ (u)
 
         simX[i+1,:] = x
         simU[i+1,:] = np.array(u).flatten()
@@ -443,6 +444,7 @@ def main():
             references = x0.reshape(1,12)
         else:
             references = np.vstack([references, x_ref[i,:]])
+        print(x[3:6])
 
         
 
