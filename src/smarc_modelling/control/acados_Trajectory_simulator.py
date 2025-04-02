@@ -66,15 +66,16 @@ def read_csv_to_array(file_path: str):
 def main():
     # Extract the CasADi model
     sam = SAM_casadi()
-    model = sam.export_dynamics_model()
-    nx = model.x.rows()
-    nu = model.u.rows()
+
 
     # create ocp object to formulate the OCP
     Ts = 0.2            # Sampling time
     N_horizon = 10      # Prediction horizon
-    nmpc = NMPC_trajectory(model, Ts, N_horizon)
+    nmpc = NMPC_trajectory(sam, Ts, N_horizon)
+    nx = nmpc.nx        # State vector length + control vector
+    nu = nmpc.nu        # Control derivative vector length
 
+    
     # load trajectory - Replace with your actual file path
     file_path = "/home/admin/smarc_modelling/src/smarc_modelling/Trajectories/simonTrajectory.csv"
     #file_path = "/home/admin/smarc_modelling/src/smarc_modelling/Trajectories/resolution01.csv"  

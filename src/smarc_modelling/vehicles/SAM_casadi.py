@@ -57,7 +57,6 @@ Refactored: David Doerner
 
 import numpy as np
 import casadi as ca
-from acados_template import AcadosModel
 from smarc_modelling.lib.gnc import *
 from smarc_modelling.lib.gnc_casadi import *
 
@@ -373,30 +372,6 @@ class SAM_casadi():
 
         #return self.x_dot_sym(x, u_ref) # returns a ca.DM
         return self.x_dot_sym  # returns a casadi MX.function
-
-    def export_dynamics_model(self):
-        # Create symbolic state and control variables
-        x_sym     = ca.MX.sym('x', 19,1)
-        u_ref_sym = ca.MX.sym('u_ref', 6,1)
-
-        # Create symbolic derivative
-        x_dot_sym = ca.MX.sym('x_dot', 19, 1)
-        
-        # Set up acados model
-        model = AcadosModel()
-        model.name = 'SAM_equation_system'
-        model.x    = x_sym
-        model.xdot = x_dot_sym
-        model.u    = u_ref_sym
-
-        # Declaration of explicit and implicit expressions
-        x_dot  = self.dynamics(export=True)    # extract casadi.MX function
-        f_expl = ca.vertcat(x_dot(x_sym[:13], x_sym[13:]), u_ref_sym)
-        f_impl = x_dot_sym - f_expl
-        model.f_expl_expr = f_expl
-        model.f_impl_expr = f_impl
-
-        return model
 
     
     def calculate_system_state(self, nu, eta, u_control):

@@ -1,5 +1,5 @@
 # Script for the acados NMPC model
-from acados_template import AcadosOcp, AcadosOcpSolver, AcadosSimSolver
+from acados_template import AcadosOcp, AcadosOcpSolver, AcadosSimSolver, AcadosModel
 import numpy as np
 import casadi as ca
 
@@ -152,20 +152,46 @@ class NMPC:
         return x_error
 
 class NMPC_trajectory:
-    def __init__(self, model, Ts, N_horizon):
+    def __init__(self, casadi_model, Ts, N_horizon):
         '''
         Input:
-        model == Casadi model
+        casadi_model == Casadi model
         Ts == Sampling Time
         N_horizon == control horizon
         '''
         self.ocp   = AcadosOcp()
-        self.model = model
+        self.model = self.export_dynamics_model(casadi_model)
         self.ocp.model = self.model
+        self.nx = self.model.x.rows()
+        self.nu = self.model.u.rows()
         self.Ts    = Ts
         self.Tf    = Ts*N_horizon
         self.N_horizon = N_horizon
         
+    # Function to create a Acados model from the casadi model
+    def export_dynamics_model(self, casadi_model):
+        # Create symbolic state and control variables
+        x_sym     = ca.MX.sym('x', 19,1)
+        u_ref_sym = ca.MX.sym('u_ref', 6,1)
+
+        # Create symbolic derivative
+        x_dot_sym = ca.MX.sym('x_dot', 19, 1)
+        
+        # Set up acados model
+        model = AcadosModel()
+        model.name = 'SAM_equation_system'
+        model.x    = x_sym
+        model.xdot = x_dot_sym
+        model.u    = u_ref_sym
+
+        # Declaration of explicit and implicit expressions
+        x_dot  = casadi_model.dynamics(export=True)    # extract casadi.MX function
+        f_expl = ca.vertcat(x_dot(x_sym[:13], x_sym[13:]), u_ref_sym)
+        f_impl = x_dot_sym - f_expl
+        model.f_expl_expr = f_expl
+        model.f_impl_expr = f_impl
+
+        return model
     def setup(self, x0):
         nx = self.model.x.rows()
         nu = self.model.u.rows()
