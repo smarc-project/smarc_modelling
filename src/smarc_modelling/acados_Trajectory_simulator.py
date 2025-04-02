@@ -393,29 +393,28 @@ def main():
     nmpc = NMPC_trajectory(model, Ts, N_horizon)
 
     # load trajectory - Replace with your actual file path
-    #file_path = "/home/admin/smarc_modelling/src/smarc_modelling/Trajectories/resolution01.csv"  
     file_path = "/home/admin/smarc_modelling/src/smarc_modelling/Trajectories/simonTrajectory.csv"
+    #file_path = "/home/admin/smarc_modelling/src/smarc_modelling/Trajectories/resolution01.csv"  
     #file_path = "/home/admin/smarc_modelling/src/smarc_modelling/Trajectories/straight_trajectory.csv"
     trajectory = read_csv_to_array(file_path)
 
-
-    Nsim = (trajectory.shape[0])
+    # Declare duration of sim. and the x_axis in the plots
+    Nsim = (trajectory.shape[0])            # The sim length should be equal to the number of waypoints
     x_axis = np.linspace(0, Ts*Nsim, Nsim)
-    print(f"Trajectory shape: {trajectory.shape}")
 
-    simU = np.zeros((Nsim, nu))     # Matrix to store the optimal control sequence
-    simX = np.zeros((Nsim+1, nx))   # Matrix to store the simulated state
+    simU = np.zeros((Nsim, nu))     # Matrix to store the optimal control derivative
+    simX = np.zeros((Nsim+1, nx))   # Matrix to store the simulated states
+
 
     # Declare the initial state
     x0 = trajectory[0] 
     simX[0,:] = x0
 
-    # Declare the reference state - Static point in this tests
-    # Initialize ref
-    ref = trajectory[1] #np.zeros((nx + nu,))
-    Uref = np.zeros((trajectory.shape[0], nu))
+    # Augment the trajectory and control input reference 
+    Uref = np.zeros((trajectory.shape[0], nu))  # Derivative reference - set to 0 to penalize fast control changes
+    trajectory = np.concatenate((trajectory, Uref), axis=1) 
 
-    trajectory = np.concatenate((trajectory, Uref), axis=1)
+    # Run the MPC setup
     ocp_solver, integrator = nmpc.setup(x0)
 
     # Initialize the state and control vector as David does
@@ -430,21 +429,24 @@ def main():
     # closed loop - simulation
     for i in range(Nsim):
         print(f"Nsim: {i}")
+
+        # extract the sub-trajectory for the horizon
         if i <= (Nsim - N_horizon):
             ref = trajectory[i:i + N_horizon, :]
         else:
             ref = trajectory[i:, :]
 
         # Update reference vector
+        # If the end of the trajectory has been reached, (ref.shape < N_horizon)
+        # set the following waypoints in the horizon to the last waypoint of the trajectory
         for stage in range(N_horizon):
-            index = int(stage)
-            print(ref.shape[0], index)
-            if ref.shape[0] < int(N_horizon) and ref.shape[0] != 0:
+            print(ref.shape[0], stage)
+            if ref.shape[0] < N_horizon and ref.shape[0] != 0:
                 ocp_solver.set(stage, "p", ref[ref.shape[0]-1,:])
             else:
-                ocp_solver.set(stage, "p", ref[index,:])
+                ocp_solver.set(stage, "p", ref[stage,:])
 
-
+        # Set the terminal state reference
         ocp_solver.set(N_horizon, "yref", ref[-1,:nx])
  
         # Set current state
