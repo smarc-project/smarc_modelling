@@ -380,32 +380,12 @@ def read_csv_to_array(file_path: str):
     
     return np.array(data)
 
-def interpolate_trajectory(trajectory, update_factor):
-    factors = np.linspace(0, 1, 3) # Create a reference between two current references. depends on upd_rate
-    print(factors)
-    for i in range(trajectory.shape[0]-1):
-        if i != trajectory.shape[0]-1:
-            for factor in factors[:-1]:
-                if i == 0:
-                    interpolated_vectors = trajectory[i] + factor * (trajectory[i+1] - trajectory[i])
-                else:
-                    interpolated_vectors = np.vstack([interpolated_vectors, trajectory[i] + factor * (trajectory[i+1] - trajectory[i])])
-        else:
-           for factor in factors:
-                if i == 0:
-                    interpolated_vectors = trajectory[i] + factor * (trajectory[i+1] - trajectory[i])
-                else:
-                    interpolated_vectors = np.vstack([interpolated_vectors, trajectory[i] + factor * (trajectory[i+1] - trajectory[i])])
-
-    return interpolated_vectors
 def main():
     # Extract the CasADi model
     sam = SAM_casadi()
     model = sam.export_dynamics_model()
     nx = model.x.rows()
     nu = model.u.rows()
-    #Nsim = 1200          # Simulation duration (no. of iterations) - sim. length is Ts*Nsim
-
 
     # create ocp object to formulate the OCP
     Ts = 0.2            # Sampling time
@@ -413,7 +393,6 @@ def main():
     nmpc = NMPC_trajectory(model, Ts, N_horizon)
 
     # load trajectory 
-
     #file_path = "/home/admin/smarc_modelling/src/smarc_modelling/Trajectories/resolution01.csv"  # Replace with your actual file path
     file_path = "/home/admin/smarc_modelling/src/smarc_modelling/Trajectories/simonTrajectory.csv"
     #file_path = "/home/admin/smarc_modelling/src/smarc_modelling/Trajectories/straight_trajectory.csv"
@@ -423,7 +402,6 @@ def main():
     Nsim = (trajectory.shape[0]-1)
     x_axis = np.linspace(0, (Ts)*Nsim, Nsim+1)
     print(f"Trajectory shape: {trajectory.shape}")
-    #trajectory = interpolate_trajectory(trajectory, update_factor)
 
     simU = np.zeros((Nsim, nu))     # Matrix to store the optimal control sequence
     simX = np.zeros((Nsim+1, nx))   # Matrix to store the simulated state
@@ -438,8 +416,8 @@ def main():
     Uref = np.zeros((trajectory.shape[0], nu))
 
     trajectory = np.concatenate((trajectory, Uref), axis=1)
-    references = trajectory[0, :19] #ref
     ocp_solver, integrator = nmpc.setup(x0)
+
     # Initialize the state and control vector as David does
     for stage in range(N_horizon + 1):
         ocp_solver.set(stage, "x", x0)
@@ -450,8 +428,6 @@ def main():
     t = np.zeros((Nsim))
 
     # closed loop - simulation
-    Uref = np.zeros((nu,))
-
     for i in range(Nsim):
         print(f"Nsim: {i}")
         if i < (Nsim - N_horizon/update_factor):
@@ -470,7 +446,6 @@ def main():
                     ocp_solver.set(stage, "p", ref[index,:])
 
 
-        references = np.vstack([references, ref[0,:nx]])
         ocp_solver.set(N_horizon, "yref", ref[-1,:nx])
  
         # Set current state
@@ -495,7 +470,12 @@ def main():
 
 
     # plot results
-    plot(x_axis, references, simX, simU)
+    print(f"x_axis: {x_axis.shape}")
+    print(f"refs: {trajectory.shape}")
+    print(f"simX: {simX.shape}")
+    print(f"simU: {simU.shape}")
+
+    plot(x_axis, trajectory, simX, simU)
 
     ocp_solver = None
 
