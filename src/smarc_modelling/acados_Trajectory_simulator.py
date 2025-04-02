@@ -397,7 +397,6 @@ def main():
     file_path = "/home/admin/smarc_modelling/src/smarc_modelling/Trajectories/simonTrajectory.csv"
     #file_path = "/home/admin/smarc_modelling/src/smarc_modelling/Trajectories/straight_trajectory.csv"
     trajectory = read_csv_to_array(file_path)
-    update_factor = 1
 
     Nsim = (trajectory.shape[0]-1)
     x_axis = np.linspace(0, (Ts)*Nsim, Nsim+1)
@@ -430,20 +429,19 @@ def main():
     # closed loop - simulation
     for i in range(Nsim):
         print(f"Nsim: {i}")
-        if i < (Nsim - N_horizon/update_factor):
-            ref = trajectory[i:i+int(N_horizon/update_factor), :]
+        if i < (Nsim - N_horizon):
+            ref = trajectory[i:i+int(N_horizon), :]
         else:
             ref = trajectory[i:, :]
 
         # Update reference vector
         for stage in range(N_horizon):
-            if stage % update_factor == 0: 
-                index = int(stage/update_factor)
-                print(ref.shape[0], index)
-                if ref.shape[0] < int(N_horizon/update_factor) and ref.shape[0] != 0:
-                    ocp_solver.set(stage, "p", ref[ref.shape[0]-1,:])
-                else:
-                    ocp_solver.set(stage, "p", ref[index,:])
+            index = int(stage)
+            print(ref.shape[0], index)
+            if ref.shape[0] < int(N_horizon) and ref.shape[0] != 0:
+                ocp_solver.set(stage, "p", ref[ref.shape[0]-1,:])
+            else:
+                ocp_solver.set(stage, "p", ref[index,:])
 
 
         ocp_solver.set(N_horizon, "yref", ref[-1,:nx])
