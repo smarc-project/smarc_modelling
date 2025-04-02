@@ -213,19 +213,19 @@ def plot(x_axis, ref, simX, simU):
     plt.grid()
 
     plt.subplot(4,3,4)
-    plt.step(x_axis[:-1], simU[:, 0])
+    plt.step(x_axis, simU[:, 0])
     plt.legend([r"VBS"])
     plt.ylabel("VBS derivative") 
     plt.grid()
 
     plt.subplot(4,3,5)
-    plt.step(x_axis[:-1], simU[:, 2])
+    plt.step(x_axis, simU[:, 2])
     plt.legend([r"Stern angle"])
     plt.ylabel(r" Degree derivative [$\degree/s$]")
     plt.grid()
 
     plt.subplot(4,3,6)
-    plt.step(x_axis[:-1], simU[:, 4])
+    plt.step(x_axis, simU[:, 4])
     plt.legend([r"RPM1"])
     plt.ylabel("RPM1 derivative")
     plt.grid()
@@ -255,19 +255,19 @@ def plot(x_axis, ref, simX, simU):
     plt.grid()
 
     plt.subplot(4,3,10)
-    plt.step(x_axis[:-1], simU[:, 1])
+    plt.step(x_axis, simU[:, 1])
     plt.legend([r"LCG"])
     plt.ylabel("LCG derivative") 
     plt.grid()
 
     plt.subplot(4,3,11)
-    plt.step(x_axis[:-1], simU[:, 3])
+    plt.step(x_axis, simU[:, 3])
     plt.legend([r"Rudder angle"])
     plt.ylabel(r" Degree derivative [$\degree/s$]")
     plt.grid()
 
     plt.subplot(4,3,12)
-    plt.step(x_axis[:-1], simU[:, 5])
+    plt.step(x_axis, simU[:, 5])
     plt.legend([r"RPM2"])
     plt.ylabel("RPM2 derivative")
     plt.grid()
@@ -392,19 +392,20 @@ def main():
     N_horizon = 10      # Prediction horizon
     nmpc = NMPC_trajectory(model, Ts, N_horizon)
 
-    # load trajectory 
-    #file_path = "/home/admin/smarc_modelling/src/smarc_modelling/Trajectories/resolution01.csv"  # Replace with your actual file path
+    # load trajectory - Replace with your actual file path
+    #file_path = "/home/admin/smarc_modelling/src/smarc_modelling/Trajectories/resolution01.csv"  
     file_path = "/home/admin/smarc_modelling/src/smarc_modelling/Trajectories/simonTrajectory.csv"
     #file_path = "/home/admin/smarc_modelling/src/smarc_modelling/Trajectories/straight_trajectory.csv"
     trajectory = read_csv_to_array(file_path)
 
-    Nsim = (trajectory.shape[0]-1)
-    x_axis = np.linspace(0, (Ts)*Nsim, Nsim+1)
+
+    Nsim = (trajectory.shape[0])
+    x_axis = np.linspace(0, Ts*Nsim, Nsim)
     print(f"Trajectory shape: {trajectory.shape}")
 
     simU = np.zeros((Nsim, nu))     # Matrix to store the optimal control sequence
     simX = np.zeros((Nsim+1, nx))   # Matrix to store the simulated state
-    
+
     # Declare the initial state
     x0 = trajectory[0] 
     simX[0,:] = x0
@@ -429,8 +430,8 @@ def main():
     # closed loop - simulation
     for i in range(Nsim):
         print(f"Nsim: {i}")
-        if i < (Nsim - N_horizon):
-            ref = trajectory[i:i+int(N_horizon), :]
+        if i <= (Nsim - N_horizon):
+            ref = trajectory[i:i + N_horizon, :]
         else:
             ref = trajectory[i:, :]
 
@@ -473,7 +474,7 @@ def main():
     print(f"simX: {simX.shape}")
     print(f"simU: {simU.shape}")
 
-    plot(x_axis, trajectory, simX, simU)
+    plot(x_axis, trajectory, simX[:-1], simU)
 
     ocp_solver = None
 
