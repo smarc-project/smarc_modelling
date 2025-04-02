@@ -476,6 +476,9 @@ def main():
     print(f"simX: {simX.shape}")
     print(f"simU: {simU.shape}")
 
+    # Extract the optimal control sequence
+    optimal_u = simX[:, 13:]
+
     plot(x_axis, trajectory, simX[:-1], simU)
 
     ocp_solver = None
