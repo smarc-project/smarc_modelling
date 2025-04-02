@@ -7,8 +7,8 @@
 import sys
 import csv
 import os
-# Add the src directory to the system path
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', 'src'))
+# Add the parent directory to the system path
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 import numpy as np
 from control import *
 
