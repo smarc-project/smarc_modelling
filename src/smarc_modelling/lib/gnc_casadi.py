@@ -1,3 +1,8 @@
+"""
+GNC functions for the casadi model. 
+Only the necessary functions from gnc.py to make the model work are converted in this script
+
+"""
 import casadi as ca
 
 
