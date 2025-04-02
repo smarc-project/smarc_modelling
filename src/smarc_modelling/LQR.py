@@ -150,10 +150,10 @@ class LQR:
         # Since delta_u =-L*delta_x, delta_u = u-u_ref --> u = -L*delta_x + u_ref
         u = -self.L @ self.x_error(x, x_ref) + u_ref
 
-        #u = -self.L @ x
-        #x_next = self.Ad @ x + self.Bd @ u
-        x_next = (self.Ad @ self.x_error(x, x_ref) + self.Bd @ (u-u_ref) + x_ref +
-                 np.array(self.dynamics(x_lin, u_lin)).flatten())
+        u = -self.L @ x
+        x_next = self.Ad @ x + self.Bd @ u
+        #x_next = (self.Ad @ self.x_error(x, x_ref) + self.Bd @ (u-u_ref) + x_ref +
+        #         np.array(self.dynamics(x_lin, u_lin)).flatten())
                   
         
         # Convert output from casadi.DM to np.array

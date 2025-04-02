@@ -356,10 +356,8 @@ def main():
     dynamics_function = sam.dynamics(export=True)   # The LQR model to be used.
     nx   = 12
     nu   = 6
-    Nsim = 100                          # Simulation duration (no. of iterations) - sim. length is Ts*Nsim
-    simU = np.zeros((Nsim+1, nu))       # Matrix to store the optimal control sequence
-    simX = np.zeros((Nsim+1, nx))       # Matrix to store the simulated state
-    simNonlinear = np.zeros((Nsim+1, nx))       # Matrix to store the simulated state
+                        # Simulation duration (no. of iterations) - sim. length is Ts*Nsim
+    
 
 
     # create LQR object to to access methods
@@ -372,9 +370,16 @@ def main():
     #file_path = "/home/admin/smarc_modelling/src/smarc_modelling/Trajectories/simonTrajectory.csv"
     file_path = "/home/admin/smarc_modelling/src/smarc_modelling/Trajectories/straight_trajectory.csv"
     trajectory = read_csv_to_array(file_path)
+    Nsim = trajectory.shape[0]
+
+    simU = np.zeros((trajectory.shape[0], nu))       # Matrix to store the optimal control sequence
+    simX = np.zeros((trajectory.shape[0], nx))       # Matrix to store the simulated state
+    simNonlinear = np.zeros((trajectory.shape[0], nx))       # Matrix to store the simulated state
+
     x_ref = trajectory[:, 0:3]
     x_ref = np.concatenate((x_ref, trajectory[:, 4:13]), axis=1)
     u_ref = trajectory[:, 13:]
+    
 
     # Declare the initial state
     x0 = x_ref[0,:]
@@ -399,7 +404,7 @@ def main():
     x = x0
     u = u0
 
-    # Init the jacobians for the linear dynamics
+    # Init the jacobians for the linear dynamics, input is shape of vectors
     lqr.create_linearized_dynamics(x_ref.shape[1], u_ref.shape[1])
 
     # Initial linearization points
@@ -408,21 +413,21 @@ def main():
 
     # SIMULATION LOOP
     print(f"----------------------- SIMULATION STARTS---------------------------------")
-    for i in range(Nsim):
+    for i in range(Nsim-1):
         print("-------------------------------------------------------------")
         print(f"Nsim: {i}")
 
         x2, u = lqr.solve(x, u,  x_lin, u_lin)
-        print(f"x: {x}")
         simNonlinear[i+1,:] = np.array(dynamics_function(x, u)).flatten()
         simX[i+1,:] = x2
         simU[i+1,:] = u
-
-        if i % 1 == 0:
+        if i < x_ref.shape[0]:
             x_lin = x_ref[i,:]
             u_lin = u_ref[i,:]
         if i == 0:
             references = x0.reshape(1,12)
+        elif i >= x_ref.shape[0]:
+            references = np.vstack([references, x_ref[-1,:]]) 
         else:
             references = np.vstack([references, x_ref[i,:]])    
         x=x2
@@ -434,7 +439,7 @@ def main():
 
 
     # plot results
-    x_axis = np.linspace(0, (Ts)*Nsim, Nsim+1)
+    x_axis = np.linspace(0, (Ts)*Nsim, Nsim)
     plot(x_axis, references, simX, simNonlinear, simU)
 
 if __name__ == '__main__':
