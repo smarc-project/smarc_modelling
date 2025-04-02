@@ -414,9 +414,9 @@ def main():
 
     # load trajectory 
 
-    #file_path = "/home/admin/smarc_modelling/src/smarc_modelling/resolution01.csv"  # Replace with your actual file path
-    file_path = "/home/admin/smarc_modelling/src/smarc_modelling/simonTrajectory.csv"
-    #file_path = "/home/admin/smarc_modelling/src/smarc_modelling/straight_trajectory.csv"
+    #file_path = "/home/admin/smarc_modelling/src/smarc_modelling/Trajectories/resolution01.csv"  # Replace with your actual file path
+    file_path = "/home/admin/smarc_modelling/src/smarc_modelling/Trajectories/simonTrajectory.csv"
+    #file_path = "/home/admin/smarc_modelling/src/smarc_modelling/Trajectories/straight_trajectory.csv"
     trajectory = read_csv_to_array(file_path)
     update_factor = 1
 
