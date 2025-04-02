@@ -87,7 +87,7 @@ def plot(x_axis, ref, simX, simNl, simU):
     plt.plot(x_axis, simX[:, 0] )
     plt.plot(x_axis, simNl[:, 0] )
     plt.plot(x_axis[:-1],  ref[:, 0], linestyle='--', color='r')
-    plt.legend(["X", "X_org", "X_ref"])
+    plt.legend(["X", r"$X_{NL}$", r"$X_{ref}$"])
     plt.ylabel("Position [m]")
     plt.grid()
 
@@ -95,7 +95,7 @@ def plot(x_axis, ref, simX, simNl, simU):
     plt.plot(x_axis, simX[:, 1] )
     plt.plot(x_axis, simNl[:, 1] )
     plt.plot(x_axis[:-1],  ref[:, 1], linestyle='--', color='r')
-    plt.legend(["Y", "y_org" "Y_ref"])
+    plt.legend(["Y", r"$Y_{NL}$", r"$Y_{ref}$"])
     plt.ylabel("Position [m]")
     plt.grid()
 
@@ -103,7 +103,7 @@ def plot(x_axis, ref, simX, simNl, simU):
     plt.plot(x_axis, simX[:, 2])
     plt.plot(x_axis, simNl[:, 2])
     plt.plot(x_axis[:-1],  ref[:, 2], linestyle='--', color='r')
-    plt.legend(["Z","z_org", "Z_ref"])
+    plt.legend(["Z", r"$Z_{NL}$", r"$Z_{ref}$"])
     plt.ylabel("Position [m]")
     plt.grid()
 
@@ -111,7 +111,7 @@ def plot(x_axis, ref, simX, simNl, simU):
     plt.plot(x_axis, simX[:, 7])
     plt.plot(x_axis, simNl[:, 7] )
     plt.plot(x_axis[:-1],  ref[:, 6], linestyle='--', color='r')
-    plt.legend([r"$\dotX$",r"$\dotX_{org}$", r"$\dotX_{ref}$"])
+    plt.legend([r"$\dotX$",r"$\dotX_{NL}$", r"$\dotX_{ref}$"])
     plt.ylabel("X Velocity [m/s]")
     plt.grid()
 
@@ -119,7 +119,7 @@ def plot(x_axis, ref, simX, simNl, simU):
     plt.plot(x_axis, simX[:, 8])
     plt.plot(x_axis, simNl[:, 8])
     plt.plot(x_axis[:-1],  ref[:, 7], linestyle='--', color='r')
-    plt.legend([r"$\dotY$", r"$\dotY_{org}$", r"$\dotY_{ref}$"])
+    plt.legend([r"$\dotY$", r"$\dotY_{NL}$", r"$\dotY_{ref}$"])
     plt.ylabel("Y Velocity [m/s]")
     plt.grid()
 
@@ -127,7 +127,7 @@ def plot(x_axis, ref, simX, simNl, simU):
     plt.plot(x_axis, simX[:, 9])
     plt.plot(x_axis, simNl[:, 9])
     plt.plot(x_axis[:-1],  ref[:, 8], linestyle='--', color='r')
-    plt.legend([r"$\dotZ$", r"$\dotZ_{org}$", r"$\dotZ_{ref}$"])
+    plt.legend([r"$\dotZ$", r"$\dotZ_{NL}$", r"$\dotZ_{ref}$"])
     plt.ylabel("Z Velocity [m/s]")
     plt.grid()
 
@@ -135,7 +135,7 @@ def plot(x_axis, ref, simX, simNl, simU):
     plt.plot(x_axis, np.rad2deg(phi))
     plt.plot(x_axis, np.rad2deg(phiNl))
     plt.plot(x_axis[:-1], np.rad2deg(ref[:, 3]), linestyle='--', color='r')
-    plt.legend([r"$\phi$", r"$\phi_{org}$", r"$\phi_{ref}$"])
+    plt.legend([r"$\phi$", r"$\phi_{NL}$", r"$\phi_{ref}$"])
     plt.ylabel("Roll [deg]")    
     plt.grid()
 
@@ -143,7 +143,7 @@ def plot(x_axis, ref, simX, simNl, simU):
     plt.plot(x_axis, np.rad2deg(theta))
     plt.plot(x_axis, np.rad2deg(thetaNl))
     plt.plot(x_axis[:-1], np.rad2deg(ref[:, 4]), linestyle='--', color='r')
-    plt.legend([r"$\theta$", r"$\theta_{org}$",r"$\theta_{ref}$"])
+    plt.legend([r"$\theta$", r"$\theta_{NL}$",r"$\theta_{ref}$"])
     plt.ylabel("Pitch [deg]")
     plt.grid()
 
@@ -151,7 +151,7 @@ def plot(x_axis, ref, simX, simNl, simU):
     plt.plot(x_axis, np.rad2deg(psi))
     plt.plot(x_axis, np.rad2deg(psiNl))
     plt.plot(x_axis[:-1], np.rad2deg(ref[:, 5]), linestyle='--', color='r')
-    plt.legend([r"$\psi$", r"$\psi_{org}$",r"$\psi_{ref}$"])
+    plt.legend([r"$\psi$", r"$\psi_{NL}$",r"$\psi_{ref}$"])
     plt.ylabel("Yaw [deg]")
     plt.grid()
 
@@ -159,7 +159,7 @@ def plot(x_axis, ref, simX, simNl, simU):
     plt.plot(x_axis, simX[:, 9])
     plt.plot(x_axis, simNl[:, 9])
     plt.plot(x_axis[:-1],  ref[:, 9], linestyle='--', color='r')
-    plt.legend([r"$\dot\phi$", r"$\dot\phi_{ref}$"])
+    plt.legend([r"$\dot\phi$", r"$\dot\phi_{NL}$", r"$\dot\phi_{ref}$"])
     plt.ylabel("Angular Velocity [rad/s]")
     plt.grid()
 
@@ -167,7 +167,7 @@ def plot(x_axis, ref, simX, simNl, simU):
     plt.plot(x_axis, simX[:, 10])
     plt.plot(x_axis, simNl[:, 10])
     plt.plot(x_axis[:-1],  ref[:, 10], linestyle='--', color='r')
-    plt.legend([r"$\dot\theta$", r"$\dot\theta_{ref}$"])
+    plt.legend([r"$\dot\theta$", r"$\dot\theta_{NL}$", r"$\dot\theta_{ref}$"])
     plt.ylabel("Angular Velocity [rad/s]")
     plt.grid()
 
@@ -175,7 +175,7 @@ def plot(x_axis, ref, simX, simNl, simU):
     plt.plot(x_axis, simX[:, 11])
     plt.plot(x_axis, simNl[:, 11])
     plt.plot(x_axis[:-1],  ref[:, 11], linestyle='--', color='r')
-    plt.legend([r"$\dot\psi$", r"$\dot\psi_{ref}$"])
+    plt.legend([r"$\dot\psi$", r"$\dot\psi_{NL}$", r"$\dot\psi_{ref}$"])
     plt.ylabel("Angular Velocity [rad/s]")
     plt.grid()
 
@@ -273,6 +273,8 @@ def plot(x_axis, ref, simX, simNl, simU):
 
     # Plot the trajectory
     ax.plot3D(x, y, z, label='Linearized', lw=2, c='r')
+    ax.plot3D(simNl[:,0], simNl[:,1], simNl[:,2], label='Nonlinear model', lw=2, c='b')
+
     ax.plot3D(ref[:, 0], ref[:, 1], ref[:, 2], linestyle='--', label='Reference', lw=1, c='black')
 
 
@@ -410,7 +412,7 @@ def main():
         print("-------------------------------------------------------------")
         print(f"Nsim: {i}")
 
-        x2, u = lqr.solve(x, x_lin, u_lin)
+        x2, u = lqr.solve(x, u,  x_lin, u_lin)
         
         simNonlinear[i+1,:] = np.array(dynamics_function(x, u)).flatten()
         simX[i+1,:] = x2
@@ -424,8 +426,6 @@ def main():
         else:
             references = np.vstack([references, x_ref[i,:]])    
         x=x2
-        print(x[3:6])    
-
 
     # evaluate timings
     t *= 1000  # scale to milliseconds
