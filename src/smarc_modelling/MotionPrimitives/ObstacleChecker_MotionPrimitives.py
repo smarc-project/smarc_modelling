@@ -1,5 +1,6 @@
 import sys
 import numpy as np
+import smarc_modelling.MotionPrimitives.GlobalVariables_MotionPrimitives as glbv
 from scipy.spatial.transform import Rotation as R
 
 def IsWithinObstacle(x,y,z, map_instance):
@@ -51,7 +52,10 @@ def arrived(current, map_instance):
     if (x<arrivalx_min or x>arrivalx_max) or (y<arrivaly_min or y>arrivaly_max)  or (z<arrivalz_min or z>arrivalz_max):
         return False
     
-    print("DONE!")
+    if glbv.ARRIVED_PRIM == 0:
+        print("DONE!")
+        glbv.ARRIVED_PRIM = 1
+        
     return True
 
 def IsOutsideTheMap(x,y,z, map_instance):
@@ -69,7 +73,7 @@ def IsOutsideTheMap(x,y,z, map_instance):
     radius = 0.095
     
     # Check if we are inside the map
-    if (x > xMin +  radius and y > yMin + radius and z > zMin + radius) and (x < xMax - radius and y < yMax - radius and z < zMax - radius):   # Inside the map
+    if (x > xMin + radius and y > yMin + radius and z > zMin + radius) and (x < xMax - radius and y < yMax - radius and z < zMax - radius):   # Inside the map
         return False
     
     return True
@@ -90,12 +94,12 @@ def IsFinedInRestricted(current, map_instance):
         q0, q1, q2, q3, vx, vy, vz = current[3:10]
         currentVelocityVector = body_to_global_velocity((q0,q1,q2,q3), [vx, vy, vz])
         currentVelocityNorm = np.linalg.norm(currentVelocityVector)
-        maxFinalVelocity = 1.5
+        maxFinalVelocity = 0.5
 
         # Check if our velocity exceeds the limit
         if(currentVelocityNorm > maxFinalVelocity):
             return True
-        
+
     return False
 
 def compute_A_point_forward(state, distance=0.655):
@@ -145,6 +149,7 @@ def compute_B_point_backward(state, distance=0.655):
     return tuple(new_point)
 
 def body_to_global_velocity(quaternion, body_velocity):
+
     """
     Convert body-fixed linear velocity to global frame.
     
@@ -163,3 +168,62 @@ def body_to_global_velocity(quaternion, body_velocity):
     global_velocity = rotation.apply(body_velocity)
     
     return global_velocity
+
+def calculate_angle_goalVector(state, vector, map_instance):
+    """
+    Compute the angle (in rad) between a vector and the goal vector from the current state
+    """
+
+    # Define current and goal positions
+    x = state[0]
+    y = state[1]
+    z = state[2]
+    x_goal = map_instance["goal_pixel"][0]
+    y_goal = map_instance["goal_pixel"][1]
+    z_goal = map_instance["goal_pixel"][2]
+
+    # Define the distance between position and goal
+    dx = x_goal - x
+    dy = y_goal - y
+    dz = z_goal - z
+
+    # Define cvector
+    vector_norm = np.linalg.norm(vector)
+    if vector_norm != 0:
+        vector /= vector_norm
+
+    # Define the goal vector
+    goal_vector = np.array([dx, dy, dz])
+    goal_vector_norm = np.linalg.norm(goal_vector)
+    goal_vector /= goal_vector_norm
+
+    # Boundary case
+    if vector_norm == 0 or goal_vector_norm == 0:
+        return 0 
+
+    # Compute the angle 
+    angle_between_vectors = calculate_angle_betweenVectors(vector, goal_vector) # both normalized
+
+    # Return the value
+    return angle_between_vectors    # in rad
+
+def calculate_angle_betweenVectors(vector1, vector2):
+    """
+    Computes the angle (rad) between two vectors : [0, pi]
+    """
+
+    # Computing the norms
+    vector1_norm = np.linalg.norm(vector1)
+    vector2_norm = np.linalg.norm(vector2)
+
+    # Extreme cases
+    if vector1_norm == 0 or vector2_norm == 0:
+        return 0
+    
+    # Computing the angle
+    cos_theta = np.dot(vector1, vector2) / (vector1_norm * vector2_norm)
+    cos_theta = np.clip(cos_theta, -1.0, 1.0)
+    angle_between_vectors = np.arccos(cos_theta)    # In rad [0, pi]
+
+    # Return the value
+    return angle_between_vectors

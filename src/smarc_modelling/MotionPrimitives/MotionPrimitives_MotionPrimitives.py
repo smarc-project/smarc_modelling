@@ -17,7 +17,7 @@ class SAM_PRIMITIVES():
         self.dt = glbv.DT_PRIMITIVES
         
         # 2 # select the duration of 1 primitive 
-        self.t_span = (0, 3)
+        self.t_span = (0, 2)
 
         # 3 # do not touch!
         self.n_sim = int(self.t_span[1]/self.dt)
@@ -72,14 +72,14 @@ class SAM_PRIMITIVES():
         # 1-Using the distance from node(k-1) and node(k)
         cost = np.sqrt((x0[0] - x1[0])**2 + (x0[1] - x1[1])**2 + (x0[2] - x1[2])**2)
         
-        # 2-Using the angular acceleration 
+        # 2-Using the current acceleration 
         #v0 = np.sqrt(x0[7]**2 + x0[8]**2 + x0[9]**2)
         #v1 = np.sqrt(x1[7]**2 + x1[8]**2 + x1[9]**2)
         #cost = ((v1 + v0) * self.dt) * 0.5
 
         return cost
         
-    def curvePrimitives(self, x0, ds_inputs, indexes_u, map_instance, angle):
+    def curvePrimitives(self, x0, ds_inputs, indexes_u, map_instance, angle, breaking = False):
         '''
         It returns the sequence of steps within a single input primitive.
 
@@ -127,6 +127,16 @@ class SAM_PRIMITIVES():
                 data[:, i+1] = finalState
             cost_sum += cost
 
+            if breaking:
+                # Check velocity
+                q0,q1,q2,q3,vx,vy,vz = data[3:10, i+1]
+                current_v = body_to_global_velocity((q0,q1,q2,q3), [vx,vy,vz])
+                current_v_norm = np.linalg.norm(current_v)
+                if current_v_norm <= 0.05:
+                    angle = calculate_angle_goalVector(data[:, i+1], current_v, map_instance)
+                    ds_inputs = [50,50,0,0,0,0]
+                    indexes_u = [0,1,2,3,4,5]
+
             # Find point base, A and B
             pointA = compute_A_point_forward(data[:, i+1])
             pointB = compute_B_point_backward(data[:, i+1])
@@ -148,11 +158,9 @@ class SAM_PRIMITIVES():
         ONLY USED FOR PLOTTING THE PRIMITIVES IN THIS SCRIPT
 
         It returns the sequence of steps within a single input.
-        The output will be (a, b, c, d), where:
+        The output will be (a, b), where:
             a: sequence of point within one primitive (one single input)    --> We use them to plot the primitive (we can not only use the last point, otherwise it will be a stright line)
             b: the cost of this path, from x0 to x1 (within one single input)   --> We add it to the cost of the previous node (x0)
-            c: True if at least one point of the primitive lies in an obstacle, False otherwise
-            d: True if at least one point of the primitive lies in the goal area, False otherwise
         '''
 
         # Initialize the variables
@@ -165,6 +173,17 @@ class SAM_PRIMITIVES():
             data[:, i+1], cost = self.curvePrimitives_singleStep(data[:, i], ds_inputs, indexes_u)
 
         return data, cost   
+    
+    def changeLengthOfPrimitive(self, lengthTime):
+        """
+        Modify the length of each primitive if necessary
+        """
+
+        self.t_span = (0, lengthTime)
+        self.n_sim = int(self.t_span[1]/self.dt)
+        self.t_eval = np.linspace(self.t_span[0], self.t_span[1], self.n_sim)
+        self.sam = SAM(self.dt)
+
 
 if __name__ == "__main__":
     '''
@@ -197,8 +216,8 @@ if __name__ == "__main__":
     #2# WHAT ARE THE INPUTS THAT YOU ARE USING? ###
     rudder_inputs = np.arange(-max_input, max_input, step_input)
     stern_inputs = np.array([-7, 0, 7])
-    vbs_inputs = np.array([0])
-    lcg_inputs = np.array([0])
+    vbs_inputs = np.array([10, 50, 90])
+    lcg_inputs = np.array([0, 50, 100])
     rpm_inputs = np.arange(-1000, 1000, 200)
 
     #3# ADD THE NAME OF YOUR INPUT INSIDE np.meshgrid() ###

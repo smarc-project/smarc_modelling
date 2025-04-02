@@ -1,1 +1,0 @@
-angleBetweenVectors_global = None
