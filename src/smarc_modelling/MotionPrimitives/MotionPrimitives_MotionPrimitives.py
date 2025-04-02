@@ -17,7 +17,7 @@ class SAM_PRIMITIVES():
         self.dt = glbv.DT_PRIMITIVES
         
         # 2 # select the duration of 1 primitive 
-        self.t_span = (0, 3)
+        self.t_span = (0, 2)
 
         # 3 # do not touch!
         self.n_sim = int(self.t_span[1]/self.dt)
@@ -158,11 +158,9 @@ class SAM_PRIMITIVES():
         ONLY USED FOR PLOTTING THE PRIMITIVES IN THIS SCRIPT
 
         It returns the sequence of steps within a single input.
-        The output will be (a, b, c, d), where:
+        The output will be (a, b), where:
             a: sequence of point within one primitive (one single input)    --> We use them to plot the primitive (we can not only use the last point, otherwise it will be a stright line)
             b: the cost of this path, from x0 to x1 (within one single input)   --> We add it to the cost of the previous node (x0)
-            c: True if at least one point of the primitive lies in an obstacle, False otherwise
-            d: True if at least one point of the primitive lies in the goal area, False otherwise
         '''
 
         # Initialize the variables
@@ -175,6 +173,17 @@ class SAM_PRIMITIVES():
             data[:, i+1], cost = self.curvePrimitives_singleStep(data[:, i], ds_inputs, indexes_u)
 
         return data, cost   
+    
+    def changeLengthOfPrimitive(self, lengthTime):
+        """
+        Modify the length of each primitive if necessary
+        """
+
+        self.t_span = (0, lengthTime)
+        self.n_sim = int(self.t_span[1]/self.dt)
+        self.t_eval = np.linspace(self.t_span[0], self.t_span[1], self.n_sim)
+        self.sam = SAM(self.dt)
+
 
 if __name__ == "__main__":
     '''
