@@ -74,7 +74,6 @@ while True:
         pygame.draw.line(DISPLAY, (255,0,0), (path[index][0], path[index][1]), (path[index + 1][0], path[index + 1][1]), 2)
     
 
-    '''
     "Draw random primitives"
     for input_u in np.arange(-max_input,max_input,step_input):
         #get the states if I apply such input
@@ -87,7 +86,6 @@ while True:
                 pygame.draw.line(DISPLAY, (0,0,255), (x_val[ii-1], y_val[ii-1]), (x_val[ii], y_val[ii]), 2)
             else:
                 break
-    '''
 
     "Update Display"
     pygame.display.update()

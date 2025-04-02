@@ -4,7 +4,7 @@ import math
 import sys
 sys.path.append('~/Desktop/smarc_modelling-master')
 from smarc_modelling.vehicles.SAM import SAM
-from mpl_toolkits.mplot3d import Axes3D
+# from mpl_toolkits.mplot3d import Axes3D
 from smarc_modelling.MotionPrimitivesTest.ObstacleChecker import IsWithinObstacle
 
 '''
