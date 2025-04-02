@@ -10,6 +10,8 @@ from smarc_modelling.vehicles import *
 from smarc_modelling.lib import *
 from smarc_modelling.vehicles.SAM import SAM
 from smarc_modelling.vehicles.SAM_casadi import SAM_casadi
+from smarc_modelling.vehicles.SAM_LQR import SAM_LQR
+
 
 import matplotlib
 import matplotlib.pyplot as plt
@@ -36,7 +38,8 @@ t_eval = np.linspace(t_span[0], t_span[1], n_sim)
 sam = SAM(dt)
 sam_casadi = SAM_casadi(dt)
 sam_dynamics = sam_casadi.dynamics()
-
+samlqr = SAM_LQR()
+lqr_dynamics = samlqr.dynamics(export=True)   # The LQR model to be used.
 
 class Sol():
     """
@@ -65,10 +68,29 @@ def run_simulation(t_span, x0, sam):
         u[5] = u[4]     # RPM 2
 
         # choose between numpy model (0) or casadi model (1)
-        model = 1
+        model = 2
         if model == 0:
+            # Numpy SAM
             return sam.dynamics(x, u)
+        elif model == 1:
+            # SAM LQR
+            u = x[13:]
+            x = np.delete(x,3)
+
+            x_dot = lqr_dynamics(x[:12],u)
+
+            q1 = x_dot[3]
+            q2 = x_dot[4]
+            q3 = x_dot[5]
+            q0 = np.sqrt(1 - q1**2 - q2**2 - q3**2)
+            q = np.array([q0, q1, q2, q3]).flatten()
+            
+            x_dot = np.array(x_dot).flatten()
+            x_dot = np.hstack((x_dot[:3], q, x_dot[6:], u))
+
+            return x_dot
         else:
+            # CASADI SAM
             x_dot = sam_dynamics(x,u)
             x_dot = np.array(x_dot).flatten()
             return x_dot
@@ -86,7 +108,9 @@ def run_simulation(t_span, x0, sam):
     #   performance we see.
     start_time = time.time()
     for i in range(n_sim-1):
+        print(i)
         data[:,i+1] = data[:,i] + dynamics_wrapper(i, data[:,i]) * (t_span[1]/n_sim)
+
     sol = Sol(t_eval,data)
 
     end_time = time.time()

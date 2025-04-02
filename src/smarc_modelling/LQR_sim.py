@@ -273,7 +273,7 @@ def plot(x_axis, ref, simX, simNl, simU):
 
     # Plot the trajectory
     ax.plot3D(x, y, z, label='Linearized', lw=2, c='r')
-    ax.plot3D(simNl[:,0], simNl[:,1], simNl[:,2], label='Nonlinear model', lw=2, c='b')
+    #ax.plot3D(simNl[:,0], simNl[:,1], simNl[:,2], label='Nonlinear model', lw=2, c='b')
 
     ax.plot3D(ref[:, 0], ref[:, 1], ref[:, 2], linestyle='--', label='Reference', lw=1, c='black')
 
@@ -413,7 +413,7 @@ def main():
         print(f"Nsim: {i}")
 
         x2, u = lqr.solve(x, u,  x_lin, u_lin)
-        
+        print(f"x: {x}")
         simNonlinear[i+1,:] = np.array(dynamics_function(x, u)).flatten()
         simX[i+1,:] = x2
         simU[i+1,:] = u
@@ -426,6 +426,7 @@ def main():
         else:
             references = np.vstack([references, x_ref[i,:]])    
         x=x2
+        print(simNonlinear[i+1,:])
 
     # evaluate timings
     t *= 1000  # scale to milliseconds
@@ -433,7 +434,6 @@ def main():
 
 
     # plot results
-    print(references.shape)
     x_axis = np.linspace(0, (Ts)*Nsim, Nsim+1)
     plot(x_axis, references, simX, simNonlinear, simU)
 
