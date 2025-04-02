@@ -363,14 +363,14 @@ def main():
 
 
     # create LQR object to to access methods
-    Ts = 0.1
+    Ts = 0.2
     lqr = LQR(dynamics_function, Ts)
 
 
     # Declare reference trajectory
-    #file_path = "/home/admin/smarc_modelling/src/smarc_modelling/resolution01.csv"  # Replace with your actual file path
-    file_path = "/home/admin/smarc_modelling/src/smarc_modelling/simonTrajectory.csv"
-    #file_path = "/home/admin/smarc_modelling/src/smarc_modelling/straight_trajectory.csv"
+    #file_path = "/home/admin/smarc_modelling/src/smarc_modelling/Trajectories/resolution01.csv"  # Replace with your actual file path
+    file_path = "/home/admin/smarc_modelling/src/smarc_modelling/Trajectories/simonTrajectory.csv"
+    #file_path = "/home/admin/smarc_modelling/src/smarc_modelling/Trajectories/straight_trajectory.csv"
     trajectory = read_csv_to_array(file_path)
     x_ref = trajectory[:, 0:3]
     x_ref = np.concatenate((x_ref, trajectory[:, 4:13]), axis=1)
