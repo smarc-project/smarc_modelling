@@ -39,9 +39,19 @@ def generationFirstMap():
     # Generate obstacles (with probability)
     letters = [F]*number_F +[O]*number_O
     map1 = []
-    numberVerticalTiles = 20 #rows, y
-    numberHorizontalTiles = 10  #columns, x
-    number3DTiles = 6 #z-axis
+    # Vertical: 10m
+    # Horizontal: 5m
+    # Z: 3m
+
+    TILESIZE = 0.2 #size of each cell in the grid
+    numberVerticalTiles = int(10 // 0.2) #rows, y
+    numberHorizontalTiles = int(5 // 0.2)  #columns, x
+    number3DTiles = int(3 // 0.2) #z-axis
+    # Minimum TileSize verifier
+    if TILESIZE < 0.1875:
+        print("ERROR: select a TileSize > 0.1875")
+        exit(1)
+
 
     # Without boundaries
     for ii in range(number3DTiles):
@@ -67,21 +77,23 @@ def generationFirstMap():
         #start
     startrCell = random.randrange(numberVerticalTiles)  #random CELL
     startcCell = random.randrange(numberHorizontalTiles-2)+1 
-    startrCell = 4
-    startcCell = 2
+    startrCell = 4      # row = meters*5
+    startcCell = 5
     startzCell = 1
     map1[startzCell][startrCell][startcCell] = 2
 
-        #goal
+        #goal center cell
     goalrCell = random.randrange(numberVerticalTiles)    #random CELL
     goalcCell = random.randrange(numberHorizontalTiles)    #random CELL
-    goalrCell = 4
-    goalcCell = 9
-    goalzCell = 1
+    goalrCell = 25      
+    goalcCell = 20
+    goalzCell = 10
     map1[goalzCell][goalrCell][goalcCell] = 3
 
+        #orientation wrt goalCell --> the cell minimum
+    where = "top"
+
     """Create the map-size"""
-    TILESIZE = 0.5 #size of each cell in the grid
     mapWidth = numberHorizontalTiles * TILESIZE #in pixel metric
     mapHeight = numberVerticalTiles * TILESIZE  #in pixel metric
     map3DSize = number3DTiles * TILESIZE        #in pixel metric
@@ -89,9 +101,9 @@ def generationFirstMap():
     """Create the dictionaries"""
     ## Obstacle dictionary
     obstaclesDictionary = {(r, c, z) for z in range(number3DTiles) for r in range(numberVerticalTiles) for c in range(numberHorizontalTiles) if map1[z][r][c] == 1}
-    for key in obstaclesDictionary:
-        print("OBSTDICT")
-        print(key)
+    #for key in obstaclesDictionary:
+        #print("OBSTDICT")
+        #print(key)
         #How to check --> if (y,x,z) in obstaclesDictionary == true...
 
     ## Starting pixel (center of the starting cell)
@@ -108,6 +120,17 @@ def generationFirstMap():
     restr_y_max = min(mapHeight, arrivalPixel[1] + bound)
     restr_z_min = max(0, arrivalPixel[2] - bound)
     restr_z_max = min(map3DSize, arrivalPixel[2] + bound)
+
+    ## Goal pixel for front of SAM
+    # Case: with respect to the goal pixel for the CG. Looking from the bottom of the tank.    <---columns
+    #                                                                                             |
+    #                                                                                             |
+    #                                                                                             v rows
+    match where:
+        case "top":
+            goalAreaFront = (goalrCell - 1, goalcCell, goalzCell)
+        case _:
+            goalAreaFront = (goalrCell, goalcCell + 1, goalzCell) # right
     
     # Create the map instance to pass to other scripts
     map_instance = {
@@ -117,9 +140,11 @@ def generationFirstMap():
         "obstacleDict": obstaclesDictionary,
         "start_pos": startingPixel, #(x,y,z)
         "goal_area": (goalrCell, goalcCell, goalzCell),    #(CELLy, CELLx, CELLz)
+        "goal_area_front": goalAreaFront,  #(CELLy, CELLx, CELLz)
         "restricted_area": [(restr_x_min, restr_y_min, restr_z_min), (restr_x_max, restr_y_max, restr_z_max)],  # [(minimumCoordinates), (maximumCoordinates)], list of tuples
         "goal_pixel": (arrivalPixel[0], arrivalPixel[1], arrivalPixel[2]),   #(x,y,z)
-        "TileSize": TILESIZE
+        "TileSize": TILESIZE,
+        "where": where
     }
 
     return map_instance

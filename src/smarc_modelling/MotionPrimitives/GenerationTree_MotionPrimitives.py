@@ -5,12 +5,16 @@ import random
 from smarc_modelling.MotionPrimitives.MotionPrimitives_MotionPrimitives import SAM_PRIMITIVES
 from smarc_modelling.MotionPrimitives.ObstacleChecker_MotionPrimitives import calculate_angle_betweenVectors, calculate_angle_goalVector
 from smarc_modelling.MotionPrimitives.OptimizationTrust_MotionPrimitives import testOptimization
+from smarc_modelling.MotionPrimitives.acados_Trajectory_simulator import MPC_optimization
+from smarc_modelling.MotionPrimitives.OptimizationAcados_MotionPrimitives import optimization_acados
 import smarc_modelling.MotionPrimitives.GlobalVariables_MotionPrimitives as glbv
 from joblib import Parallel, delayed
 from threading import Lock
 from scipy.spatial.transform import Rotation as R
 import time
 import multiprocessing
+import pandas as pd
+import csv
 
 # Global variables
 lock = Lock()
@@ -141,6 +145,50 @@ def postProcessVelocity(list_vertices, map_instance, ax, plt):
 
     return final_list_vertices
 
+def load_trajectory_from_csv(filename):
+    """
+    Reads trajectory data from a CSV file and returns it as a list of states.
+
+    Args:
+        filename (str): The path to the CSV file.
+
+    Returns:
+        list: A list of states, where each state is a list or tuple of the values
+              from a row in the CSV.
+    """
+    trajectory = []
+    with open(filename, 'r') as csvfile:
+        reader = csv.reader(csvfile)
+        # Skip the header row if it exists (optional)
+        header = next(reader, None)
+        if header:
+            print(f"Header row: {header}")
+        for row in reader:
+            # Convert the string values to appropriate data types (e.g., float, int)
+            # Assuming your states are numerical, you'll likely need to convert.
+            try:
+                state = [float(value) for value in row]
+                state = np.asarray(state, dtype=np.float32)
+            except ValueError:
+                print(f"Warning: Could not convert row to numbers: {row}. Skipping.")
+                continue
+            trajectory.append(state)
+    return trajectory
+
+def testOptimization(map_instance):
+            start_opti = time.time()
+            print("<starting optimization>")
+            # Load trajectory
+            res_list = load_trajectory_from_csv('OptimizationTrajectory.csv')
+            print(res_list)
+            result_list = optimization_acados(res_list, map_instance)
+            if len(result_list) > 0:
+                res_list = result_list
+            print("[     OK     ]")
+            end_opti = time.time()
+            print(f"optimization time:...{end_opti-start_opti:.4f} seconds")
+            return res_list
+
 def reconstruct_path(current, parents_dict, resolution_dict, map_instance, ax, plt):
     """
     This function reconstructs the path from the goal to the start. 
@@ -169,8 +217,8 @@ def reconstruct_path(current, parents_dict, resolution_dict, map_instance, ax, p
                 res_list = result_list
         '''
 
+        '''
         # Optimization TRUST
-        
         if len(final_path) == 0:
             start_opti = time.time()
             print("<starting optimization>")
@@ -181,6 +229,40 @@ def reconstruct_path(current, parents_dict, resolution_dict, map_instance, ax, p
             print("[     OK     ]")
             end_opti = time.time()
             print(f"optimization time:...{end_opti-start_opti:.4f} seconds")
+        '''
+
+        
+        # Optimization Acados
+        if len(final_path) == 0:
+            start_opti = time.time()
+            print("<starting optimization>")
+            #print(res_list)
+
+            # Save trajectory
+            #df = pd.DataFrame(res_list, columns=["x", "y", "z", "q0", "q1", "q2", "q3", "u", "v", "w", "q", "p", "r", "V_bs", "l_cg", "ds", "dr", "rpm_1", "rpm_2"])
+            #df.to_csv("OptimizationTrajectory.csv", index=False)
+
+            result_list = optimization_acados(res_list, map_instance)
+            if len(result_list) > 0:
+                res_list = result_list
+            print("[     OK     ]")
+            end_opti = time.time()
+            print(f"optimization time:...{end_opti-start_opti:.4f} seconds")
+              
+
+        # Optimization MPC
+        '''
+        if len(final_path) == 0:
+            start_opti = time.time()
+            print("<starting optimization>")
+            print(res_list)
+            result_list = MPC_optimization(res_list, map_instance)
+            if len(result_list) > 0:
+                res_list = result_list
+            print("[     OK     ]")
+            end_opti = time.time()
+            print(f"optimization time:...{end_opti-start_opti:.4f} seconds")
+        '''
 
         # Append vertices to the final list (reverted order)
         for vertex in res_list[::-1]:
@@ -533,6 +615,8 @@ def a_star_search(ax, plt, map_instance, realTimeDraw, typeF_function, dec):
         if arrivedPoint:
             print("A star ended successfully!")
             glbv.ARRIVED_PRIM = 0
+            #pre_processed_trajectory = reconstruct_path(Node(finalLast), parents_dictionary, resolution_dictionary, map_instance, ax, plt)
+            #new_trajectory = MPC_optimization(pre_processed_trajectory, map_instance)
             return reconstruct_path(Node(finalLast), parents_dictionary, resolution_dictionary, map_instance, ax, plt), 1, finalCost
         
         # Print the iteration number

@@ -8,7 +8,7 @@ import numpy as np
 from smarc_modelling.vehicles import *
 from smarc_modelling.lib import *
 import smarc_modelling.MotionPrimitives.MapGeneration_MotionPrimitives as MapGen
-from smarc_modelling.MotionPrimitives.GenerationTree_MotionPrimitives import a_star_search, body_to_global_velocity
+from smarc_modelling.MotionPrimitives.GenerationTree_MotionPrimitives import a_star_search, body_to_global_velocity, testOptimization
 from smarc_modelling.MotionPrimitives.ObstacleChecker_MotionPrimitives import compute_A_point_forward, compute_B_point_backward
 from smarc_modelling.vehicles.SAM import SAM 
 import matplotlib
@@ -17,7 +17,7 @@ import time
 import pandas as pd
 import csv
 import matplotlib.animation as animation
-matplotlib.use('TkAgg')  # or 'Qt5Agg', depending on what you have installed
+matplotlib.use('TkAgg')  # or 'Qt5Agg', depending on what you have 
 
 def plot_map(map_data, typePlot):
     """
@@ -31,6 +31,8 @@ def plot_map(map_data, typePlot):
     obstacles = map_data["obstacleDict"]    #in the grid (row, column and z)
     start_pos = map_data["start_pos"]   #(x,y,z)
     goal_pixel = map_data["goal_pixel"] #(x,y,z)
+    goal_area = map_data["goal_area"]
+    goal_area_front = map_data["goal_area_front"]
     TILESIZE = map_data["TileSize"]
     (restr_x_min, restr_y_min, restr_z_min), (restr_x_max, restr_y_max, restr_z_max) = map_data["restricted_area"]
 
@@ -50,6 +52,18 @@ def plot_map(map_data, typePlot):
         color_grid[obs[0], obs[1], obs[2]] = "black"
     color_grid[int(start_pos[1] // TILESIZE), int(start_pos[0] // TILESIZE), int(start_pos[2] // TILESIZE)] = "green"
     color_grid[int(goal_pixel[1] // TILESIZE), int(goal_pixel[0] // TILESIZE), int(goal_pixel[2] // TILESIZE)] = "red"
+    #color_grid[int(goal_area_front[0]), int(goal_area_front[1]), int(goal_area_front[2])] = "red"
+    if map_data["where"] == "top":
+        color_grid[int(goal_area[0]-1), int(goal_area[1]), int(goal_area[2])] = "red"
+        color_grid[int(goal_area[0]-2), int(goal_area[1]), int(goal_area[2])] = "red"
+        color_grid[int(goal_area[0]+2), int(goal_area[1]), int(goal_area[2])] = "red"
+        color_grid[int(goal_area[0]+1), int(goal_area[1]), int(goal_area[2])] = "red"
+
+    else:
+        color_grid[int(goal_area[0]), int(goal_area[1]-1), int(goal_area[2])] = "red"
+        color_grid[int(goal_area[0]), int(goal_area[1]-2), int(goal_area[2])] = "red"
+        color_grid[int(goal_area[0]), int(goal_area[1]+1), int(goal_area[2])] = "red"
+        color_grid[int(goal_area[0]), int(goal_area[1]+2), int(goal_area[2])] = "red"
 
     plotRestrictedArea = False
     if plotRestrictedArea:
@@ -264,11 +278,11 @@ def MotionPlanningAlgorithm(realTimeDraw):
         ax = None 
         plt = None
     
-    onlyOptimization = False
+    onlyOptimization = True
     if not onlyOptimization:
         trajectory, succesfulSearch, totalCost = a_star_search(ax, plt, map_instance, realTimeDraw, typeFunction, dec)
     else:
-        trajectory = load_trajectory_from_csv('saved_trajectory.csv')
+        trajectory = testOptimization(map_instance)
     print("ok>>")
     end_time = time.time()
 

@@ -37,9 +37,9 @@ def fossen_dynamics(state, control_input):
     '''
 
     # Check if the next state is infeasible
-    if IsOutsideTheMap(next_state[0], next_state[1], next_state[2], glbv.MAP_INSTANCE):
-        print("RuntimeWarning: a state returned by the fossen_dynamics function is odd")
-        return state, True  # Signal infeasibility
+    #if IsOutsideTheMap(next_state[0], next_state[1], next_state[2], glbv.MAP_INSTANCE):
+        #print("RuntimeWarning: a state returned by the fossen_dynamics function is odd")
+        #return state, True  # Signal infeasibility
     
     return next_state, False
 
@@ -57,8 +57,8 @@ def objective_function(U_flat, x_init, N, map_instance):
     sum_velocities = 0
     for i in range(N):
         state, errorHandler = fossen_dynamics(state, U[i])
-        if errorHandler:
-            return 1e6  # Large penalty for infeasibility
+        #if errorHandler:
+        #    return 1e6  # Large penalty for infeasibility
         sum_velocities += np.linalg.norm(state[7:10])
 
     #final_velocity_magnitude = np.linalg.norm(state[7:10])
