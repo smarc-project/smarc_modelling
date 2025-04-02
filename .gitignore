@@ -7,3 +7,4 @@
 *.so
 *.pxd
 *.json
+c_generated_code/Makefile

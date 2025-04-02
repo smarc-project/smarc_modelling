@@ -59,7 +59,7 @@ import numpy as np
 import casadi as ca
 from acados_template import AcadosModel
 from smarc_modelling.lib.gnc import *
-from smarc_modelling.lib.casadi_functions import *
+from smarc_modelling.lib.gnc_casadi import *
 
 
 class SolidStructure:
