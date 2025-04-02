@@ -1,2 +1,12 @@
 **/__pycache__
 *.egg*
+src/Old_stuff/
+src/Trajectories/
+# Ignore files from acados
+*.c
+*.h
+*.o
+*.so
+*.pxd
+*.json
+c_generated_code/Makefile
