@@ -654,5 +654,3 @@ class SAM():
             u_dot[1] = self.lcg.x_lcg_dot_max * np.sign(u_dot[1])
 
         return u_dot
-
-
