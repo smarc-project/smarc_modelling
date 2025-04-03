@@ -1,4 +1,5 @@
 **/__pycache__
+*.egg*
 src/Old_stuff/
 src/Trajectories/
 # Ignore files from acados
@@ -9,3 +10,8 @@ src/Trajectories/
 *.pxd
 *.json
 c_generated_code/Makefile
+**/venv
+**/pics
+**/data
+**/.vscode
+**/c_generated_code
