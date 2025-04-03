@@ -1,2 +1,7 @@
 **/__pycache__
 **/venv
+**/pics
+**/data
+**/.vscode
+**/c_generated_code
+**/.egg-info
