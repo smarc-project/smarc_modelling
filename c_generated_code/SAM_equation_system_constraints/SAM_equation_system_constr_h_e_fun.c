@@ -75,15 +75,15 @@ casadi_real casadi_sq(casadi_real x) { return x*x;}
 
 static const casadi_int casadi_s0[23] = {19, 1, 0, 19, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18};
 static const casadi_int casadi_s1[3] = {0, 0, 0};
-static const casadi_int casadi_s2[8] = {4, 1, 0, 4, 0, 1, 2, 3};
+static const casadi_int casadi_s2[10] = {6, 1, 0, 6, 0, 1, 2, 3, 4, 5};
 
 static const casadi_real casadi_c0[3] = {1., 0., 0.};
 
-/* SAM_equation_system_constr_h_e_fun:(i0[19],i1[],i2[],i3[])->(o0[4]) */
+/* SAM_equation_system_constr_h_e_fun:(i0[19],i1[],i2[],i3[])->(o0[6]) */
 static int casadi_f0(const casadi_real** arg, casadi_real** res, casadi_int* iw, casadi_real* w, int mem) {
   casadi_int i, j, k;
   casadi_real *rr, *ss, *tt;
-  const casadi_real *cr, *cs;
+  const casadi_real *cs;
   casadi_real *w0=w+3, w1, w2, w3, *w4=w+25, *w5=w+28, w6, w7, w8, w9, w10, w11, w12, w13, w14, w15, w16, w17, *w18=w+43, *w19=w+46, *w20=w+49, *w21=w+52, *w22=w+61;
   /* #0: @0 = input[0][0] */
   casadi_copy(arg[0], 19, w0);
@@ -253,18 +253,20 @@ static int casadi_f0(const casadi_real** arg, casadi_real** res, casadi_int* iw,
   for (i=0, rr=w5; i<3; ++i) (*rr++) /= w15;
   /* #77: @5 = (@1*@5) */
   for (i=0, rr=w5, cs=w5; i<3; ++i) (*rr++)  = (w1*(*cs++));
-  /* #78: @18 = (@4+@5) */
-  for (i=0, rr=w18, cr=w4, cs=w5; i<3; ++i) (*rr++)  = ((*cr++)+(*cs++));
-  /* #79: @1 = @18[2] */
-  for (rr=(&w1), ss=w18+2; ss!=w18+3; ss+=1) *rr++ = *ss;
-  /* #80: @4 = (@4-@5) */
-  for (i=0, rr=w4, cs=w5; i<3; ++i) (*rr++) -= (*cs++);
-  /* #81: @15 = @4[2] */
-  for (rr=(&w15), ss=w4+2; ss!=w4+3; ss+=1) *rr++ = *ss;
-  /* #82: @1 = (@1-@15) */
-  w1 -= w15;
-  /* #83: output[0][3] = @1 */
+  /* #78: @4 = (@4+@5) */
+  for (i=0, rr=w4, cs=w5; i<3; ++i) (*rr++) += (*cs++);
+  /* #79: @1 = @4[0] */
+  for (rr=(&w1), ss=w4+0; ss!=w4+1; ss+=1) *rr++ = *ss;
+  /* #80: output[0][3] = @1 */
   if (res[0]) res[0][3] = w1;
+  /* #81: @1 = @4[1] */
+  for (rr=(&w1), ss=w4+1; ss!=w4+2; ss+=1) *rr++ = *ss;
+  /* #82: output[0][4] = @1 */
+  if (res[0]) res[0][4] = w1;
+  /* #83: @1 = @4[2] */
+  for (rr=(&w1), ss=w4+2; ss!=w4+3; ss+=1) *rr++ = *ss;
+  /* #84: output[0][5] = @1 */
+  if (res[0]) res[0][5] = w1;
   return 0;
 }
 

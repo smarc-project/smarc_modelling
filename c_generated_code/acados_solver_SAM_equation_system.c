@@ -454,7 +454,23 @@ void SAM_equation_system_acados_setup_nlp_in(SAM_equation_system_solver_capsule*
         cost_scaling[7] = 0.1;
         cost_scaling[8] = 0.1;
         cost_scaling[9] = 0.1;
-        cost_scaling[10] = 1;
+        cost_scaling[10] = 0.1;
+        cost_scaling[11] = 0.1;
+        cost_scaling[12] = 0.1;
+        cost_scaling[13] = 0.1;
+        cost_scaling[14] = 0.1;
+        cost_scaling[15] = 0.1;
+        cost_scaling[16] = 0.1;
+        cost_scaling[17] = 0.1;
+        cost_scaling[18] = 0.1;
+        cost_scaling[19] = 0.1;
+        cost_scaling[20] = 0.1;
+        cost_scaling[21] = 0.1;
+        cost_scaling[22] = 0.1;
+        cost_scaling[23] = 0.1;
+        cost_scaling[24] = 0.1;
+        cost_scaling[25] = 0.1;
+        cost_scaling[26] = 1;
         for (int i = 0; i <= N; i++)
         {
             ocp_nlp_cost_model_set(nlp_config, nlp_dims, nlp_in, i, "scaling", &cost_scaling[i]);
@@ -559,42 +575,28 @@ void SAM_equation_system_acados_setup_nlp_in(SAM_equation_system_solver_capsule*
     double* lbx0 = lubx0;
     double* ubx0 = lubx0 + NBX0;
     // change only the non-zero elements:
-    lbx0[0] = 4.212590217590332;
-    ubx0[0] = 4.212590217590332;
-    lbx0[1] = 3.842066526412964;
-    ubx0[1] = 3.842066526412964;
-    lbx0[2] = 2.063854455947876;
-    ubx0[2] = 2.063854455947876;
-    lbx0[3] = 0.6239803433418274;
-    ubx0[3] = 0.6239803433418274;
-    lbx0[4] = -0.027699779719114304;
-    ubx0[4] = -0.027699779719114304;
-    lbx0[5] = 0.024612609297037125;
-    ubx0[5] = 0.024612609297037125;
-    lbx0[6] = 0.7886782288551331;
-    ubx0[6] = 0.7886782288551331;
-    lbx0[7] = -0.4471014738082886;
-    ubx0[7] = -0.4471014738082886;
-    lbx0[8] = -0.1716490387916565;
-    ubx0[8] = -0.1716490387916565;
-    lbx0[9] = 0.09357929974794388;
-    ubx0[9] = 0.09357929974794388;
-    lbx0[10] = 0.023004157468676567;
-    ubx0[10] = 0.023004157468676567;
-    lbx0[11] = -0.0031422751490026712;
-    ubx0[11] = -0.0031422751490026712;
-    lbx0[12] = -0.07480990886688232;
-    ubx0[12] = -0.07480990886688232;
-    lbx0[13] = 45;
-    ubx0[13] = 45;
-    lbx0[14] = 51.5;
-    ubx0[14] = 51.5;
-    lbx0[16] = -0.01745329238474369;
-    ubx0[16] = -0.01745329238474369;
-    lbx0[17] = 800;
-    ubx0[17] = 800;
-    lbx0[18] = 800;
-    ubx0[18] = 800;
+    lbx0[0] = 1.1;
+    ubx0[0] = 1.1;
+    lbx0[1] = 0.9;
+    ubx0[1] = 0.9;
+    lbx0[2] = 0.30000000000000004;
+    ubx0[2] = 0.30000000000000004;
+    lbx0[3] = 1;
+    ubx0[3] = 1;
+    lbx0[11] = -0.004223942194460507;
+    ubx0[11] = -0.004223942194460507;
+    lbx0[13] = 51;
+    ubx0[13] = 51;
+    lbx0[14] = 50;
+    ubx0[14] = 50;
+    lbx0[15] = 0.12217304763960309;
+    ubx0[15] = 0.12217304763960309;
+    lbx0[16] = 0.03490658503988659;
+    ubx0[16] = 0.03490658503988659;
+    lbx0[17] = 200;
+    ubx0[17] = 200;
+    lbx0[18] = 200;
+    ubx0[18] = 200;
 
     ocp_nlp_constraints_model_set(nlp_config, nlp_dims, nlp_in, 0, "idxbx", idxbx0);
     ocp_nlp_constraints_model_set(nlp_config, nlp_dims, nlp_in, 0, "lbx", lbx0);
@@ -759,14 +761,18 @@ void SAM_equation_system_acados_setup_nlp_in(SAM_equation_system_solver_capsule*
     double* luh_e = calloc(2*NHN, sizeof(double));
     double* lh_e = luh_e;
     double* uh_e = luh_e + NHN;
-    lh_e[0] = 4;
-    lh_e[1] = 5;
-    lh_e[2] = 2;
-    lh_e[3] = -0.1;
-    uh_e[0] = 2.2;
-    uh_e[1] = 5.2;
-    uh_e[2] = 2.2;
-    uh_e[3] = 0.1;
+    lh_e[0] = 2.2;
+    lh_e[1] = 0.4;
+    lh_e[2] = 0.1;
+    lh_e[3] = 2.2;
+    lh_e[4] = 0.4;
+    lh_e[5] = 0.1;
+    uh_e[0] = 2.4000000000000004;
+    uh_e[1] = 1.4;
+    uh_e[2] = 0.5;
+    uh_e[3] = 2.4000000000000004;
+    uh_e[4] = 1.4;
+    uh_e[5] = 0.5;
 
     ocp_nlp_constraints_model_set_external_param_fun(nlp_config, nlp_dims, nlp_in, N, "nl_constr_h_fun_jac", &capsule->nl_constr_h_e_fun_jac);
     ocp_nlp_constraints_model_set_external_param_fun(nlp_config, nlp_dims, nlp_in, N, "nl_constr_h_fun", &capsule->nl_constr_h_e_fun);
@@ -856,7 +862,7 @@ static void SAM_equation_system_acados_create_set_opts(SAM_equation_system_solve
     ocp_nlp_solver_opts_set(nlp_config, nlp_opts, "levenberg_marquardt", &levenberg_marquardt);
 
     /* options QP solver */
-    int qp_solver_cond_N;const int qp_solver_cond_N_ori = 10;
+    int qp_solver_cond_N;const int qp_solver_cond_N_ori = 26;
     qp_solver_cond_N = N < qp_solver_cond_N_ori ? N : qp_solver_cond_N_ori; // use the minimum value here
     ocp_nlp_solver_opts_set(nlp_config, nlp_opts, "qp_cond_N", &qp_solver_cond_N);
 
@@ -929,24 +935,17 @@ void SAM_equation_system_acados_set_nlp_out(SAM_equation_system_solver_capsule* 
     double* x0 = xu0;
 
     // initialize with x0
-    x0[0] = 4.212590217590332;
-    x0[1] = 3.842066526412964;
-    x0[2] = 2.063854455947876;
-    x0[3] = 0.6239803433418274;
-    x0[4] = -0.027699779719114304;
-    x0[5] = 0.024612609297037125;
-    x0[6] = 0.7886782288551331;
-    x0[7] = -0.4471014738082886;
-    x0[8] = -0.1716490387916565;
-    x0[9] = 0.09357929974794388;
-    x0[10] = 0.023004157468676567;
-    x0[11] = -0.0031422751490026712;
-    x0[12] = -0.07480990886688232;
-    x0[13] = 45;
-    x0[14] = 51.5;
-    x0[16] = -0.01745329238474369;
-    x0[17] = 800;
-    x0[18] = 800;
+    x0[0] = 1.1;
+    x0[1] = 0.9;
+    x0[2] = 0.30000000000000004;
+    x0[3] = 1;
+    x0[11] = -0.004223942194460507;
+    x0[13] = 51;
+    x0[14] = 50;
+    x0[15] = 0.12217304763960309;
+    x0[16] = 0.03490658503988659;
+    x0[17] = 200;
+    x0[18] = 200;
 
 
     double* u0 = xu0 + NX;

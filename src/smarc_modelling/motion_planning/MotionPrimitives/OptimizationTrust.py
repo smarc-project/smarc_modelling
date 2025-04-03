@@ -1,16 +1,13 @@
+from scipy.optimize import minimize, Bounds, NonlinearConstraint
 import numpy as np
 from scipy.optimize import minimize
 from scipy.interpolate import CubicSpline
 from smarc_modelling.vehicles.SAM import SAM
-from smarc_modelling.MotionPrimitives.ObstacleChecker_MotionPrimitives import *
-import smarc_modelling.MotionPrimitives.GlobalVariables_MotionPrimitives as glbv
+from smarc_modelling.motion_planning.MotionPrimitives.ObstacleChecker import *
+import smarc_modelling.motion_planning.MotionPrimitives.GlobalVariables as glbv
 import matplotlib.pyplot as plt
 import os
 import platform
-
-"""
-Add constraints: free space, last vertex inside goal area!
-"""
 
 # Provided AUV dynamics function (Fossen's model)
 def fossen_dynamics(state, control_input):
@@ -21,19 +18,30 @@ def fossen_dynamics(state, control_input):
     #print(state)
     #print(">>> >>> >>> control input:")
     #print(control_input)
+
     next_state_dot = sam.dynamics(state, control_input)
+
+    # Forward Euler
     next_state = state + next_state_dot * dt
-    if next_state[0] > 100:
+
+    # Midpoint Method (RK2)
+    k2 = sam.dynamics(state+0.5*dt*next_state_dot, control_input)
+    next_state = state + k2*dt
+
+    '''
+    if np.abs(next_state[0]) > 100 or np.abs(next_state[1]) > 100 or np.abs(next_state[2]) > 100:
         print(">>> >>> >>> current_state:")
         print(state)
         print(">>> >>> >>> control input:")
         print(control_input)
+    '''
 
     # Check if the next state is infeasible
     #if IsOutsideTheMap(next_state[0], next_state[1], next_state[2], glbv.MAP_INSTANCE):
-    #    return None  # Signal infeasibility
+        #print("RuntimeWarning: a state returned by the fossen_dynamics function is odd")
+        #return state, True  # Signal infeasibility
     
-    return next_state
+    return next_state, False
 
 def clear_terminal():
     """Clears the terminal screen based on the operating system."""
@@ -48,14 +56,14 @@ def objective_function(U_flat, x_init, N, map_instance):
     state = x_init.copy()
     sum_velocities = 0
     for i in range(N):
-        state = fossen_dynamics(state, U[i])
-        #if state is None:
+        state, errorHandler = fossen_dynamics(state, U[i])
+        #if errorHandler:
         #    return 1e6  # Large penalty for infeasibility
         sum_velocities += np.linalg.norm(state[7:10])
 
-    final_velocity_magnitude = np.linalg.norm(state[7:10])
+    #final_velocity_magnitude = np.linalg.norm(state[7:10])
 
-    return  final_velocity_magnitude #sum_velocities #final_velocity_magnitude
+    return  sum_velocities #final_velocity_magnitude
 
 def rpm_equality_constraint(U_flat, N):
     """
@@ -82,7 +90,7 @@ def final_position_either_or_constraint(U_flat, x_init, N, map_instance):
 
     # Simulate the trajectory
     for i in range(N):
-        state = fossen_dynamics(state, U[i])
+        state, errorHandler = fossen_dynamics(state, U[i])
 
     # Compute final points A and B
     pointA = compute_A_point_forward(state)
@@ -117,7 +125,7 @@ def final_velocity_constraint(U_flat, x_init, N, map_instance):
     state = x_init.copy()
 
     for u in U:
-        state = fossen_dynamics(state, u)
+        state, errorHandler = fossen_dynamics(state, u)
         states.append(state)
     
     return 0.1 - np.linalg.norm(states[-1][7:10])
@@ -129,7 +137,7 @@ def position_constraint(U_flat, x_init, N, dim, lower_bound, upper_bound):
     violations = []
 
     for i in range(N):
-        state = fossen_dynamics(state, U[i])  # Propagate state
+        state, errorHandler = fossen_dynamics(state, U[i])  # Propagate state
         pos = state[dim]  # Extract position along the given dimension
 
         # Two constraints: ensuring lower and upper bounds
@@ -139,54 +147,72 @@ def position_constraint(U_flat, x_init, N, dim, lower_bound, upper_bound):
     return np.array(violations)  # Returning an array allows checking all steps
 
 def optimize_waypoints(x_init, U_init, N, map_instance):
-    """Optimize control inputs to ensure zero final velocity."""
+    """Optimize control inputs to ensure zero final velocity using trust-constr."""
 
     control_dim = 6  # Number of control inputs per step
-
-    # Ensure U_init is the correct shape (N, 6)
     init_guess = U_init.flatten()  # Flatten (N, 6) -> (N * 6,)
 
     # Define bounds for each control input
     control_bounds = [
-        (0, 100),        # Vbs
-        (0, 100),        # lcg
-        (-np.deg2rad(7), np.deg2rad(7)),  # ds
-        (-np.deg2rad(7), np.deg2rad(7)),  # dr
+        (10, 90),        # Vbs
+        (10, 90),        # lcg
+        (-np.deg2rad(6), np.deg2rad(6)),  # ds
+        (-np.deg2rad(6), np.deg2rad(6)),  # dr
         (-1300, 1300),   # rpm1
         (-1300, 1300)    # rpm2
     ]
 
-    # Repeat bounds for each timestep
-    bounds = [b for _ in range(N) for b in control_bounds]
+    # Convert bounds to Bounds object
+    lower_bounds, upper_bounds = zip(*control_bounds)
+    bounds = Bounds(np.tile(lower_bounds, N), np.tile(upper_bounds, N))
 
-    x_min = 0 
-    y_min = 0 
-    z_min = 0 
-    x_max = map_instance["x_max"] 
-    y_max = map_instance["y_max"] 
-    z_max = map_instance["z_max"] 
+    # Position constraints
+    x_min, y_min, z_min = 0, 0, 0
+    x_max, y_max, z_max = map_instance["x_max"], map_instance["y_max"], map_instance["z_max"]
 
-    ineq_cons_list = [
-        {'type': 'ineq', 'fun': final_velocity_constraint, 'args': (x_init, N, map_instance)},
-        {'type': 'ineq', 'fun': position_constraint, 'args': (x_init, N, 0, x_min, x_max)},  # X constraint
-        {'type': 'ineq', 'fun': position_constraint, 'args': (x_init, N, 1, y_min, y_max)},  # Y constraint
-        {'type': 'ineq', 'fun': position_constraint, 'args': (x_init, N, 2, z_min, z_max)},  # Z constraint
-        {'type': 'ineq', 'fun': final_position_either_or_constraint, 'args': (x_init, N, map_instance)}
-    ]
+    # Convert constraints to NonlinearConstraint format
+    final_velocity_constraint_nl = NonlinearConstraint(
+        lambda U: final_velocity_constraint(U, x_init, N, map_instance),
+        lb=0, ub=np.inf  # Should be >= 0
+    )
 
-    eq_cons_list = [
-        {"type": "eq", "fun": lambda U: rpm_equality_constraint(U, N)}
-    ]
-    
+    position_constraints_x = NonlinearConstraint(
+        lambda U: position_constraint(U, x_init, N, 0, x_min, x_max),
+        lb=0, ub=np.inf
+    )
+
+    position_constraints_y = NonlinearConstraint(
+        lambda U: position_constraint(U, x_init, N, 1, y_min, y_max),
+        lb=0, ub=np.inf
+    )
+
+    position_constraints_z = NonlinearConstraint(
+        lambda U: position_constraint(U, x_init, N, 2, z_min, z_max),
+        lb=0, ub=np.inf
+    )
+
+    final_position_constraint_nl = NonlinearConstraint(
+        lambda U: final_position_either_or_constraint(U, x_init, N, map_instance),
+        lb=0, ub=np.inf  # At least one point should be inside the goal area
+    )
+
+    rpm_equality_constraint_nl = NonlinearConstraint(
+        lambda U: rpm_equality_constraint(U, N),
+        lb=0, ub=0  # Equality constraint
+    )
+
+    # Optimize using trust-constr
     result = minimize(
         objective_function, init_guess, args=(x_init, N, map_instance),
-        method="SLSQP", bounds=bounds, constraints=ineq_cons_list + eq_cons_list,
-        options={"maxiter": 100, 'ftol': 1e-9, 'disp': True}
+        method="trust-constr", bounds=bounds,
+        constraints=[final_velocity_constraint_nl, position_constraints_x, position_constraints_y,
+                     position_constraints_z, final_position_constraint_nl, rpm_equality_constraint_nl],
+        options={"maxiter": 50, 'xtol': 1e-9, 'verbose': 2}
     )
 
     best_U = result.x.reshape(N, control_dim)
 
-    # Simulate the trajectory and store all states
+    # Simulate the trajectory
     states = [x_init.copy()]
     state = x_init.copy()
     for u in best_U:
@@ -208,7 +234,7 @@ def testOptimization(waypoints, map_instance, axx, pltt):
         return
 
     # Extract control inputs from waypoints (assuming waypoints contain state and control)
-    x0 = waypoints[N // 2]
+    x0 = waypoints[0]
     U_init = np.zeros((N, 6))
     for i in range(N):
         # Assuming the last 6 elements of each waypoint are the control inputs
@@ -231,10 +257,10 @@ def testOptimization(waypoints, map_instance, axx, pltt):
     plt.draw()
     #plt.show()
 
-    final_list = []
-    for i in range(N // 2):
-        final_list.append(waypoints[i])
+    #final_list = []
+    #for i in range(N // 2):
+    #    final_list.append(waypoints[i])
 
-    return final_list + optimal_states
-    #return optimal_states
+    #return final_list + optimal_states
+    return optimal_states
 

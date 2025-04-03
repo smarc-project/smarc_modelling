@@ -85,9 +85,9 @@ def generationFirstMap():
         #goal center cell
     goalrCell = random.randrange(numberVerticalTiles)    #random CELL
     goalcCell = random.randrange(numberHorizontalTiles)    #random CELL
-    goalrCell = 25      
-    goalcCell = 20
-    goalzCell = 10
+    goalrCell = 4     
+    goalcCell = 18
+    goalzCell = 1
     map1[goalzCell][goalrCell][goalcCell] = 3
 
         #orientation wrt goalCell --> the cell minimum
@@ -112,6 +112,12 @@ def generationFirstMap():
     ## Goal pixel (center of the goal cell)
     arrivalPixel = (goalcCell * TILESIZE + 0.5 * TILESIZE, goalrCell * TILESIZE + 0.5 * TILESIZE, goalzCell * TILESIZE + 0.5 * TILESIZE)    #ATTENTION! is (x,y,z), not row, column and z
 
+    ## Final orientation vector
+    direction_vector = (1,0,0)  # (x,y,z)
+    direction_vector /= np.linalg.norm(direction_vector)
+    direction_vector = 1 * direction_vector
+    originOrientationVector = arrivalPixel + direction_vector
+
     ## Restricted area (where the velocity will be constrained)
     bound = 1
     restr_x_min = max(0, arrivalPixel[0] - bound)
@@ -126,12 +132,14 @@ def generationFirstMap():
     #                                                                                             |
     #                                                                                             |
     #                                                                                             v rows
+    
     match where:
         case "top":
             goalAreaFront = (goalrCell - 1, goalcCell, goalzCell)
         case _:
             goalAreaFront = (goalrCell, goalcCell + 1, goalzCell) # right
     
+
     # Create the map instance to pass to other scripts
     map_instance = {
         "x_max": mapWidth,
@@ -142,8 +150,10 @@ def generationFirstMap():
         "goal_area": (goalrCell, goalcCell, goalzCell),    #(CELLy, CELLx, CELLz)
         "goal_area_front": goalAreaFront,  #(CELLy, CELLx, CELLz)
         "restricted_area": [(restr_x_min, restr_y_min, restr_z_min), (restr_x_max, restr_y_max, restr_z_max)],  # [(minimumCoordinates), (maximumCoordinates)], list of tuples
-        "goal_pixel": (arrivalPixel[0], arrivalPixel[1], arrivalPixel[2]),   #(x,y,z)
+        "goal_pixel": (arrivalPixel[0], arrivalPixel[1], arrivalPixel[2]),   #(x,y,z)  <---This is the one working for sure
+        #"goal_pixel": (originOrientationVector[0], originOrientationVector[1], originOrientationVector[2]),   #(x,y,z)
         "TileSize": TILESIZE,
+        "direction_vector": direction_vector,
         "where": where
     }
 

@@ -84,25 +84,25 @@ int main()
     x_current[18] = 0.0;
 
   
-    x_current[0] = 4.212590217590332;
-    x_current[1] = 3.842066526412964;
-    x_current[2] = 2.063854455947876;
-    x_current[3] = 0.6239803433418274;
-    x_current[4] = -0.027699779719114304;
-    x_current[5] = 0.024612609297037125;
-    x_current[6] = 0.7886782288551331;
-    x_current[7] = -0.4471014738082886;
-    x_current[8] = -0.1716490387916565;
-    x_current[9] = 0.09357929974794388;
-    x_current[10] = 0.023004157468676567;
-    x_current[11] = -0.0031422751490026712;
-    x_current[12] = -0.07480990886688232;
-    x_current[13] = 45;
-    x_current[14] = 51.5;
-    x_current[15] = 0;
-    x_current[16] = -0.01745329238474369;
-    x_current[17] = 800;
-    x_current[18] = 800;
+    x_current[0] = 1.1;
+    x_current[1] = 0.9;
+    x_current[2] = 0.30000000000000004;
+    x_current[3] = 1;
+    x_current[4] = 0;
+    x_current[5] = 0;
+    x_current[6] = 0;
+    x_current[7] = 0;
+    x_current[8] = 0;
+    x_current[9] = 0;
+    x_current[10] = 0;
+    x_current[11] = -0.004223942194460507;
+    x_current[12] = 0;
+    x_current[13] = 51;
+    x_current[14] = 50;
+    x_current[15] = 0.12217304763960309;
+    x_current[16] = 0.03490658503988659;
+    x_current[17] = 200;
+    x_current[18] = 200;
     
   
 

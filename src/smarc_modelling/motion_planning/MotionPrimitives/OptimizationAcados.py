@@ -2,7 +2,7 @@ import numpy as np
 from casadi import SX, vertcat, sqrt
 from acados_template import AcadosOcp, AcadosOcpSolver, AcadosModel
 from smarc_modelling.vehicles.SAM_casadi import *
-import smarc_modelling.MotionPrimitives.GlobalVariables_MotionPrimitives as glbv
+import smarc_modelling.motion_planning.MotionPrimitives.GlobalVariables as glbv
 
 from casadi import SX, MX, vertcat, sqrt, horzcat
 
@@ -154,6 +154,7 @@ def create_ocp(model, x0, N, map_instance):
             y_g_front_MAX = y_g_front_min + TILESIZE
             z_g_front_min = TILESIZE * (map_instance["goal_area_front"][2]) - 0.1
             z_g_front_MAX = z_g_front_min + TILESIZE + 0.2
+
     # Define terminal state constraints as symbolic expressions
     
     goal_constraints_cg = vertcat(

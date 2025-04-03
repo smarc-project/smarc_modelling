@@ -1,6 +1,6 @@
 import numpy as np
-from smarc_modelling.MotionPrimitives.MotionPrimitives_MotionPrimitives import SAM_PRIMITIVES
-from smarc_modelling.MotionPrimitives.ObstacleChecker_MotionPrimitives import draw_torpedo
+from smarc_modelling.motion_planning.MotionPrimitives.MotionPrimitives import SAM_PRIMITIVES
+from smarc_modelling.motion_planning.MotionPrimitives.PlotResults import draw_torpedo
 from joblib import Parallel, delayed
 from threading import Lock
 import multiprocessing
@@ -128,6 +128,7 @@ if __name__ == "__main__":
     full_input_pairs = np.hstack((input_pairs, additional_values))
 
     # Parallelise the primitive generation
+    
     results = Parallel(n_jobs=multiprocessing.cpu_count())(
         delayed(parallelise_generation)(inputs, x0, simulator) for inputs in full_input_pairs
     ) 

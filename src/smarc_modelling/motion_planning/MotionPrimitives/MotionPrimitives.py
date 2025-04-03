@@ -1,12 +1,12 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import math
-import smarc_modelling.MotionPrimitives.GlobalVariables_MotionPrimitives as glbv
+import smarc_modelling.motion_planning.MotionPrimitives.GlobalVariables as glbv
 import sys
 sys.path.append('~/Desktop/smarc_modelling-master')
 from smarc_modelling.vehicles.SAM import SAM
 from mpl_toolkits.mplot3d import Axes3D
-from smarc_modelling.MotionPrimitives.ObstacleChecker_MotionPrimitives import *
+from smarc_modelling.motion_planning.MotionPrimitives.ObstacleChecker import *
 import math
 
 

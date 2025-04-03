@@ -3,7 +3,7 @@ import numpy as np
 from smarc_modelling.vehicles import *
 from smarc_modelling.lib import *
 from smarc_modelling.vehicles.SAM import SAM
-from smarc_modelling.MotionPrimitives.PlotResults_Motionprimitives import MotionPlanningAlgorithm
+from smarc_modelling.MotionPrimitives.MainScript import MotionPlanningAlgorithm
 import matplotlib
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
