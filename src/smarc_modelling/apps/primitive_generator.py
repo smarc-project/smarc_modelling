@@ -153,4 +153,3 @@ def generate_primitives():
 
     return list_primitives
 
-generate_primitives()
