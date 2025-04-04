@@ -89,8 +89,7 @@ def draw_primitives(x0, list_of_primitives, typePlot = "rotated"):
     print("[ OK ]")
     plt.show()
 
-if __name__ == "__main__":
-
+def generate_primitives():
     print(">> Generating the primitives")
     start_time = time.time()
     simulator = SAM_PRIMITIVES()
@@ -151,3 +150,7 @@ if __name__ == "__main__":
     # Draw the primitives and SAM
     print(">> Drawing the primitives")
     draw_primitives(x0, list_primitives, "rotated")
+
+    return list_primitives
+
+generate_primitives()
