@@ -151,7 +151,6 @@ def get_state_and_control():
 
         state_list.append(simX[:, :13])
         control_list.append(simX[:, 13:])
-        print(len(state_list))
 
     return state_list, control_list
 
