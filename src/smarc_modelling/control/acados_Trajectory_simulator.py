@@ -77,9 +77,9 @@ def main():
 
     
     # load trajectory - Replace with your actual file path
-    file_path = "/home/admin/smarc_modelling/src/smarc_modelling/Trajectories/simonTrajectory.csv"
-    #file_path = "/home/admin/smarc_modelling/src/smarc_modelling/Trajectories/resolution01.csv"  
-    #file_path = "/home/admin/smarc_modelling/src/smarc_modelling/Trajectories/straight_trajectory.csv"
+    file_path = "/home/admin/smarc_modelling/src/Trajectories/simonTrajectory.csv"
+    #file_path = "/home/admin/smarc_modelling/src/Trajectories/resolution01.csv"  
+    #file_path = "/home/admin/smarc_modelling/src/Trajectories/straight_trajectory.csv"
     trajectory = read_csv_to_array(file_path)
 
     # Declare duration of sim. and the x_axis in the plots

@@ -4,7 +4,7 @@ Script to test and verify different models of SAM
 import sys
 import os
 # Add the src directory to the system path
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', 'src'))
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 
 import time
 import numpy as np
@@ -41,8 +41,8 @@ t_eval = np.linspace(t_span[0], t_span[1], n_sim)
 sam = SAM(dt)
 sam_casadi = SAM_casadi(dt)
 sam_dynamics = sam_casadi.dynamics()
-samlqr = SAM_LQR()
-lqr_dynamics = samlqr.dynamics(export=True)   # The LQR model to be used.
+samlqr = SAM_LQR(dt)
+lqr_dynamics = samlqr.dynamics(export=False)   # The LQR model to be used.
 
 class Sol():
     """
@@ -71,26 +71,25 @@ def run_simulation(t_span, x0, sam):
         u[5] = u[4]     # RPM 2
 
         # choose between numpy model (0) or casadi model (1)
-        model = 2
+        model = 1
         if model == 0:
             # Numpy SAM
             return sam.dynamics(x, u)
         elif model == 1:
             # SAM LQR
-            u = x[13:]
             x = np.delete(x,3)
 
-            x_dot = lqr_dynamics(x[:12],u)
+            #x_dot = lqr_dynamics(x[:12],u) # Export True
+            x_dot = lqr_dynamics(x,u)  # Export False
 
             q1 = x_dot[3]
             q2 = x_dot[4]
             q3 = x_dot[5]
             q0 = np.sqrt(1 - q1**2 - q2**2 - q3**2)
             q = np.array([q0, q1, q2, q3]).flatten()
-            
             x_dot = np.array(x_dot).flatten()
-            x_dot = np.hstack((x_dot[:3], q, x_dot[6:], u))
-
+            #x_dot = np.hstack((x_dot, u))
+            x_dot = np.hstack((x_dot[:3], q, x_dot[6:]))
             return x_dot
         else:
             # CASADI SAM

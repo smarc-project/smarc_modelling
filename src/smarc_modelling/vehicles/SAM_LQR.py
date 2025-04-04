@@ -57,7 +57,6 @@ Refactored: David Doerner
 
 import numpy as np
 import casadi as ca
-from acados_template import AcadosModel
 from smarc_modelling.lib.gnc import *
 from smarc_modelling.lib.gnc_casadi import *
 
@@ -324,8 +323,8 @@ class SAM_LQR():
         if self.create_model == True and export == False:
             x_sym = ca.MX.sym('x', 18,1)
             u_ref_sym = ca.MX.sym('u_ref', 6,1)
-            eta = x_sym[0:7]
-            nu = x_sym[7:12]
+            eta = x_sym[0:6]
+            nu = x_sym[6:12]
             u = x_sym[12:18]
 
             # Bound_actuators is removed -see SAM for reference
@@ -374,30 +373,6 @@ class SAM_LQR():
         #return self.x_dot_sym(x, u_ref) # returns a ca.DM
         return self.x_dot_sym  # returns a casadi MX.function
 
-    def export_dynamics_model(self):
-        # Create symbolic state and control variables
-        x_sym     = ca.MX.sym('x', 19,1)
-        u_ref_sym = ca.MX.sym('u_ref', 6,1)
-
-        # Create symbolic derivative
-        x_dot_sym = ca.MX.sym('x_dot', 19, 1)
-        
-        # Set up acados model
-        model = AcadosModel()
-        model.name = 'SAM_equation_system'
-        model.x    = x_sym
-        model.xdot = x_dot_sym
-        model.u    = u_ref_sym
-
-        # Declaration of explicit and implicit expressions
-        x_dot  = self.dynamics(export=True)    # extract casadi.MX function
-        f_expl = ca.vertcat(x_dot(x_sym[:13], x_sym[13:]), u_ref_sym)
-        f_impl = x_dot_sym - f_expl
-        model.f_expl_expr = f_expl
-        model.f_impl_expr = f_impl
-
-        return model
-
     
     def calculate_system_state(self, nu, eta, u_control):
         """
@@ -406,7 +381,6 @@ class SAM_LQR():
 
         # Extract Euler angles
         quat = eta[3:6]
-
         q1 = quat[0]
         q2 = quat[1]
         q3 = quat[2]
@@ -662,30 +636,33 @@ class SAM_LQR():
             eta_dot: [ẋ, ẏ, ż, q̇0, q̇1, q̇2, q̇3]
         """
         # Extract position and quaternion
-        q = eta[3:6]  # [q1, q2, q3] where q0 is scalar part. not included in this. Check q0 below.
-
+        q = eta[3:6]  # [q0, q1, q2, q3] where q0 is scalar part
         q1 = q[0]
         q2 = q[1]
         q3 = q[2]
         q0 = ca.sqrt(1 - q1**2 - q2**2 - q3**2)
 
-        q_c = ca.vertcat(q0, q1, q2, q3)
-        q_c = q_c/ca.norm_2(q_c)
+        q = ca.vertcat(q0, q1, q2, q3)
+        q = q/ca.norm_2(q)
+
         # Convert quaternion to DCM for position kinematics
-        C = quaternion_to_dcm_ca(q_c)
+        C = quaternion_to_dcm_ca(q)
 
         # Position dynamics: ṗ = C * v
         pos_dot = C @ nu[0:3]
 
         ## From Fossen 2021, eq. 2.78:
         om = nu[3:6]  # Angular velocity
-        
-        T_q_n_b = 0.5 * ca.vertcat(ca.horzcat(q0, -q3, q2),
+
+
+        T_q_n_b = 0.5 * ca.vertcat(ca.horzcat(-q1, -q2, -q3),
+                                   ca.horzcat(q0, -q3, q2),
                                    ca.horzcat(q3, q0, -q1),
                                    ca.horzcat(-q2, q1, q0)
                                    )
         
         q_dot = ca.mtimes(T_q_n_b, om) + self.gamma / 2 * (1 - ca.mtimes(q.T, q)) * q
+        q_dot = q_dot[1:]
         return ca.vertcat(pos_dot, q_dot)
 
     def actuator_dynamics(self, u_cur, u_ref):
