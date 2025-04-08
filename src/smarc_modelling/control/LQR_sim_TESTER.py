@@ -28,14 +28,10 @@ def plot(x_axis, ref, u_ref, simX, simNl, simU):
     theta = np.zeros(np.size(ref, 0))
     phi = np.zeros(np.size(ref, 0))
     for i in range(np.size(ref, 0)):
-        q1 = ref[i, 3]
-        q2 = ref[i, 4]
-        q3 = ref[i, 5]
-        q0 = np.sqrt(1 - q1**2 - q2**2 - q3**2)
-        q = [q0, q1, q2, q3]
+        q = ref[i, 3:7]
         psi[i], theta[i], phi[i] = gnc.quaternion_to_angles(q)
 
-    reference = np.zeros((np.size(ref, 0), 12))
+    reference = np.zeros((np.size(ref, 0), 13))
     reference[:, :3] = ref[:, :3]
     reference[:, 3] = phi
     reference[:, 4] = theta
@@ -53,20 +49,12 @@ def plot(x_axis, ref, u_ref, simX, simNl, simU):
     phiNl = np.zeros(n)
 
     for i in range(n):
-        q1 = simX[i, 3]
-        q2 = simX[i, 4]
-        q3 = simX[i, 5]
-        q0 = np.sqrt(1 - q1**2 - q2**2 - q3**2)
-        q = [q0, q1, q2, q3]
+        q = simX[i, 3:7]
         psi[i], theta[i], phi[i] = gnc.quaternion_to_angles(q)
 
-    for i in range(n):
-        q1 = simNl[i, 3]
-        q2 = simNl[i, 4]
-        q3 = simNl[i, 5]
-        q0 = np.sqrt(1 - q1**2 - q2**2 - q3**2)
-        q = [q0, q1, q2, q3]
-        psiNl[i], thetaNl[i], phiNl[i] = gnc.quaternion_to_angles(q)
+    # for i in range(n):
+    #     q = simNl[i, 3:7]/np.linalg.norm(simNl[i, 3:7])
+    #     psiNl[i], thetaNl[i], phiNl[i] = gnc.quaternion_to_angles(q)
 
 
     y_axis = np.zeros(np.shape(simX))
@@ -85,7 +73,7 @@ def plot(x_axis, ref, u_ref, simX, simNl, simU):
     plt.figure()
     plt.subplot(4,3,1)
     plt.plot(x_axis, simX[:, 0] )
-    plt.plot(x_axis, simNl[:, 0] )
+    #plt.plot(x_axis, simNl[:, 0] )
     plt.plot(x_axis[:-1],  ref[:, 0], linestyle='--', color='r')
     plt.legend(["X", r"$X_{NL}$", r"$X_{ref}$"])
     plt.ylabel("Position [m]")
@@ -93,7 +81,7 @@ def plot(x_axis, ref, u_ref, simX, simNl, simU):
 
     plt.subplot(4,3,2)
     plt.plot(x_axis, simX[:, 1] )
-    plt.plot(x_axis, simNl[:, 1] )
+    #plt.plot(x_axis, simNl[:, 1] )
     plt.plot(x_axis[:-1],  ref[:, 1], linestyle='--', color='r')
     plt.legend(["Y", r"$Y_{NL}$", r"$Y_{ref}$"])
     plt.ylabel("Position [m]")
@@ -101,7 +89,7 @@ def plot(x_axis, ref, u_ref, simX, simNl, simU):
 
     plt.subplot(4,3,3)
     plt.plot(x_axis, simX[:, 2])
-    plt.plot(x_axis, simNl[:, 2])
+    #plt.plot(x_axis, simNl[:, 2])
     plt.plot(x_axis[:-1],  ref[:, 2], linestyle='--', color='r')
     plt.legend(["Z", r"$Z_{NL}$", r"$Z_{ref}$"])
     plt.ylabel("Position [m]")
@@ -109,7 +97,7 @@ def plot(x_axis, ref, u_ref, simX, simNl, simU):
 
     plt.subplot(4,3,4)
     plt.plot(x_axis, simX[:, 7])
-    plt.plot(x_axis, simNl[:, 7] )
+    #plt.plot(x_axis, simNl[:, 7] )
     plt.plot(x_axis[:-1],  ref[:, 6], linestyle='--', color='r')
     plt.legend([r"$\dotX$",r"$\dotX_{NL}$", r"$\dotX_{ref}$"])
     plt.ylabel("X Velocity [m/s]")
@@ -117,7 +105,7 @@ def plot(x_axis, ref, u_ref, simX, simNl, simU):
 
     plt.subplot(4,3,5)
     plt.plot(x_axis, simX[:, 8])
-    plt.plot(x_axis, simNl[:, 8])
+    #plt.plot(x_axis, simNl[:, 8])
     plt.plot(x_axis[:-1],  ref[:, 7], linestyle='--', color='r')
     plt.legend([r"$\dotY$", r"$\dotY_{NL}$", r"$\dotY_{ref}$"])
     plt.ylabel("Y Velocity [m/s]")
@@ -125,7 +113,7 @@ def plot(x_axis, ref, u_ref, simX, simNl, simU):
 
     plt.subplot(4,3,6)
     plt.plot(x_axis, simX[:, 9])
-    plt.plot(x_axis, simNl[:, 9])
+    #plt.plot(x_axis, simNl[:, 9])
     plt.plot(x_axis[:-1],  ref[:, 8], linestyle='--', color='r')
     plt.legend([r"$\dotZ$", r"$\dotZ_{NL}$", r"$\dotZ_{ref}$"])
     plt.ylabel("Z Velocity [m/s]")
@@ -133,7 +121,7 @@ def plot(x_axis, ref, u_ref, simX, simNl, simU):
 
     plt.subplot(4,3,7)
     plt.plot(x_axis, np.rad2deg(phi))
-    plt.plot(x_axis, np.rad2deg(phiNl))
+    #plt.plot(x_axis, np.rad2deg(phiNl))
     plt.plot(x_axis[:-1], np.rad2deg(ref[:, 3]), linestyle='--', color='r')
     plt.legend([r"$\phi$", r"$\phi_{NL}$", r"$\phi_{ref}$"])
     plt.ylabel("Roll [deg]")    
@@ -141,7 +129,7 @@ def plot(x_axis, ref, u_ref, simX, simNl, simU):
 
     plt.subplot(4,3,8)
     plt.plot(x_axis, np.rad2deg(theta))
-    plt.plot(x_axis, np.rad2deg(thetaNl))
+    #plt.plot(x_axis, np.rad2deg(thetaNl))
     plt.plot(x_axis[:-1], np.rad2deg(ref[:, 4]), linestyle='--', color='r')
     plt.legend([r"$\theta$", r"$\theta_{NL}$",r"$\theta_{ref}$"])
     plt.ylabel("Pitch [deg]")
@@ -149,7 +137,7 @@ def plot(x_axis, ref, u_ref, simX, simNl, simU):
 
     plt.subplot(4,3,9)
     plt.plot(x_axis, np.rad2deg(psi))
-    plt.plot(x_axis, np.rad2deg(psiNl))
+    #plt.plot(x_axis, np.rad2deg(psiNl))
     plt.plot(x_axis[:-1], np.rad2deg(ref[:, 5]), linestyle='--', color='r')
     plt.legend([r"$\psi$", r"$\psi_{NL}$",r"$\psi_{ref}$"])
     plt.ylabel("Yaw [deg]")
@@ -157,7 +145,7 @@ def plot(x_axis, ref, u_ref, simX, simNl, simU):
 
     plt.subplot(4,3,10)
     plt.plot(x_axis, simX[:, 9])
-    plt.plot(x_axis, simNl[:, 9])
+    #plt.plot(x_axis, simNl[:, 9])
     plt.plot(x_axis[:-1],  ref[:, 9], linestyle='--', color='r')
     plt.legend([r"$\dot\phi$", r"$\dot\phi_{NL}$", r"$\dot\phi_{ref}$"])
     plt.ylabel("Angular Velocity [rad/s]")
@@ -165,7 +153,7 @@ def plot(x_axis, ref, u_ref, simX, simNl, simU):
 
     plt.subplot(4,3,11)
     plt.plot(x_axis, simX[:, 10])
-    plt.plot(x_axis, simNl[:, 10])
+    #plt.plot(x_axis, simNl[:, 10])
     plt.plot(x_axis[:-1],  ref[:, 10], linestyle='--', color='r')
     plt.legend([r"$\dot\theta$", r"$\dot\theta_{NL}$", r"$\dot\theta_{ref}$"])
     plt.ylabel("Angular Velocity [rad/s]")
@@ -173,7 +161,7 @@ def plot(x_axis, ref, u_ref, simX, simNl, simU):
 
     plt.subplot(4,3,12)
     plt.plot(x_axis, simX[:, 11])
-    plt.plot(x_axis, simNl[:, 11])
+    #plt.plot(x_axis, simNl[:, 11])
     plt.plot(x_axis[:-1],  ref[:, 11], linestyle='--', color='r')
     plt.legend([r"$\dot\psi$", r"$\dot\psi_{NL}$", r"$\dot\psi_{ref}$"])
     plt.ylabel("Angular Velocity [rad/s]")
@@ -363,27 +351,27 @@ def main():
     nu   = 6
     
     # create LQR object to to access methods
-    Ts = 0.1
+    Ts = 0.2
     lqr = LQR_TEST(dynamics_function, Ts)
 
     # Declare reference trajectory
     #file_path = "/home/admin/smarc_modelling/src/Trajectories/resolution01.csv"  # Replace with your actual file path
-    #file_path = "/home/admin/smarc_modelling/src/Trajectories/simonTrajectory.csv"
-    file_path = "/home/admin/smarc_modelling/src/Trajectories/straight_trajectory.csv"
+    file_path = "/home/admin/smarc_modelling/src/Trajectories/simonTrajectory.csv"
+    #file_path = "/home/admin/smarc_modelling/src/Trajectories/straight_trajectory.csv"
     trajectory = read_csv_to_array(file_path)
     Nsim = trajectory.shape[0]
 
-    simU = np.zeros((trajectory.shape[0], nu))       # Matrix to store the optimal control sequence
-    simX = np.zeros((trajectory.shape[0], nx))       # Matrix to store the simulated state
-    simNonlinear = np.zeros((trajectory.shape[0], nx))       # Matrix to store the simulated state
+    simU = np.zeros((trajectory.shape[0], nu+1))          # Matrix to store the optimal control sequence
+    simX = np.zeros((trajectory.shape[0], nx))          # Matrix to store the simulated state
+    simNonlinear = np.zeros((trajectory.shape[0], nx))  # Matrix to store the simulated state
 
-    x_ref = trajectory[:, 0:13]
-    u_ref = trajectory[:, 13:]
+    x_ref = trajectory[:, 0:nx]     # Etract state references
+    u_ref = trajectory[:, nx:]      # Etract cotrol referecnes
     
 
     # Declare the initial state
     x0 = x_ref[0,:]
-    x0[6] = 1e-6
+    x0[8] = 1e-6
     simX[0,:] = x0
     simNonlinear[0,:] = x0
     x_ref = np.delete(x_ref, 0, axis=0)     # Remove the initial state from the reference
@@ -391,6 +379,8 @@ def main():
 
 
     # Declare control initial state
+    u_ref = np.hstack((u_ref, np.zeros((u_ref.shape[0],1))))
+
     u0 = u_ref[0,:]
     u0[4:] = 10
     simU[0,:] = u0
@@ -418,18 +408,19 @@ def main():
         print(f"Nsim: {i}")
 
         x2, u = lqr.solve(x, u,  x_lin, u_lin)
-        simNonlinear[i+1,:] = np.array(dynamics_function(x, u)).flatten()
+        simNonlinear[i+1,:] = np.array(dynamics_function(x, u[:-1])).flatten()
         simX[i+1,:] = x2
         simU[i+1,:] = u
         if i < x_ref.shape[0]:
             x_lin = x_ref[i,:]
             u_lin = u_ref[i,:]
         if i == 0:
-            references = x0.reshape(1,12)
+            references = x0.reshape(1,13)
         elif i >= x_ref.shape[0]:
             references = np.vstack([references, x_ref[-1,:]]) 
         else:
-            references = np.vstack([references, x_ref[i,:]])    
+            references = np.vstack([references, x_ref[i,:]]) 
+        x2[3:7] = x2[3:7]/np.linalg.norm(x2[3:7])   
         x=x2
 
     # evaluate timings

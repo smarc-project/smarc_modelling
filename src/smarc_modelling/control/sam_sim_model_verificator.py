@@ -14,6 +14,8 @@ from smarc_modelling.lib import *
 from smarc_modelling.vehicles.SAM import SAM
 from smarc_modelling.vehicles.SAM_casadi import SAM_casadi
 from smarc_modelling.vehicles.SAM_LQR import SAM_LQR
+from LQR_TEST import *
+
 
 
 import matplotlib
@@ -26,13 +28,15 @@ matplotlib.use('TkAgg')  # or 'Qt5Agg', depending on what you have installed
 eta0 = np.zeros(7)
 eta0[3] = 1.0  # Initial quaternion (no rotation) 
 nu0 = np.zeros(6)  # Zero initial velocities
+nu0[0] = 1e-6
 u0 = np.zeros(6)
-u0[0] = 50
-u0[1] = 45
+u0[4:] = 10
+u0[0] = 0
+u0[1] = 0
 x0 = np.concatenate([eta0, nu0, u0])
 
 # Simulation timespan
-dt = 0.01 
+dt = 0.1 
 t_span = (0, 30)  # 20 seconds simulation
 n_sim = int(t_span[1]/dt)
 t_eval = np.linspace(t_span[0], t_span[1], n_sim)
@@ -43,6 +47,8 @@ sam_casadi = SAM_casadi(dt)
 sam_dynamics = sam_casadi.dynamics()
 samlqr = SAM_LQR(dt)
 lqr_dynamics = samlqr.dynamics(export=False)   # The LQR model to be used.
+
+lqr = LQR_TEST(SAM_casadi(dt).dynamics(export=True), dt)
 
 class Sol():
     """
@@ -71,7 +77,7 @@ def run_simulation(t_span, x0, sam):
         u[5] = u[4]     # RPM 2
 
         # choose between numpy model (0) or casadi model (1)
-        model = 1
+        model = 0
         if model == 0:
             # Numpy SAM
             return sam.dynamics(x, u)
@@ -103,6 +109,16 @@ def run_simulation(t_span, x0, sam):
     data = np.empty((len(x0), n_sim))
     data[:,0] = x0
 
+    u = np.zeros(6)
+    u[0] = 50#*np.sin((i/(20/0.02))*(3*np.pi/4))        # VBS
+    u[1] = 50 # LCG
+    #u[2] = np.deg2rad(7)    # Vertical (stern)
+    #u[3] = -np.deg2rad(7)   # Horizontal (rudder)
+    u[4] = 1000     # RPM 1
+    u[5] = u[4]     # RPM 2
+    lqr.create_linearized_dynamics(13, 6)    # Get the symbolic Jacobians that describe the A and B matrices
+
+
     # Euler forward integration
     # NOTE: This integrates eta, nu, u_control in the same time step.
     #   Depending on the maneuvers, we might want to integrate nu and u_control first
@@ -111,7 +127,9 @@ def run_simulation(t_span, x0, sam):
     start_time = time.time()
     for i in range(n_sim-1):
         print(i)
-        data[:,i+1] = data[:,i] + dynamics_wrapper(i, data[:,i]) * (t_span[1]/n_sim)
+        #data[:,i+1] = data[:,i] + dynamics_wrapper(i, data[:,i]) * (t_span[1]/n_sim)
+        data[:,i+1] = np.concatenate((lqr.model_test(data[:13,i], u), u))
+        print(data[3:7, i+1])
 
     sol = Sol(t_eval,data)
 

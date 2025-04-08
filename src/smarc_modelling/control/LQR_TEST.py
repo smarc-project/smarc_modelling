@@ -25,8 +25,7 @@ class LQR_TEST:
         B (ca.Function): Control Jacobian
         """
         x_sym = ca.MX.sym('x', nx, 1)
-        u_sym = ca.MX.sym('u', nu, 1)
-        
+        u_sym = ca.MX.sym('u', 6, 1)
         # Create Casadi functions to calculate jacobian
         # self.dfdx = ca.Function('dfdx', [x_sym, u_sym], [ca.jacobian(self.dynamics(x_sym, u_sym), x_sym)])
         # self.dfdu = ca.Function('dfdu', [x_sym, u_sym], [ca.jacobian(self.dynamics(x_sym, u_sym), u_sym)])
@@ -48,8 +47,17 @@ class LQR_TEST:
         Ac (ca.function): Continuous-time state matrix
         Bc (ca.Function): Continuous-time control matrix
         """
+        u_lin = u_lin[:-1] #u_lin[:-1] if LQRSITESTER
         self.Ac = self.A(x_lin, u_lin)
         self.Bc = self.B(x_lin, u_lin)
+
+        # Implementation of virtual stability solution - augment the quaternions as a 7th control input
+        aug_vector = ca.DM.zeros(13,1)
+        aug_vector[3:7] = x_lin[3:7]
+        self.Bc_control = ca.horzcat(self.Bc, aug_vector)
+
+
+
        
     def continuous_to_discrete(self, dt):
         """
@@ -78,15 +86,12 @@ class LQR_TEST:
         #B_d = scipy.integrate.quad_vec(lambda x: scipy.linalg.expm(A * x) @ B, 0, self.Ts)
         #B_d = scipy.integrate.quad(A_d @ B, dx=dt)
         Ad_inv = np.linalg.inv(self.Ad)
-        #self.Bd = np.dot(Ad_inv * (self.Ad + I), B)
-        self.Bd = np.dot(np.linalg.norm(Ad_inv) * (self.Ad + I), B)
+        self.Bd = np.dot(Ad_inv * (self.Ad + I), B)
+        self.Bd_control = np.dot(np.linalg.norm(Ad_inv) * (self.Ad + I), self.Bc_control)
+        #self.Bd = np.dot(np.linalg.norm(Ad_inv) * (self.Ad + I), B)
 
-        self.Ad = np.delete(self.Ad, 3, axis=0)
-        self.Ad = np.delete(self.Ad, 3, axis=1)
-        self.Bd = np.delete(self.Bd, 3, axis=0)
-        self.Bd = np.delete(self.Bd, 3, axis=1)
 
-        print(self.Ad, self.B)
+
     
     # Not currently used
     def continuous_to_discrete_appr(self, A, B, dt):
@@ -120,56 +125,72 @@ class LQR_TEST:
 
     def compute_lqr_gain(self):
         # State weight matrix
-        Q_diag = np.ones(12)
+        Q_diag = np.ones(13)
         Q_diag[ 0:3 ] = 1
-        Q_diag[ 3:6 ] = 1
-        Q_diag[ 6:9] = 1
-        Q_diag[9:] = 1
+        Q_diag[ 3:7 ] = 1
+        Q_diag[ 7:10] = 1
+        Q_diag[10:] = 1
         Q = np.diag(Q_diag)
 
 
         # Control rate of change weight matrix - control inputs as [x_vbs, x_lcg, delta_s, delta_r, rpm1, rpm2]
-        R_diag = np.ones(6)
+        R_diag = np.ones(7)
         R_diag[ :2] = 1e-2
         R_diag[2:4] = 1/50
         R_diag[4: ] = 1e-6
-        R = np.diag(R_diag)
+        R = np.diag(R_diag)*20
 
         
-        P = scipy.linalg.solve_discrete_are(self.Ad, self.Bd, Q, R)
-        L = np.linalg.inv(R + self.Bd.T @ P @ self.Bd) @ self.Bd.T @ P @ self.Ad
-
+        P = scipy.linalg.solve_discrete_are(self.Ad, self.Bd_control, Q, R)
+        L = np.linalg.inv(R + self.Bd_control.T @ P @ self.Bd_control) @ self.Bd_control.T @ P @ self.Ad
         return L
 
     def solve(self, x,u, x_lin, u_lin):
         # Since the linearization points are along a trajectory, the reference points is chosen to be the same
         x_ref = x_lin
         u_ref = u_lin
-        self.create_linearized_dynamics(x_lin.shape[0], u_lin.shape[0])    # Get the symbolic Jacobians that describe the A and B matrices
+        #self.create_linearized_dynamics(x_lin.shape[0], u_lin.shape[0])    # Get the symbolic Jacobians that describe the A and B matrices
         self.continuous_dynamics(x_lin, u_lin)      # Create matrix A and B in continuous time
         self.continuous_to_discrete(self.Ts)        # Discretize the continuous time matrices
 
-        self.L = self.compute_lqr_gain()            # Calculate the feedback gain
+        self.L = self.compute_lqr_gain()            # Calculate the feedback gain 13x7
 
         # Calculate control input
         # Since delta_u =-L*delta_x, delta_u = u-u_ref --> u = -L*delta_x + u_ref
-        u = -self.L @ self.x_error(x, x_ref) + u_ref
-
+        u = -self.L @ self.x_error(x, x_ref) + u_ref 
+        
+        # due to the augmented control, remove the lAst element
         #u = -self.L @ x
-        #x_next = self.Ad @ x + self.Bd @ u
-        x_next = (self.Ad @ self.x_error(x, x_ref) + self.Bd @ (u-u_ref) + x_ref +
-                 np.array(self.dynamics(x_lin, u_lin)).flatten())   #- self.Ad @ x_lin - self.Bd @ u_lin
+        #x_next = self.Ad @ x + self.Bd @ u[:-1]
+        x_next = (self.Ad @ self.x_error(x, x_ref) + self.Bd @ (u[:-1]-u_ref[:-1]) + x_ref + 0)
+        #         np.array(self.dynamics(x_lin, u_lin[:-1])).flatten() - self.Ad @ x_lin - self.Bd @ u_lin[:-1])
                   
         
         # Convert output from casadi.DM to np.array
-        print(f"x_next: {x_next[:6]}")
-        print(f"u: {u}")    
 
         x_next = np.array(x_next).flatten()
         u = np.array(u).flatten()
 
         return x_next, u
     
+
+    def model_test(self, x,u):
+        # Since the linearization points are along a trajectory, the reference points is chosen to be the same
+        x_lin = x
+        u_lin = u
+        self.continuous_dynamics(x_lin, u_lin)      # Create matrix A and B in continuous time
+        self.continuous_to_discrete(self.Ts)        # Discretize the continuous time matrices
+
+
+        x_next = self.Ad @self.x_error(x, x_lin) + self.Bd @ (u-u_lin) + np.array(self.dynamics(x_lin, u_lin)).flatten()
+        #x_next = (self.Ad @ self.x_error(x, x_ref) + self.Bd @ (u[:-1]-u_ref[:-1]) + x_ref + 0)
+        #         np.array(self.dynamics(x_lin, u_lin[:-1])).flatten() - self.Ad @ x_lin - self.Bd @ u_lin[:-1])
+                  
+        # Convert output from casadi.DM to np.array
+        x_next = np.array(x_next).flatten()
+
+        return x_next
+
     def x_error(self, x, ref):
         """
         Calculates the state error.
@@ -179,37 +200,25 @@ class LQR_TEST:
         :return: error vector
         """
         # Extract the reference quaternion
-        q_ref1 = ref[3]
-        q_ref2 = ref[4]
-        q_ref3 = ref[5]
-
-        q_ref0 = ca.sqrt(1 - q_ref1**2 - q_ref2**2 - q_ref3**2)
-
-        q_ref = ca.vertcat(q_ref0, q_ref1, q_ref2, q_ref3)
+        q_ref = ref[3:7]
 
         # Extract current quaternion
-        q1 = x[3]
-        q2 = x[4]
-        q3 = x[5]
-
-        q0 = ca.sqrt(1 - q1**2 - q2**2 - q3**2)
-        q = ca.vertcat(q0, q1, q2, q3)
+        q = x[3:7]
 
         # Since unit quaternion, quaternion inverse is equal to its conjugate
         q_conj = ca.vertcat(q[0], -q[1], -q[2], -q[3])
         q = q_conj
         # q_error = q_ref @ q^-1
-        #q_w = q_ref[0] * q[0] - q_ref[1] * q[1] - q_ref[2] * q[2] - q_ref[3] * q[3]
+        q_w = q_ref[0] * q[0] - q_ref[1] * q[1] - q_ref[2] * q[2] - q_ref[3] * q[3]
         q_x = q_ref[0] * q[1] + q_ref[1] * q[0] + q_ref[2] * q[3] - q_ref[3] * q[2]
         q_y = q_ref[0] * q[2] - q_ref[1] * q[3] + q_ref[2] * q[0] + q_ref[3] * q[1]
         q_z = q_ref[0] * q[3] + q_ref[1] * q[2] - q_ref[2] * q[1] + q_ref[3] * q[0]
 
-        q_error = ca.vertcat(q_x, q_y, q_z)
-        print(f"q_error: {q_error}")
+        q_error = ca.vertcat(q_w, q_x, q_y, q_z)
 
         pos_error = x[:3] - ref[:3] #+ np.array([(np.random.random()-0.5)/5,(np.random.random()-0.5)/5, (np.random.random()-0.5)/5])
-        vel_error = x[6:12] - ref[6:12]
-        
+        vel_error = x[7:13] - ref[7:13]
+        print(q_error)
         x_error = ca.vertcat(pos_error, q_error, vel_error)
 
 
