@@ -9,7 +9,7 @@ import os
 import csv
 
 # Add the src directory to the system path
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', 'src'))
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 import numpy as np
 import casadi as ca
 import matplotlib.pyplot as plt
@@ -21,7 +21,7 @@ from smarc_modelling.vehicles.SAM_LQR import SAM_LQR
 from smarc_modelling.vehicles.SAM_casadi import SAM_casadi
 
 
-def plot(x_axis, ref, simX, simNl, simU):
+def plot(x_axis, ref, u_ref, simX, simNl, simU):
     ref = ref[:,:13]  
 
     psi = np.zeros(np.size(ref, 0))
@@ -224,36 +224,42 @@ def plot(x_axis, ref, simX, simNl, simU):
     plt.figure()
     plt.subplot(4,3,4)
     plt.step(x_axis, simU[:, 0])
+    plt.plot(x_axis[:-1],  u_ref[:, 0], linestyle='--', color='r')
     plt.legend([r"VBS"])
     plt.ylabel("VBS") 
     plt.grid()
 
     plt.subplot(4,3,5)
     plt.step(x_axis, simU[:, 2])
+    plt.plot(x_axis[:-1],  u_ref[:, 2], linestyle='--', color='r')
     plt.legend([r"Stern angle"])
     plt.ylabel(r" Degree [$\degree$]")
     plt.grid()
 
     plt.subplot(4,3,6)
     plt.step(x_axis, simU[:, 4])
+    plt.plot(x_axis[:-1],  u_ref[:, 4], linestyle='--', color='r')
     plt.legend([r"RPM1"])
     plt.ylabel("RPM1")
     plt.grid()
 
     plt.subplot(4,3,10)
     plt.step(x_axis, simU[:, 1])
+    plt.plot(x_axis[:-1],  u_ref[:, 1], linestyle='--', color='r')
     plt.legend([r"LCG"])
     plt.ylabel("LCG") 
     plt.grid()
 
     plt.subplot(4,3,11)
     plt.step(x_axis, simU[:, 3])
+    plt.plot(x_axis[:-1],  u_ref[:, 3], linestyle='--', color='r')
     plt.legend([r"Rudder angle"])
     plt.ylabel(r" Degree [$\degree$]")
     plt.grid()
 
     plt.subplot(4,3,12)
     plt.step(x_axis, simU[:, 5])
+    plt.plot(x_axis[:-1],  u_ref[:, 5], linestyle='--', color='r')
     plt.legend([r"RPM2"])
     plt.ylabel("RPM2")
     plt.grid()
@@ -349,7 +355,6 @@ def read_csv_to_array(file_path: str):
     
     return np.array(data)
 
-
 def main():
     # Extract the CasADi model
     sam = SAM_LQR()
@@ -366,9 +371,9 @@ def main():
 
 
     # Declare reference trajectory
-    #file_path = "/home/admin/smarc_modelling/src/smarc_modelling/Trajectories/resolution01.csv"  # Replace with your actual file path
-    #file_path = "/home/admin/smarc_modelling/src/smarc_modelling/Trajectories/simonTrajectory.csv"
-    file_path = "/home/admin/smarc_modelling/src/smarc_modelling/Trajectories/straight_trajectory.csv"
+    #file_path = "/home/admin/smarc_modelling/src/Trajectories/resolution01.csv"  # Replace with your actual file path
+    #file_path = "/home/admin/smarc_modelling/src/Trajectories/simonTrajectory.csv"
+    file_path = "/home/admin/smarc_modelling/src/Trajectories/straight_trajectory.csv"
     trajectory = read_csv_to_array(file_path)
     Nsim = trajectory.shape[0]
 
@@ -431,7 +436,6 @@ def main():
         else:
             references = np.vstack([references, x_ref[i,:]])    
         x=x2
-        print(simNonlinear[i+1,:])
 
     # evaluate timings
     t *= 1000  # scale to milliseconds
@@ -440,7 +444,7 @@ def main():
 
     # plot results
     x_axis = np.linspace(0, (Ts)*Nsim, Nsim)
-    plot(x_axis, references, simX, simNonlinear, simU)
+    plot(x_axis, references, u_ref, simX, simNonlinear, simU)
 
 if __name__ == '__main__':
     main()
