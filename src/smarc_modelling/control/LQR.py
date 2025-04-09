@@ -114,8 +114,8 @@ class LQR:
     def compute_lqr_gain(self):
         # State weight matrix
         Q_diag = np.ones(12)
-        Q_diag[ 0:3 ] = 1
-        Q_diag[ 3:6 ] = 1
+        Q_diag[ 0:3 ] = 12
+        Q_diag[ 3:6 ] = 12
         Q_diag[ 6:9] = 1
         Q_diag[9:] = 1
         Q = np.diag(Q_diag)
@@ -123,8 +123,8 @@ class LQR:
 
         # Control rate of change weight matrix - control inputs as [x_vbs, x_lcg, delta_s, delta_r, rpm1, rpm2]
         R_diag = np.ones(6)
-        R_diag[ :2] = 1e-2
-        R_diag[2:4] = 1/50
+        R_diag[ :2] = 1e-4
+        R_diag[2:4] = 1/200
         R_diag[4: ] = 1e-6
         R = np.diag(R_diag)
 
@@ -152,13 +152,13 @@ class LQR:
 
         #u = -self.L @ x
         #x_next = self.Ad @ x + self.Bd @ u
-        x_next = (self.Ad @ self.x_error(x, x_ref) + self.Bd @ (u-u_ref) + x_ref +
-                 np.array(self.dynamics(x_lin, u_lin)).flatten())   #- self.Ad @ x_lin - self.Bd @ u_lin
+        x_next = (self.Ad @ self.x_error(x, x_ref) + self.Bd @ (u-u_ref) + x_ref)
+                 #np.array(self.dynamics(x_lin, u_lin)).flatten())   #- self.Ad @ x_lin - self.Bd @ u_lin
                   
         
         # Convert output from casadi.DM to np.array
-        print(f"x_next: {x_next[:6]}")
-        print(f"u: {u}")    
+        #print(f"x_next: {x_next[:6]}")
+        #print(f"u: {u}")    
 
         x_next = np.array(x_next).flatten()
         u = np.array(u).flatten()
@@ -200,7 +200,7 @@ class LQR:
         q_z = q_ref[0] * q[3] + q_ref[1] * q[2] - q_ref[2] * q[1] + q_ref[3] * q[0]
 
         q_error = ca.vertcat(q_x, q_y, q_z)
-        print(f"q_error: {q_error}")
+        #print(f"q_error: {q_error}")
 
         pos_error = x[:3] - ref[:3] #+ np.array([(np.random.random()-0.5)/5,(np.random.random()-0.5)/5, (np.random.random()-0.5)/5])
         vel_error = x[6:12] - ref[6:12]

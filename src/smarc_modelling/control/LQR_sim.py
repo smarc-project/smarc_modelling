@@ -108,24 +108,24 @@ def plot(x_axis, ref, u_ref, simX, simNl, simU):
     plt.grid()
 
     plt.subplot(4,3,4)
-    plt.plot(x_axis, simX[:, 7])
-    plt.plot(x_axis, simNl[:, 7] )
+    plt.plot(x_axis, simX[:, 6])
+    plt.plot(x_axis, simNl[:, 6] )
     plt.plot(x_axis[:-1],  ref[:, 6], linestyle='--', color='r')
     plt.legend([r"$\dotX$",r"$\dotX_{NL}$", r"$\dotX_{ref}$"])
     plt.ylabel("X Velocity [m/s]")
     plt.grid()
 
     plt.subplot(4,3,5)
-    plt.plot(x_axis, simX[:, 8])
-    plt.plot(x_axis, simNl[:, 8])
+    plt.plot(x_axis, simX[:, 7])
+    plt.plot(x_axis, simNl[:, 7])
     plt.plot(x_axis[:-1],  ref[:, 7], linestyle='--', color='r')
     plt.legend([r"$\dotY$", r"$\dotY_{NL}$", r"$\dotY_{ref}$"])
     plt.ylabel("Y Velocity [m/s]")
     plt.grid()
 
     plt.subplot(4,3,6)
-    plt.plot(x_axis, simX[:, 9])
-    plt.plot(x_axis, simNl[:, 9])
+    plt.plot(x_axis, simX[:, 8])
+    plt.plot(x_axis, simNl[:, 8])
     plt.plot(x_axis[:-1],  ref[:, 8], linestyle='--', color='r')
     plt.legend([r"$\dotZ$", r"$\dotZ_{NL}$", r"$\dotZ_{ref}$"])
     plt.ylabel("Z Velocity [m/s]")
@@ -358,12 +358,11 @@ def read_csv_to_array(file_path: str):
 def main():
     # Extract the CasADi model
     sam = SAM_LQR()
+    sam_casadi = SAM_casadi(dt=0.1)
+    casadi_dynamics = sam_casadi.dynamics(export=True)
     dynamics_function = sam.dynamics(export=True)   # The LQR model to be used.
     nx   = 12
-    nu   = 6
-                        # Simulation duration (no. of iterations) - sim. length is Ts*Nsim
-    
-
+    nu   = 6    
 
     # create LQR object to to access methods
     Ts = 0.1
@@ -371,7 +370,7 @@ def main():
 
 
     # Declare reference trajectory
-    #file_path = "/home/admin/smarc_modelling/src/Trajectories/resolution01.csv"  # Replace with your actual file path
+    file_path = "/home/admin/smarc_modelling/src/Trajectories/resolution01.csv"  # Replace with your actual file path
     #file_path = "/home/admin/smarc_modelling/src/Trajectories/simonTrajectory.csv"
     file_path = "/home/admin/smarc_modelling/src/Trajectories/straight_trajectory.csv"
     trajectory = read_csv_to_array(file_path)
@@ -423,9 +422,19 @@ def main():
         print(f"Nsim: {i}")
 
         x2, u = lqr.solve(x, u,  x_lin, u_lin)
-        simNonlinear[i+1,:] = np.array(dynamics_function(x, u)).flatten()
+
+        q1, q2, q3 = x[3:6]
+        q0 = np.sqrt(np.abs(1 - q1**2 - q2**2 - q3**2))
+        q = np.array([q0, q1, q2, q3])
+        q = q/np.linalg.norm(q) 
+
+        x = np.concatenate((x[:3], q, x[6:]))
+        xdot = np.array(casadi_dynamics(x, u)).flatten()
+        xdot = np.delete(xdot, 3, axis=0)
+        simNonlinear[i+1,:] = simNonlinear[i,:] + xdot*Ts
         simX[i+1,:] = x2
         simU[i+1,:] = u
+
         if i < x_ref.shape[0]:
             x_lin = x_ref[i,:]
             u_lin = u_ref[i,:]
@@ -434,7 +443,11 @@ def main():
         elif i >= x_ref.shape[0]:
             references = np.vstack([references, x_ref[-1,:]]) 
         else:
-            references = np.vstack([references, x_ref[i,:]])    
+            references = np.vstack([references, x_ref[i,:]])  
+
+ 
+        print(q/np.linalg.norm(q) ) 
+  
         x=x2
 
     # evaluate timings
