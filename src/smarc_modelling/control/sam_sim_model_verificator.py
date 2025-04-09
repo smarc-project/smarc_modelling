@@ -14,7 +14,7 @@ from smarc_modelling.lib import *
 from smarc_modelling.vehicles.SAM import SAM
 from smarc_modelling.vehicles.SAM_casadi import SAM_casadi
 from smarc_modelling.vehicles.SAM_LQR import SAM_LQR
-from LQR_TEST import *
+from smarc_modelling.control.LQR_VSI import *
 
 
 

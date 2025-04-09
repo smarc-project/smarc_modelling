@@ -18,7 +18,7 @@ from LQR import *
 from smarc_modelling.vehicles import *
 from smarc_modelling.lib import *
 from smarc_modelling.vehicles.SAM_casadi import SAM_casadi
-from LQR_TEST import *
+from smarc_modelling.control.LQR_VSI import *
 
 
 def plot(x_axis, ref, u_ref, simX, simNl, simU):
