@@ -162,7 +162,7 @@ class LQR_TEST:
         # due to the augmented control, remove the lAst element
         #u = -self.L @ x
         #x_next = self.Ad @ x + self.Bd @ u[:-1]
-        x_next = (self.Ad @ self.x_error(x, x_ref) + self.Bd @ (u[:-1]-u_ref[:-1]) + x_ref + 0)
+        x_next = (self.Ad @ self.x_error(x, x_ref) + self.Bd @ (u[:-1]-u_ref[:-1]) + x_ref)
         #         np.array(self.dynamics(x_lin, u_lin[:-1])).flatten() - self.Ad @ x_lin - self.Bd @ u_lin[:-1])
                   
         

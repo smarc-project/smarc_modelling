@@ -9,7 +9,8 @@ class LQR_CT:
         self.P = 0
         self.Ts = Ts
         self.dynamics = dynamics
-        self.x_lin_prev = np.zeros((12,))
+        self.Uprev = np.zeros((13,13))
+
 
 
     def create_linearized_dynamics(self, nx: int, nu: int):
@@ -47,17 +48,9 @@ class LQR_CT:
         Ac (ca.function): Continuous-time state matrix
         Bc (ca.Function): Continuous-time control matrix
         """
-        u_lin = u_lin[:-1] #u_lin[:-1] if LQRSITESTER
+        u_lin = u_lin[:-1] #u_lin[:-1]
         self.Ac = self.A(x_lin, u_lin)
         self.Bc = self.B(x_lin, u_lin)
-
-        # Implementation of virtual stability solution - augment the quaternions as a 7th control input
-        aug_vector = ca.DM.zeros(13,1)
-        aug_vector[3:7] = x_lin[3:7]
-        self.Bc_control = ca.horzcat(self.Bc, aug_vector)
-
-
-
        
     def continuous_to_discrete(self, dt):
         """
@@ -73,8 +66,8 @@ class LQR_CT:
         B_d (ca.MX): Discrete-time input matrix
         """
         # Convert to numpy matrices (Problem with casadi plugin)
-        A = np.array(self.Ac)
-        B = np.array(self.Bc)
+        A = np.array(self.At)
+        B = np.array(self.Bt)
 
         #print(scipy.linalg.det(A))
         # Discretize the A matrix (A_d = exp(A * dt))
@@ -87,41 +80,33 @@ class LQR_CT:
         #B_d = scipy.integrate.quad(A_d @ B, dx=dt)
         Ad_inv = np.linalg.inv(self.Ad)
         self.Bd = np.dot(Ad_inv * (self.Ad + I), B)
-        self.Bd_control = np.dot(np.linalg.norm(Ad_inv) * (self.Ad + I), self.Bc_control)
         #self.Bd = np.dot(np.linalg.norm(Ad_inv) * (self.Ad + I), B)
 
 
 
-    
-    # Not currently used
-    def continuous_to_discrete_appr(self, A, B, dt):
-        """
-        Approximate continuous-time system matrices (A, B) to discrete-time (A_d, B_d).
-        
-        Parameters:
-        A (ca.MX): Continuous-time state matrix
-        B (ca.MX): Continuous-time input matrix
-        dt (float): Sampling time
-        
-        Returns:
-        A_d (ca.MX): Discrete-time state matrix
-        B_d (ca.MX): Discrete-time input matrix
-        """
-        # Convert to numpy matrices (Problem with casadi plugin)
-        A = np.array(A)
-        B = np.array(B)
+    def compute_transform(self, x):
+        n = np.size(x)
+        q0, q1, q2, q3 = x[3:7]
+        q_v = np.array([q1, q2, q3]).reshape((3, 1))  # Quaternion vector
 
-        #print(scipy.linalg.det(A))
-        # Discretize the A matrix (A_d = exp(A * dt))
-        A_d = scipy.linalg.expm(A * dt)
+        # Create the skew-symmetric matrix for q_v
+        q_cross = np.array([[0, -q3, q2],
+                            [q3,  0, -q1],
+                            [-q2, q1,  0]])
 
-        # Trapezoidal rule for B_d: B_d = dt * (exp(A*dt) + I) / 2 * B
-        I = np.eye(A.shape[0])  # Identity matrix of the same size as A
+        # Construct Uq
+        Uq = np.block([[q0, q_v.T],
+                       [q_v, q0 * np.eye(3) - q_cross]
+                        ])
 
-        # Discretize B approximization
-        B_d = dt*B
+        # Construct the transformation matrix
+        self.U = np.block([[Uq, np.zeros((4, n-4))],
+                                [np.zeros((n-4,4)), np.eye(n-4)]])
 
-        return A_d, B_d
+    def transform(self):
+        #self.At = (self.U-self.Uprev)/self.Ts @ np.linalg.inv(self.U) + self.U @ self.Ac @ np.linalg.inv(self.U)
+        self.At = self.U @ self.Ac @ self.U.T
+        self.Bt = self.U @ self.Bc
 
     def compute_lqr_gain(self):
         # State weight matrix
@@ -134,26 +119,32 @@ class LQR_CT:
 
 
         # Control rate of change weight matrix - control inputs as [x_vbs, x_lcg, delta_s, delta_r, rpm1, rpm2]
-        R_diag = np.ones(7)
+        R_diag = np.ones(6)
         R_diag[ :2] = 1e-2
         R_diag[2:4] = 1/50
         R_diag[4: ] = 1e-6
-        R = np.diag(R_diag)*20
+        R = np.diag(R_diag)
 
         
-        P = scipy.linalg.solve_discrete_are(self.Ad, self.Bd_control, Q, R)
-        L = np.linalg.inv(R + self.Bd_control.T @ P @ self.Bd_control) @ self.Bd_control.T @ P @ self.Ad
+        P = scipy.linalg.solve_discrete_are(self.Ad, self.Bd, Q, R)
+        L = np.linalg.inv(R + self.Bd.T @ P @ self.Bd) @ self.Bd.T @ P @ self.Ad
         return L
-
+    
     def solve(self, x,u, x_lin, u_lin):
         # Since the linearization points are along a trajectory, the reference points is chosen to be the same
         x_ref = x_lin
         u_ref = u_lin
         #self.create_linearized_dynamics(x_lin.shape[0], u_lin.shape[0])    # Get the symbolic Jacobians that describe the A and B matrices
         self.continuous_dynamics(x_lin, u_lin)      # Create matrix A and B in continuous time
+
+        self.compute_transform(x)
+        self.transform()
+
         self.continuous_to_discrete(self.Ts)        # Discretize the continuous time matrices
 
-        self.L = self.compute_lqr_gain()            # Calculate the feedback gain 13x7
+        for i in range(self.Ac.shape[0]):
+            print(self.Ad[i,:])
+        self.L = self.compute_lqr_gain()         # Calculate the feedback gain 13x7
 
         # Calculate control input
         # Since delta_u =-L*delta_x, delta_u = u-u_ref --> u = -L*delta_x + u_ref
@@ -167,7 +158,7 @@ class LQR_CT:
                   
         
         # Convert output from casadi.DM to np.array
-
+        self.Uprev = self.U
         x_next = np.array(x_next).flatten()
         u = np.array(u).flatten()
 
