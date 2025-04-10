@@ -391,7 +391,6 @@ def main():
 
     # Declare the initial state
     x0 = x_ref[0,:]
-    x0[6] = 1e-6    # Numerical problems with Jacobian if 0
     simX[0,:] = x0
     simNonlinear[0,:] = x0
 
@@ -399,9 +398,6 @@ def main():
     u0 = u_ref[0,:]
     u0[4:] = 1e-3
     simU[0,:] = u0
-
-    # Array to store the time values - NOT USED ATM
-    t = np.zeros((Nsim))
 
     # closed loop - simulation
     x = x0
@@ -414,6 +410,8 @@ def main():
     # Init the jacobians for the linear dynamics, input is shape of vectors
     lqr.create_linearized_dynamics(x_ref.shape[1], u_ref.shape[1])
 
+    # Array to store the time values - NOT USED ATM
+    t = np.zeros((Nsim))
 
     # SIMULATION LOOP
     print(f"----------------------- SIMULATION STARTS---------------------------------")
