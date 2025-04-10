@@ -89,9 +89,9 @@ class LQR:
 
         # Control rate of change weight matrix - control inputs as [x_vbs, x_lcg, delta_s, delta_r, rpm1, rpm2]
         R_diag = np.ones(6)
-        R_diag[ :2] = 1e-4
+        R_diag[ :2] = 1e-2
         R_diag[2:4] = 1/200
-        R_diag[4: ] = 1e-6
+        R_diag[4: ] = 1e-5
         R = np.diag(R_diag)
 
         
@@ -107,7 +107,7 @@ class LQR:
         self.create_linearized_dynamics(x_lin.shape[0], u_lin.shape[0])    # Get the symbolic Jacobians that describe the A and B matrices
         self.continuous_dynamics(x_lin, u_lin)      # Create matrix A and B in continuous time
         self.continuous_to_discrete(self.Ts)        # Discretize the continuous time matrices
-        if i % 1 == 0:
+        if i % 3 == 0:
             print("update L")
             self.x_lin_prev = x_lin
             self.L = self.compute_lqr_gain()            # Calculate the feedback gain

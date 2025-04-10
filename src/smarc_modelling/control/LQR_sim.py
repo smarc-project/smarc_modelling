@@ -279,7 +279,7 @@ def plot(x_axis, ref, u_ref, simX, simNl, simU):
 
     # Plot the trajectory
     ax.plot3D(x, y, z, label='Linearized', lw=2, c='r')
-    #ax.plot3D(simNl[:,0], simNl[:,1], simNl[:,2], label='Nonlinear model', lw=2, c='b')
+    ax.plot3D(simNl[:,0], simNl[:,1], simNl[:,2], label='Nonlinear model', lw=2, c='b')
 
     ax.plot3D(ref[:, 0], ref[:, 1], ref[:, 2], linestyle='--', label='Reference', lw=1, c='black')
 
@@ -370,7 +370,7 @@ def main():
 
 
     # Declare reference trajectory
-    file_path = "/home/admin/smarc_modelling/src/Trajectories/resolution01.csv"  # Replace with your actual file path
+    #file_path = "/home/admin/smarc_modelling/src/Trajectories/resolution01.csv"  # Replace with your actual file path
     file_path = "/home/admin/smarc_modelling/src/Trajectories/simonTrajectory.csv"
     #file_path = "/home/admin/smarc_modelling/src/Trajectories/straight_trajectory.csv"
     trajectory = read_csv_to_array(file_path)
@@ -426,12 +426,17 @@ def main():
         q1, q2, q3 = x[3:6]
         q0 = np.sqrt(1 - q1**2 - q2**2 - q3**2)
         q = np.array([q0, q1, q2, q3])
-        q = q/np.linalg.norm(q) 
+        #q = q/np.linalg.norm(q) 
 
         x = np.concatenate((x[:3], q, x[6:]))
         xdot = np.array(casadi_dynamics(x, u)).flatten()
-        xdot = np.delete(xdot, 3, axis=0)
-        simNonlinear[i+1,:] = simNonlinear[i,:] + xdot*0.1
+        x_next = x + xdot*Ts
+
+        print(f"Before norm: {x_next[3:7]}")
+        x_next[3:7] = x_next[3:7]/np.linalg.norm(x_next[3:7])  # Normalize quaternion
+        print(f"After  norm: {x_next[3:7]}")
+        x_next = np.delete(x_next, 3, axis=0)
+        simNonlinear[i+1,:] = x_next
         simX[i+1,:] = x_LQR
         simU[i+1,:] = u
 
@@ -453,6 +458,8 @@ def main():
 
 
     # plot results
+    np.set_printoptions(precision=3, suppress=True)
+    print(simU)
     x_axis = np.linspace(0, (Ts)*Nsim, Nsim)
     plot(x_axis, references, u_ref, simX[:-1], simNonlinear[:-1], simU[:-1])
 
