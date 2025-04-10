@@ -6,11 +6,9 @@ import casadi as ca
 # Add the LQR below
 class LQR:
     def __init__(self, dynamics, Ts):
-        self.P = 0
         self.Ts = Ts
         self.dynamics = dynamics
         self.x_lin_prev = np.zeros((12,))
-
 
     def create_linearized_dynamics(self, nx: int, nu: int):
         """
@@ -50,7 +48,6 @@ class LQR:
         """
         self.Ac = self.A(x_lin, u_lin)
         self.Bc = self.B(x_lin, u_lin)
-        self.Const = np.array(self.dynamics(x_lin, u_lin)).flatten() - self.Ac @ x_lin - self.Bc @ u_lin
        
     def continuous_to_discrete(self, dt):
         """
@@ -79,10 +76,8 @@ class LQR:
         #B_d = scipy.integrate.quad_vec(lambda x: scipy.linalg.expm(A * x) @ B, 0, self.Ts)
         #B_d = scipy.integrate.quad(A_d @ B, dx=dt)
         Ad_inv = np.linalg.inv(self.Ad)
-        #self.Bd = np.dot(Ad_inv * (self.Ad + I), B)
-        self.Bd = np.dot(np.linalg.norm(Ad_inv) * (self.Ad + I), B)
-
-        self.Const_d = np.dot(Ad_inv * (self.Ad + I), self.Const)
+        self.Bd = np.dot(Ad_inv * (self.Ad + I), B)
+        #self.Bd = np.dot(np.linalg.norm(Ad_inv) * (self.Ad + I), B)
 
     def compute_lqr_gain(self):
         # State weight matrix

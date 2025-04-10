@@ -358,7 +358,7 @@ def read_csv_to_array(file_path: str):
 def main():
     # Extract the CasADi model
     sam = SAM_LQR()
-    sam_casadi = SAM_casadi(dt=0.1)
+    sam_casadi = SAM_casadi()
     casadi_dynamics = sam_casadi.dynamics(export=True)
     dynamics_function = sam.dynamics(export=True)   # The LQR model to be used.
     nx   = 12
@@ -394,15 +394,11 @@ def main():
     x0[6] = 1e-6    # Numerical problems with Jacobian if 0
     simX[0,:] = x0
     simNonlinear[0,:] = x0
-    x_ref = np.delete(x_ref, 0, axis=0)      # Remove the initial state from the reference
-
 
     # Declare control initial state
     u0 = u_ref[0,:]
     u0[4:] = 1e-3
     simU[0,:] = u0
-    #u_ref = np.delete(u_ref, 0, axis=0)
-
 
     # Array to store the time values - NOT USED ATM
     t = np.zeros((Nsim))
@@ -412,8 +408,8 @@ def main():
     u = u0
 
     # Initial linearization points
-    x_lin = x0
-    u_lin = u0
+    x_lin = x_ref[1,:]
+    u_lin = u_ref[1,:]
 
     # Init the jacobians for the linear dynamics, input is shape of vectors
     lqr.create_linearized_dynamics(x_ref.shape[1], u_ref.shape[1])
@@ -425,10 +421,10 @@ def main():
         print("-------------------------------------------------------------")
         print(f"Nsim: {i}")
 
-        x_LQR, u = lqr.solve(x, u,  x_lin, u_lin)
-
+        x_LQR, u = lqr.solve(x, u, x_lin, u_lin)
+        
         q1, q2, q3 = x[3:6]
-        q0 = np.sqrt(np.abs(1 - q1**2 - q2**2 - q3**2))
+        q0 = np.sqrt(1 - q1**2 - q2**2 - q3**2)
         q = np.array([q0, q1, q2, q3])
         q = q/np.linalg.norm(q) 
 
@@ -439,9 +435,9 @@ def main():
         simX[i+1,:] = x_LQR
         simU[i+1,:] = u
 
-        if i < x_ref.shape[0]:
-            x_lin = x_ref[i,:]
-            u_lin = u_ref[i,:]
+        if i < x_ref.shape[0]-2:
+            x_lin = x_ref[i+2,:]
+            u_lin = u_ref[i+2,:]
         if i == 0:
             references = x0.reshape(1,12)
         elif i >= x_ref.shape[0]:
@@ -450,7 +446,7 @@ def main():
             references = np.vstack([references, x_ref[i,:]])  
 
         x=simNonlinear[i+1,:]
-
+        print(x[3:6])
     # evaluate timings
     t *= 1000  # scale to milliseconds
     print(f'Computation time in ms:\n min: {np.min(t):.3f}\nmax: {np.max(t):.3f}\navg: {np.average(t):.3f}\nstdev: {np.std(t)}\nmedian: {np.median(t):.3f}')
