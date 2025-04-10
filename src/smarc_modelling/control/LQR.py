@@ -114,8 +114,8 @@ class LQR:
     def compute_lqr_gain(self):
         # State weight matrix
         Q_diag = np.ones(12)
-        Q_diag[ 0:3 ] = 12
-        Q_diag[ 3:6 ] = 12
+        Q_diag[ 0:3 ] = 1
+        Q_diag[ 3:6 ] = 1
         Q_diag[ 6:9] = 1
         Q_diag[9:] = 1
         Q = np.diag(Q_diag)
@@ -155,11 +155,11 @@ class LQR:
         x_next = (self.Ad @ self.x_error(x, x_ref) + self.Bd @ (u-u_ref) + x_ref)
                  #np.array(self.dynamics(x_lin, u_lin)).flatten())   #- self.Ad @ x_lin - self.Bd @ u_lin
                   
+        # x_next = (np.array(self.dynamics(x_lin, u_lin)).flatten() + 
+        #           self.Ad @ self.x_error(x, x_ref) + self.Bd @ (u-u_ref) +
+        #           self.Ad @ self.x_error(x_lin, x_ref) + self.Bd @ (u_lin-u_ref) + x_ref)
         
-        # Convert output from casadi.DM to np.array
-        #print(f"x_next: {x_next[:6]}")
-        #print(f"u: {u}")    
-
+        # Convert output from casadi.DM to np.array 
         x_next = np.array(x_next).flatten()
         u = np.array(u).flatten()
 

@@ -376,10 +376,11 @@ def main():
     trajectory = read_csv_to_array(file_path)
     Nsim = trajectory.shape[0]
 
-    simU = np.zeros((trajectory.shape[0], nu))       # Matrix to store the optimal control sequence
-    simX = np.zeros((trajectory.shape[0], nx))       # Matrix to store the simulated state
-    simNonlinear = np.zeros((trajectory.shape[0], nx))       # Matrix to store the simulated state
+    simU = np.zeros((trajectory.shape[0], nu))            # Matrix to store the optimal control sequence
+    simX = np.zeros((trajectory.shape[0], nx))            # Matrix to store the simulated state
+    simNonlinear = np.zeros((trajectory.shape[0], nx))    # Matrix to store the simulated state
 
+    # Remove the scalar quaternion
     x_ref = trajectory[:, 0:3]
     x_ref = np.concatenate((x_ref, trajectory[:, 4:13]), axis=1)
     u_ref = trajectory[:, 13:]
