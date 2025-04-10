@@ -52,13 +52,13 @@ def plot(x_axis, ref, u_ref, simX, simNl, simU):
     thetaNl = np.zeros(n)
     phiNl = np.zeros(n)
 
-    for i in range(n):
-        q1 = simX[i, 3]
-        q2 = simX[i, 4]
-        q3 = simX[i, 5]
-        q0 = np.sqrt(1 - q1**2 - q2**2 - q3**2)
-        q = [q0, q1, q2, q3]
-        psi[i], theta[i], phi[i] = gnc.quaternion_to_angles(q)
+    # for i in range(n):
+    #     q1 = simX[i, 3]
+    #     q2 = simX[i, 4]
+    #     q3 = simX[i, 5]
+    #     q0 = np.sqrt(1 - q1**2 - q2**2 - q3**2)
+    #     q = [q0, q1, q2, q3]
+    #     psi[i], theta[i], phi[i] = gnc.quaternion_to_angles(q)
 
     for i in range(n):
         q1 = simNl[i, 3]
