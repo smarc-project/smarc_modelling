@@ -50,6 +50,7 @@ class LQR:
         """
         self.Ac = self.A(x_lin, u_lin)
         self.Bc = self.B(x_lin, u_lin)
+        self.Const = np.array(self.dynamics(x_lin, u_lin)).flatten() - self.Ac @ x_lin - self.Bc @ u_lin
        
     def continuous_to_discrete(self, dt):
         """
@@ -80,42 +81,14 @@ class LQR:
         Ad_inv = np.linalg.inv(self.Ad)
         #self.Bd = np.dot(Ad_inv * (self.Ad + I), B)
         self.Bd = np.dot(np.linalg.norm(Ad_inv) * (self.Ad + I), B)
-    
-    # Not currently used
-    def continuous_to_discrete_appr(self, A, B, dt):
-        """
-        Approximate continuous-time system matrices (A, B) to discrete-time (A_d, B_d).
-        
-        Parameters:
-        A (ca.MX): Continuous-time state matrix
-        B (ca.MX): Continuous-time input matrix
-        dt (float): Sampling time
-        
-        Returns:
-        A_d (ca.MX): Discrete-time state matrix
-        B_d (ca.MX): Discrete-time input matrix
-        """
-        # Convert to numpy matrices (Problem with casadi plugin)
-        A = np.array(A)
-        B = np.array(B)
 
-        #print(scipy.linalg.det(A))
-        # Discretize the A matrix (A_d = exp(A * dt))
-        A_d = scipy.linalg.expm(A * dt)
-
-        # Trapezoidal rule for B_d: B_d = dt * (exp(A*dt) + I) / 2 * B
-        I = np.eye(A.shape[0])  # Identity matrix of the same size as A
-
-        # Discretize B approximization
-        B_d = dt*B
-
-        return A_d, B_d
+        self.Const_d = np.dot(Ad_inv * (self.Ad + I), self.Const)
 
     def compute_lqr_gain(self):
         # State weight matrix
         Q_diag = np.ones(12)
-        Q_diag[ 0:3 ] = 1
-        Q_diag[ 3:6 ] = 1
+        Q_diag[ 0:3 ] = 10
+        Q_diag[ 3:6 ] = 10
         Q_diag[ 6:9] = 1
         Q_diag[9:] = 1
         Q = np.diag(Q_diag)
@@ -148,17 +121,12 @@ class LQR:
 
         # Calculate control input
         # Since delta_u =-L*delta_x, delta_u = u-u_ref --> u = -L*delta_x + u_ref
-        u = -self.L @ self.x_error(x, x_ref) + u_ref
+        u = -self.L @ (self.x_error(x, x_ref)) + u_ref
 
         #u = -self.L @ x
         #x_next = self.Ad @ x + self.Bd @ u
-        x_next = (self.Ad @ self.x_error(x, x_ref) + self.Bd @ (u-u_ref) + x_ref)
-                 #np.array(self.dynamics(x_lin, u_lin)).flatten())   #- self.Ad @ x_lin - self.Bd @ u_lin
-                  
-        # x_next = (np.array(self.dynamics(x_lin, u_lin)).flatten() + 
-        #           self.Ad @ self.x_error(x, x_ref) + self.Bd @ (u-u_ref) +
-        #           self.Ad @ self.x_error(x_lin, x_ref) + self.Bd @ (u_lin-u_ref) + x_ref)
-        
+        x_next = (self.Ad @ self.x_error(x, x_ref) + self.Bd @ (u-u_ref) + x_ref) 
+
         # Convert output from casadi.DM to np.array 
         x_next = np.array(x_next).flatten()
         u = np.array(u).flatten()

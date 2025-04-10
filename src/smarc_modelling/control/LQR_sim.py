@@ -371,11 +371,11 @@ def main():
 
     # Declare reference trajectory
     file_path = "/home/admin/smarc_modelling/src/Trajectories/resolution01.csv"  # Replace with your actual file path
-    #file_path = "/home/admin/smarc_modelling/src/Trajectories/simonTrajectory.csv"
-    file_path = "/home/admin/smarc_modelling/src/Trajectories/straight_trajectory.csv"
+    file_path = "/home/admin/smarc_modelling/src/Trajectories/simonTrajectory.csv"
+    #file_path = "/home/admin/smarc_modelling/src/Trajectories/straight_trajectory.csv"
     trajectory = read_csv_to_array(file_path)
     Nsim = trajectory.shape[0]
-
+    print(f"Trajectory shape: {trajectory.shape}")
     simU = np.zeros((trajectory.shape[0], nu))            # Matrix to store the optimal control sequence
     simX = np.zeros((trajectory.shape[0], nx))            # Matrix to store the simulated state
     simNonlinear = np.zeros((trajectory.shape[0], nx))    # Matrix to store the simulated state
@@ -409,12 +409,13 @@ def main():
     x = x0
     u = u0
 
-    # Init the jacobians for the linear dynamics, input is shape of vectors
-    lqr.create_linearized_dynamics(x_ref.shape[1], u_ref.shape[1])
-
     # Initial linearization points
     x_lin = x0
     u_lin = u0
+
+    # Init the jacobians for the linear dynamics, input is shape of vectors
+    lqr.create_linearized_dynamics(x_ref.shape[1], u_ref.shape[1])
+
 
     # SIMULATION LOOP
     print(f"----------------------- SIMULATION STARTS---------------------------------")
@@ -422,7 +423,7 @@ def main():
         print("-------------------------------------------------------------")
         print(f"Nsim: {i}")
 
-        x2, u = lqr.solve(x, u,  x_lin, u_lin)
+        x_LQR, u = lqr.solve(x, u,  x_lin, u_lin)
 
         q1, q2, q3 = x[3:6]
         q0 = np.sqrt(np.abs(1 - q1**2 - q2**2 - q3**2))
@@ -433,7 +434,7 @@ def main():
         xdot = np.array(casadi_dynamics(x, u)).flatten()
         xdot = np.delete(xdot, 3, axis=0)
         simNonlinear[i+1,:] = simNonlinear[i,:] + xdot*Ts
-        simX[i+1,:] = x2
+        simX[i+1,:] = x_LQR
         simU[i+1,:] = u
 
         if i < x_ref.shape[0]:
@@ -446,10 +447,7 @@ def main():
         else:
             references = np.vstack([references, x_ref[i,:]])  
 
- 
-        print(q/np.linalg.norm(q) ) 
-  
-        x=x2
+        x=simNonlinear[i+1,:]
 
     # evaluate timings
     t *= 1000  # scale to milliseconds
