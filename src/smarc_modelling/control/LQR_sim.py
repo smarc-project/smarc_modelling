@@ -421,7 +421,7 @@ def main():
         print("-------------------------------------------------------------")
         print(f"Nsim: {i}")
 
-        x_LQR, u = lqr.solve(x, u, x_lin, u_lin)
+        x_LQR, u = lqr.solve(x, u, x_lin, u_lin, i)
         
         q1, q2, q3 = x[3:6]
         q0 = np.sqrt(1 - q1**2 - q2**2 - q3**2)
@@ -431,7 +431,7 @@ def main():
         x = np.concatenate((x[:3], q, x[6:]))
         xdot = np.array(casadi_dynamics(x, u)).flatten()
         xdot = np.delete(xdot, 3, axis=0)
-        simNonlinear[i+1,:] = simNonlinear[i,:] + xdot*Ts
+        simNonlinear[i+1,:] = simNonlinear[i,:] + xdot*0.1
         simX[i+1,:] = x_LQR
         simU[i+1,:] = u
 

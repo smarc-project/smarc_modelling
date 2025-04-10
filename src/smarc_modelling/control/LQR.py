@@ -73,8 +73,6 @@ class LQR:
         I = np.eye(A.shape[0])  # Identity matrix of the same size as A
 
         # Discretize B using the trapezoidal rule (more accurate than Euler method)
-        #B_d = scipy.integrate.quad_vec(lambda x: scipy.linalg.expm(A * x) @ B, 0, self.Ts)
-        #B_d = scipy.integrate.quad(A_d @ B, dx=dt)
         Ad_inv = np.linalg.inv(self.Ad)
         self.Bd = np.dot(Ad_inv * (self.Ad + I), B)
         #self.Bd = np.dot(np.linalg.norm(Ad_inv) * (self.Ad + I), B)
@@ -102,17 +100,17 @@ class LQR:
 
         return L
 
-    def solve(self, x,u, x_lin, u_lin):
+    def solve(self, x,u, x_lin, u_lin, i):
         # Since the linearization points are along a trajectory, the reference points is chosen to be the same
         x_ref = x_lin
         u_ref = u_lin
         self.create_linearized_dynamics(x_lin.shape[0], u_lin.shape[0])    # Get the symbolic Jacobians that describe the A and B matrices
         self.continuous_dynamics(x_lin, u_lin)      # Create matrix A and B in continuous time
         self.continuous_to_discrete(self.Ts)        # Discretize the continuous time matrices
-        #if x_lin[0] != self.x_lin_prev[0] or self.x_lin_prev[0] == 0:
-        #    print("update L")
-        #    self.x_lin_prev = x_lin
-        self.L = self.compute_lqr_gain()            # Calculate the feedback gain
+        if i % 1 == 0:
+            print("update L")
+            self.x_lin_prev = x_lin
+            self.L = self.compute_lqr_gain()            # Calculate the feedback gain
 
         # Calculate control input
         # Since delta_u =-L*delta_x, delta_u = u-u_ref --> u = -L*delta_x + u_ref
