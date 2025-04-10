@@ -69,8 +69,8 @@ def plot(x_axis, ref, u_ref, simX, simNl, simU):
         psiNl[i], thetaNl[i], phiNl[i] = gnc.quaternion_to_angles(q)
 
 
-    y_axis = np.zeros(np.shape(simX))
-    for i in range(np.size(simX, 1)):
+    y_axis = np.zeros(np.shape(simNl))
+    for i in range(np.size(simNl, 1)):
         if i in [3, 4, 5, 6]:
             if i == 3:
                 y_axis[:,i] = phi
@@ -79,7 +79,7 @@ def plot(x_axis, ref, u_ref, simX, simNl, simU):
             elif i == 5:
                 y_axis[:,i] = psi
         else: 
-            y_axis[:,i] = simX[:,i]
+            y_axis[:,i] = simNl[:,i]
             
 
     plt.figure()
@@ -366,7 +366,7 @@ def main():
 
     # create LQR object to to access methods
     Ts = 0.1
-    lqr = LQR(dynamics_function, Ts)
+    lqr = LQR_transform(dynamics_function, Ts)
 
 
     # Declare reference trajectory
@@ -426,7 +426,6 @@ def main():
         q1, q2, q3 = x[3:6]
         q0 = np.sqrt(1 - q1**2 - q2**2 - q3**2)
         q = np.array([q0, q1, q2, q3])
-        #q = q/np.linalg.norm(q) 
 
         x = np.concatenate((x[:3], q, x[6:]))
         xdot = np.array(casadi_dynamics(x, u)).flatten()
@@ -458,8 +457,6 @@ def main():
 
 
     # plot results
-    np.set_printoptions(precision=3, suppress=True)
-    print(simU)
     x_axis = np.linspace(0, (Ts)*Nsim, Nsim)
     plot(x_axis, references, u_ref, simX[:-1], simNonlinear[:-1], simU[:-1])
 
