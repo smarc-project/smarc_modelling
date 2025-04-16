@@ -18,7 +18,7 @@ u0[1] = 45
 x0 = np.concatenate([eta0, nu0, u0])
 
 # Simulation timespan
-dt = 0.01 # FIXME: Why can't I run it with dt=0.5?
+dt = 0.01 
 t_span = (0, 30)  # 20 seconds simulation
 n_sim = int(t_span[1]/dt)
 t_eval = np.linspace(t_span[0], t_span[1], n_sim)
