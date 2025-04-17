@@ -11,7 +11,6 @@ import csv
 # Add the src directory to the system path
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 import numpy as np
-import casadi as ca
 import matplotlib.pyplot as plt
 from LQR import *
 
@@ -52,13 +51,13 @@ def plot(x_axis, ref, u_ref, simX, simNl, simU):
     thetaNl = np.zeros(n)
     phiNl = np.zeros(n)
 
-    # for i in range(n):
-    #     q1 = simX[i, 3]
-    #     q2 = simX[i, 4]
-    #     q3 = simX[i, 5]
-    #     q0 = np.sqrt(1 - q1**2 - q2**2 - q3**2)
-    #     q = [q0, q1, q2, q3]
-    #     psi[i], theta[i], phi[i] = gnc.quaternion_to_angles(q)
+    for i in range(n):
+        q1 = simX[i, 3]
+        q2 = simX[i, 4]
+        q3 = simX[i, 5]
+        q0 = np.sqrt(1 - q1**2 - q2**2 - q3**2)
+        q = [q0, q1, q2, q3]
+        psi[i], theta[i], phi[i] = gnc.quaternion_to_angles(q)
 
     for i in range(n):
         q1 = simNl[i, 3]
@@ -360,7 +359,7 @@ def main():
     sam = SAM_LQR()
     sam_casadi = SAM_casadi()
     casadi_dynamics = sam_casadi.dynamics(export=True)
-    dynamics_function = sam.dynamics(export=True)   # The LQR model to be used.
+    dynamics_function = sam.dynamics(export=True)   # The LQR model to be used (removed scalar part of the quaternion)
     nx   = 12
     nu   = 6    
 
@@ -429,14 +428,13 @@ def main():
         xdot = np.array(casadi_dynamics(x, u)).flatten()
         x_next = x + xdot*Ts
 
-        print(f"Before norm: {x_next[3:7]}")
         x_next[3:7] = x_next[3:7]/np.linalg.norm(x_next[3:7])  # Normalize quaternion
-        print(f"After  norm: {x_next[3:7]}")
         x_next = np.delete(x_next, 3, axis=0)
+
         simNonlinear[i+1,:] = x_next
         simX[i+1,:] = x_LQR
         simU[i+1,:] = u
-
+        
         if i < x_ref.shape[0]-2:
             x_lin = x_ref[i+2,:]
             u_lin = u_ref[i+2,:]
