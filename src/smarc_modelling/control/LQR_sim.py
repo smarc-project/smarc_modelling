@@ -13,6 +13,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 import numpy as np
 import matplotlib.pyplot as plt
 from LQR import *
+import time
 
 from smarc_modelling.vehicles import *
 from smarc_modelling.lib import *
@@ -418,7 +419,10 @@ def main():
         print("-------------------------------------------------------------")
         print(f"Nsim: {i}")
 
+        time_start = time.time()
         x_LQR, u = lqr.solve(x, u, x_lin, u_lin, i)
+        time_end = time.time()
+        t[i] = time_end - time_start
         
         q1, q2, q3 = x[3:6]
         q0 = np.sqrt(1 - q1**2 - q2**2 - q3**2)
@@ -446,7 +450,7 @@ def main():
             references = np.vstack([references, x_ref[i,:]])  
 
         x=simNonlinear[i+1,:]
-        print(x[3:6])
+
     # evaluate timings
     t *= 1000  # scale to milliseconds
     print(f'Computation time in ms:\n min: {np.min(t):.3f}\nmax: {np.max(t):.3f}\navg: {np.average(t):.3f}\nstdev: {np.std(t)}\nmedian: {np.median(t):.3f}')
