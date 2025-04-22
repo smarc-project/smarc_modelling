@@ -371,7 +371,6 @@ class LQR_transform_integral:
     def __init__(self, dynamics, Ts):
         self.Ts = Ts
         self.dynamics = dynamics
-        self.x_lin_prev = np.zeros((12,))
         self.integral = 0
 
     def create_linearized_dynamics(self, nx: int, nu: int):
@@ -511,10 +510,9 @@ class LQR_transform_integral:
         self.compute_transform(x)
         self.transform()
 
-        self.continuous_to_discrete(self.Ts)        # Discretize the continuous time matrices
+        self.continuous_to_discrete(self.Ts)            # Discretize the continuous time matrices
         if i % 3 == 0:
             print("update L")
-            self.x_lin_prev = x_lin
             self.L = self.compute_lqr_gain()            # Calculate the feedback gain
             self.L = self.L @ self.U
 
@@ -575,7 +573,7 @@ class LQR_transform_integral:
         
         x_error = ca.vertcat(pos_error, q_error, vel_error)
 
-        self.integral += x_error * self.Ts*8
+        self.integral += x_error
         x_error = ca.vertcat(pos_error, q_error, vel_error, self.integral)
 
 
