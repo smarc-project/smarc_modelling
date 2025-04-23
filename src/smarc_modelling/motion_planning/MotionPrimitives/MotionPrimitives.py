@@ -79,7 +79,7 @@ class SAM_PRIMITIVES():
 
         return cost
         
-    def curvePrimitives(self, x0, ds_inputs, indexes_u, map_instance, angle, breaking = False):
+    def curvePrimitives(self, x0, ds_inputs, indexes_u, map_instance, angle, numberTree):
         '''
         It returns the sequence of steps within a single input primitive.
 
@@ -127,16 +127,6 @@ class SAM_PRIMITIVES():
                 data[:, i+1] = finalState
             cost_sum += cost
 
-            if breaking:
-                # Check velocity
-                q0,q1,q2,q3,vx,vy,vz = data[3:10, i+1]
-                current_v = body_to_global_velocity((q0,q1,q2,q3), [vx,vy,vz])
-                current_v_norm = np.linalg.norm(current_v)
-                if current_v_norm <= 0.05:
-                    angle = calculate_angle_goalVector(data[:, i+1], current_v, map_instance)
-                    ds_inputs = [50,50,0,0,0,0]
-                    indexes_u = [0,1,2,3,4,5]
-
             # Find point base, A and B
             pointA = compute_A_point_forward(data[:, i+1])
             pointB = compute_B_point_backward(data[:, i+1])
@@ -147,7 +137,8 @@ class SAM_PRIMITIVES():
                 return [], -1, True, False, None
 
             # If arrived at the goal
-            if not arrivedPointBefore and (arrived(current_cg, map_instance) or arrived(pointA, map_instance) or arrived(pointB, map_instance)):
+            if not arrivedPointBefore and (arrived(current_cg, map_instance, numberTree) or arrived(pointA, map_instance, numberTree) or arrived(pointB, map_instance, numberTree)):
+            #if not arrivedPointBefore and pointArrivedToGoal(current_cg, map_instance["goal_pixel"]) and pointArrivedToGoal(pointA, map_instance["goal_pixel_pointA"]):
                 arrivedPointBefore = True
                 finalState = data[:, i+1]
                 

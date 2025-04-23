@@ -4,6 +4,9 @@ The size of the grid is defined as TILESIZE
 '''
 import numpy as np
 import random
+from smarc_modelling.motion_planning.MotionPrimitives.GenerationTree import compute_current_forward_vector, calculate_angle_betweenVectors
+from scipy.spatial.transform import Rotation as R
+import pandas as pd
 
 def generationFirstMap():
     """Define random seed"""
@@ -43,10 +46,10 @@ def generationFirstMap():
     # Horizontal: 5m
     # Z: 3m
 
-    TILESIZE = 0.2 #size of each cell in the grid
-    numberVerticalTiles = int(10 // 0.2) #rows, y
-    numberHorizontalTiles = int(5 // 0.2)  #columns, x
-    number3DTiles = int(3 // 0.2) #z-axis
+    TILESIZE = 0.5 #size of each cell in the grid
+    numberVerticalTiles = int(10 // TILESIZE) #rows, y
+    numberHorizontalTiles = int(5 // TILESIZE)  #columns, x
+    number3DTiles = int(3 // TILESIZE) #z-axis
     # Minimum TileSize verifier
     if TILESIZE < 0.1875:
         print("ERROR: select a TileSize > 0.1875")
@@ -75,23 +78,27 @@ def generationFirstMap():
     # (4, 2, 2) and (9, 9, 4)
 
         #start
-    startrCell = random.randrange(numberVerticalTiles)  #random CELL
-    startcCell = random.randrange(numberHorizontalTiles-2)+1 
-    startrCell = 4      # row = meters*5
-    startcCell = 5
-    startzCell = 1
+    startrCell = random.randrange(numberVerticalTiles-4) + 2  #random CELL
+    startcCell = random.randrange(numberHorizontalTiles-4) + 2 
+    #startrCell = 4      # row = meters//TILESIZE
+    #startcCell = 4
+    startzCell = random.randrange(number3DTiles)
     map1[startzCell][startrCell][startcCell] = 2
 
         #goal center cell
-    goalrCell = random.randrange(numberVerticalTiles)    #random CELL
-    goalcCell = random.randrange(numberHorizontalTiles)    #random CELL
-    goalrCell = 4     
-    goalcCell = 18
-    goalzCell = 1
-    map1[goalzCell][goalrCell][goalcCell] = 3
+    goalrCell = random.randrange(numberVerticalTiles-4) + 2     #random CELL
+    goalcCell = random.randrange(numberHorizontalTiles - 4) + 2    #random CELL
+    #goalrCell = 4
+    #goalcCell = 4
+    goalzCell = random.randrange(number3DTiles)
 
-        #orientation wrt goalCell --> the cell minimum
-    where = "top"
+    # Change the goal if goal==start position
+    while goalrCell == startrCell and goalcCell == startcCell and goalzCell == startzCell:
+        goalrCell = random.randrange(numberVerticalTiles - 4 + 2)    #random CELL
+        goalcCell = random.randrange(numberHorizontalTiles - 4) + 2    #random CELL
+        goalzCell = random.randrange(number3DTiles)
+
+    map1[goalzCell][goalrCell][goalcCell] = 3
 
     """Create the map-size"""
     mapWidth = numberHorizontalTiles * TILESIZE #in pixel metric
@@ -101,10 +108,6 @@ def generationFirstMap():
     """Create the dictionaries"""
     ## Obstacle dictionary
     obstaclesDictionary = {(r, c, z) for z in range(number3DTiles) for r in range(numberVerticalTiles) for c in range(numberHorizontalTiles) if map1[z][r][c] == 1}
-    #for key in obstaclesDictionary:
-        #print("OBSTDICT")
-        #print(key)
-        #How to check --> if (y,x,z) in obstaclesDictionary == true...
 
     ## Starting pixel (center of the starting cell)
     startingPixel = (startcCell * TILESIZE + 0.5 * TILESIZE, startrCell * TILESIZE + 0.5 * TILESIZE, startzCell * TILESIZE + 0.5 * TILESIZE)    #ATTENTION! is (x,y,z), not row, column and z
@@ -112,33 +115,32 @@ def generationFirstMap():
     ## Goal pixel (center of the goal cell)
     arrivalPixel = (goalcCell * TILESIZE + 0.5 * TILESIZE, goalrCell * TILESIZE + 0.5 * TILESIZE, goalzCell * TILESIZE + 0.5 * TILESIZE)    #ATTENTION! is (x,y,z), not row, column and z
 
-    ## Final orientation vector
-    direction_vector = (1,0,0)  # (x,y,z)
-    direction_vector /= np.linalg.norm(direction_vector)
-    direction_vector = 1 * direction_vector
-    originOrientationVector = arrivalPixel + direction_vector
-
-    ## Restricted area (where the velocity will be constrained)
-    bound = 1
-    restr_x_min = max(0, arrivalPixel[0] - bound)
-    restr_x_max = min(mapWidth, arrivalPixel[0] + bound)
-    restr_y_min = max(0, arrivalPixel[1] - bound)
-    restr_y_max = min(mapHeight, arrivalPixel[1] + bound)
-    restr_z_min = max(0, arrivalPixel[2] - bound)
-    restr_z_max = min(map3DSize, arrivalPixel[2] + bound)
-
-    ## Goal pixel for front of SAM
-    # Case: with respect to the goal pixel for the CG. Looking from the bottom of the tank.    <---columns
-    #                                                                                             |
-    #                                                                                             |
-    #                                                                                             v rows
+    # SAM initial state 
+    eta0 = np.zeros(7)
+    eta0[0] = startingPixel[0]
+    eta0[1] = startingPixel[1]
+    eta0[2] = startingPixel[2]
+    eta0[3] = 1
+    eta0[4] = 0
+    eta0[5] = 0
+    eta0[6] = 0
+    nu0 = np.zeros(6)   # Zero initial velocities
+    u0 = np.zeros(6)    #The initial control inputs for SAM
+    u0[0] = 50          #Vbs
+    u0[1] = 50          #lcg
+    x0 = np.concatenate([eta0, nu0, u0])
     
-    match where:
-        case "top":
-            goalAreaFront = (goalrCell - 1, goalcCell, goalzCell)
-        case _:
-            goalAreaFront = (goalrCell, goalcCell + 1, goalzCell) # right
-    
+    # SAM final state
+    finalState = x0.copy()
+    finalState[0:3] = arrivalPixel[0:3]
+    final_yaw = np.deg2rad(random.randrange(-180, 180, 90))   # in deg
+    final_pitch = np.deg2rad(0) # in deg
+    final_roll = np.deg2rad(0)  # in deg 
+    r = R.from_euler('zyx', [final_yaw, final_pitch, final_roll])
+    q = r.as_quat()
+    finalState[3] = q[3]
+    finalState[4:7] = q[0:3]
+
 
     # Create the map instance to pass to other scripts
     map_instance = {
@@ -147,14 +149,48 @@ def generationFirstMap():
         "z_max": map3DSize,
         "obstacleDict": obstaclesDictionary,
         "start_pos": startingPixel, #(x,y,z)
-        "goal_area": (goalrCell, goalcCell, goalzCell),    #(CELLy, CELLx, CELLz)
-        "goal_area_front": goalAreaFront,  #(CELLy, CELLx, CELLz)
-        "restricted_area": [(restr_x_min, restr_y_min, restr_z_min), (restr_x_max, restr_y_max, restr_z_max)],  # [(minimumCoordinates), (maximumCoordinates)], list of tuples
+        "start_area": (startrCell, startcCell, startzCell),
+        "goal_area": (goalrCell, goalcCell, goalzCell),    #(CELLy, CELLx, CELLz)  <---This is the one working for sure
         "goal_pixel": (arrivalPixel[0], arrivalPixel[1], arrivalPixel[2]),   #(x,y,z)  <---This is the one working for sure
-        #"goal_pixel": (originOrientationVector[0], originOrientationVector[1], originOrientationVector[2]),   #(x,y,z)
+        "final_state": finalState,
         "TileSize": TILESIZE,
-        "direction_vector": direction_vector,
-        "where": where
+        "initial_state": x0
     }
 
+    # Saving map_instance
+    map_resume = []
+    map_resume.append((map_instance["start_area"], map_instance["goal_area"], np.rad2deg(final_yaw)))
+    df = pd.DataFrame(map_resume, columns=["start_area", "goal_area", "final_yaw"])
+    df.to_csv("last_map_instance.csv", index=False)
+
     return map_instance
+
+def evaluateComplexityMap(map_instance):
+    start_position = map_instance["start_pos"]
+    goal_position = map_instance["goal_pixel"]
+    start_quaternion = map_instance["initial_state"][3:7]
+    goal_quaternion = map_instance["final_state"][3:7]
+    start_state = np.concatenate([start_position, start_quaternion])
+    goal_state = np.concatenate([goal_position, goal_quaternion])
+
+    complexity = [0,0,0]    # (orientation, xyz position, z position)
+
+    ## Difference orientation goal/start (+2)
+    forward_start = compute_current_forward_vector(start_state)
+    forward_goal = compute_current_forward_vector(goal_state)
+    angle = calculate_angle_betweenVectors(forward_start, forward_goal)
+    if np.abs(np.rad2deg(angle)) > 5:
+        complexity[0] += 1
+
+    ## Distance between goal/start (+1)
+    linear_distance = np.sqrt((start_position[0] - goal_position[0])**2 + (start_position[1] - goal_position[1])**2 + (start_position[2] - goal_position[2])**2)
+    if linear_distance > 3: #max length of 1 primitive
+        complexity[1] += 1
+
+    ## Difference in z positions goal/start (+5)
+    difference_z = np.abs(goal_position[2] - start_position[2])
+    xy_distance = np.sqrt((start_position[0] - goal_position[0])**2 + (start_position[1] - goal_position[1])**2)
+    if difference_z > xy_distance * np.tan(np.deg2rad(7)):
+        complexity[2] += 1
+
+    return complexity
