@@ -4,20 +4,47 @@ import numpy as np
 import casadi as ca
 
 class NMPC:
-    def __init__(self, model, Ts, N_horizon):
+    def __init__(self, casadi_model, Ts, N_horizon):
         '''
         Input:
-        model == Casadi model
+        casadi_model == Casadi model
         Ts == Sampling Time
         N_horizon == control horizon
         '''
         self.ocp   = AcadosOcp()
-        self.model = model
+        self.model = self.export_dynamics_model(casadi_model)
+        self.nx = self.model.x.rows()
+        self.nu = self.model.u.rows()
         self.ocp.model = self.model
         self.Ts    = Ts
         self.Tf    = Ts*N_horizon
         self.N_horizon = N_horizon
+
+
+    def export_dynamics_model(self, casadi_model):
+        # Create symbolic state and control variables
+        x_sym     = ca.MX.sym('x', 19,1)
+        u_ref_sym = ca.MX.sym('u_ref', 6,1)
+
+        # Create symbolic derivative
+        x_dot_sym = ca.MX.sym('x_dot', 19, 1)
         
+        # Set up acados model
+        model = AcadosModel()
+        model.name = 'SAM_equation_system'
+        model.x    = x_sym
+        model.xdot = x_dot_sym
+        model.u    = u_ref_sym
+
+        # Declaration of explicit and implicit expressions
+        x_dot  = casadi_model.dynamics(export=True)    # extract casadi.MX function
+        f_expl = ca.vertcat(x_dot(x_sym[:13], x_sym[13:]), u_ref_sym)
+        f_impl = x_dot_sym - f_expl
+        model.f_expl_expr = f_expl
+        model.f_impl_expr = f_impl
+
+        return model
+    
     def setup(self, x0):
         nx = self.model.x.rows()
         nu = self.model.u.rows()
@@ -25,15 +52,16 @@ class NMPC:
         # --------------------------- Cost setup ---------------------------------
         # State weight matrix
         Q_diag = np.ones(nx)
-        Q_diag[ 0:3 ] = 4e3         # Position
-        Q_diag[ 3:7 ] = 4e3         # Quaternion
-        Q_diag[ 7:10] = 0           # linear velocity
-        Q_diag[10:13] = 100         # Angular velocity
+        Q_diag[ 0:3 ] = 1e3         # Position
+        Q_diag[0] = 1e2
+        Q_diag[ 3:7 ] = 1e3         # Quaternion
+        Q_diag[ 7:10] = 1e1           # linear velocity
+        Q_diag[10:13] = 1e1         # Angular velocity
 
         # Control weight matrix - Costs set according to Bryson's rule (MPC course)
         Q_diag[13:15] = 1e-2        # VBS, LCG
         Q_diag[15:17] = 1/50        # stern_angle, rudder_angle
-        Q_diag[17:  ] = 1e-6        # RPM1 And RPM2
+        Q_diag[17:  ] = 1e-4        # RPM1 And RPM2
         Q = np.diag(Q_diag)
 
         # Control rate of change weight matrix - control inputs as [x_vbs, x_lcg, delta_s, delta_r, rpm1, rpm2]
@@ -51,10 +79,10 @@ class NMPC:
         self.ocp.cost.cost_type = 'NONLINEAR_LS'
         self.ocp.cost.W = ca.diagcat(Q, R).full()
         self.ocp.model.cost_y_expr = self.x_error(self.model.x, self.model.u, self.model.p, terminal=False) #ca.vertcat(self.model.x, self.model.u)
-        
+
         # Terminal cost
         self.ocp.cost.cost_type_e = 'NONLINEAR_LS'
-        self.ocp.cost.W_e = Q #np.zeros(np.shape(Q))
+        self.ocp.cost.W_e = np.zeros(np.shape(Q))
         self.ocp.model.cost_y_expr_e = self.x_error(self.model.x, self.model.u, self.ocp.model.p, terminal=True)
         self.ocp.cost.yref_e = np.zeros((nx,))
 
@@ -80,7 +108,7 @@ class NMPC:
         # Set constraints on the control
         x_ubx[13:15] = 100 
         x_ubx[15:17] = 7
-        x_ubx[17:  ] = 1000
+        x_ubx[17:  ] = 1500
 
         x_lbx = -x_ubx
         x_lbx[13:15] = 0
@@ -109,10 +137,16 @@ class NMPC:
         self.ocp.solver_options.regularize_method = 'NO_REGULARIZE'
 
         solver_json = 'acados_ocp_' + self.model.name + '.json'
-        acados_ocp_solver = AcadosOcpSolver(self.ocp, json_file = solver_json)
+        update_solver = True
+        if update_solver == False:
+            acados_ocp_solver = AcadosOcpSolver(self.ocp, json_file = solver_json, generate=False, build=False)
 
-        # create an integrator with the same settings as used in the OCP solver.
-        acados_integrator = AcadosSimSolver(self.ocp, json_file = solver_json)
+            # create an integrator with the same settings as used in the OCP solver. generate=False, build=False
+            acados_integrator = AcadosSimSolver(self.ocp, json_file = solver_json, generate=False, build=False)
+
+        else:
+            acados_ocp_solver = AcadosOcpSolver(self.ocp, json_file = solver_json)
+            acados_integrator = AcadosSimSolver(self.ocp, json_file = solver_json)
 
         return acados_ocp_solver, acados_integrator
     
@@ -192,6 +226,7 @@ class NMPC_trajectory:
         model.f_impl_expr = f_impl
 
         return model
+    
     def setup(self, x0):
         nx = self.model.x.rows()
         nu = self.model.u.rows()
