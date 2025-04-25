@@ -14,7 +14,6 @@ from control import *
 
 from smarc_modelling.vehicles import *
 from smarc_modelling.lib import plot
-print(plot.__file__)
 from smarc_modelling.vehicles.SAM_casadi import SAM_casadi
 
 def euler_to_quaternion(roll: float, pitch: float, yaw: float):
@@ -167,7 +166,6 @@ def main():
     
     # Plot the trajectory
     plot.plot_function(x_axis, trajectory, simX[:-1], simU)
-
     ocp_solver = None
 
 
