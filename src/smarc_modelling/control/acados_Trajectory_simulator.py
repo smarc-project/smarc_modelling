@@ -13,8 +13,8 @@ import numpy as np
 from control import *
 
 from smarc_modelling.vehicles import *
-from smarc_modelling.lib import *
 from smarc_modelling.lib import plot
+print(plot.__file__)
 from smarc_modelling.vehicles.SAM_casadi import SAM_casadi
 
 def euler_to_quaternion(roll: float, pitch: float, yaw: float):
@@ -69,19 +69,22 @@ def main():
 
 
     # create ocp object to formulate the OCP
-    Ts = 0.2            # Sampling time
-    N_horizon = 10      # Prediction horizon
+    Ts = 0.1           # Sampling time
+    N_horizon = 10     # Prediction horizon
     nmpc = NMPC_trajectory(sam, Ts, N_horizon)
     nx = nmpc.nx        # State vector length + control vector
     nu = nmpc.nu        # Control derivative vector length
 
     
     # load trajectory - Replace with your actual file path
-    file_path = "/home/admin/smarc_modelling/src/Trajectories/simonTrajectory.csv"
-    #file_path = "/home/admin/smarc_modelling/src/Trajectories/resolution01.csv"  
-    #file_path = "/home/admin/smarc_modelling/src/Trajectories/straight_trajectory.csv"
-    trajectory = read_csv_to_array(file_path)
+    #file_path = "/home/admin/smarc_modelling/src/Trajectories/trajectoryComplexity3.csv"
+    #file_path = "/home/admin/smarc_modelling/src/Trajectories/Complexity2Trajectory_0.csv"
 
+    #file_path = "/home/admin/smarc_modelling/src/Trajectories/simonTrajectory.csv"
+    file_path = "/home/admin/smarc_modelling/src/Trajectories/case_hard6ok_original.csv"
+
+    #file_path = "/home/admin/smarc_modelling/src/Trajectories/resolution01.csv"  
+    trajectory = read_csv_to_array(file_path)
     # Declare duration of sim. and the x_axis in the plots
     Nsim = (trajectory.shape[0])            # The sim length should be equal to the number of waypoints
     x_axis = np.linspace(0, Ts*Nsim, Nsim)
@@ -124,7 +127,6 @@ def main():
         # If the end of the trajectory has been reached, (ref.shape < N_horizon)
         # set the following waypoints in the horizon to the last waypoint of the trajectory
         for stage in range(N_horizon):
-            print(ref.shape[0], stage)
             if ref.shape[0] < N_horizon and ref.shape[0] != 0:
                 ocp_solver.set(stage, "p", ref[ref.shape[0]-1,:])
             else:
