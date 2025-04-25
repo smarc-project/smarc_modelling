@@ -10,11 +10,12 @@ import os
 # Add the parent directory to the system path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 import numpy as np
-from control import *
+from smarc_modelling.control.control import *
 
 from smarc_modelling.vehicles import *
 from smarc_modelling.lib import plot
 from smarc_modelling.vehicles.SAM_casadi import SAM_casadi
+
 
 def euler_to_quaternion(roll: float, pitch: float, yaw: float):
     """
@@ -78,9 +79,8 @@ def main():
     # load trajectory - Replace with your actual file path
     #file_path = "/home/admin/smarc_modelling/src/Trajectories/trajectoryComplexity3.csv"
     #file_path = "/home/admin/smarc_modelling/src/Trajectories/Complexity2Trajectory_0.csv"
-
-    #file_path = "/home/admin/smarc_modelling/src/Trajectories/simonTrajectory.csv"
-    file_path = "/home/admin/smarc_modelling/src/Trajectories/case_hard6ok_original.csv"
+    file_path = "/home/admin/smarc_modelling/src/Trajectories/simX.csv"
+    #file_path = "/home/admin/smarc_modelling/src/Trajectories/case_hard3ok_original.csv"
 
     #file_path = "/home/admin/smarc_modelling/src/Trajectories/resolution01.csv"  
     trajectory = read_csv_to_array(file_path)

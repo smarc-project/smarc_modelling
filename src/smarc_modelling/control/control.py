@@ -3,6 +3,7 @@ from acados_template import AcadosOcp, AcadosOcpSolver, AcadosSimSolver, AcadosM
 import numpy as np
 import casadi as ca
 
+#NOTE: Before changing model, it is a MUST to genereate the controller
 class NMPC:
     def __init__(self, casadi_model, Ts, N_horizon):
         '''
@@ -46,15 +47,15 @@ class NMPC:
         return model
     
     def setup(self, x0):
+        print("\033[92mNMPC setup is running\033[0m")    
         nx = self.model.x.rows()
         nu = self.model.u.rows()
 
         # --------------------------- Cost setup ---------------------------------
         # State weight matrix
         Q_diag = np.ones(nx)
-        Q_diag[ 0:3 ] = 1e3         # Position
-        Q_diag[0] = 1e2
-        Q_diag[ 3:7 ] = 1e3         # Quaternion
+        Q_diag[ 0:3 ] = 1e2         # Position
+        Q_diag[ 3:7 ] = 1e2         # Quaternion
         Q_diag[ 7:10] = 1e1           # linear velocity
         Q_diag[10:13] = 1e1         # Angular velocity
 
@@ -137,7 +138,7 @@ class NMPC:
         self.ocp.solver_options.regularize_method = 'NO_REGULARIZE'
 
         solver_json = 'acados_ocp_' + self.model.name + '.json'
-        update_solver = True
+        update_solver = False
         if update_solver == False:
             acados_ocp_solver = AcadosOcpSolver(self.ocp, json_file = solver_json, generate=False, build=False)
 
@@ -227,7 +228,8 @@ class NMPC_trajectory:
 
         return model
     
-    def setup(self, x0):
+    def setup(self, x0):    
+        print("\033[92mNMPC_trajectory setup is running\033[0m")    
         nx = self.model.x.rows()
         nu = self.model.u.rows()
 
@@ -326,7 +328,7 @@ class NMPC_trajectory:
         self.ocp.solver_options.regularize_method = 'NO_REGULARIZE'
 
         solver_json = 'acados_ocp_' + self.model.name + '.json'
-        update_solver = False
+        update_solver = True
         if update_solver == False:
             acados_ocp_solver = AcadosOcpSolver(self.ocp, json_file = solver_json, generate=False, build=False)
 
