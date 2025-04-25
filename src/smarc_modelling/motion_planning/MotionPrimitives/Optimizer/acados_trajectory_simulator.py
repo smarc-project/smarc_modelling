@@ -112,7 +112,7 @@ def main(trajectory, Q, N_hor, T_s):       ##CHANGE: input trajectory
 
     # closed loop - simulation
     for i in range(Nsim):
-        print(f"Nsim: {i}")
+        #print(f"Nsim: {i}")
 
         # extract the sub-trajectory for the horizon
         if i <= (Nsim - N_horizon):
@@ -124,7 +124,7 @@ def main(trajectory, Q, N_hor, T_s):       ##CHANGE: input trajectory
         # If the end of the trajectory has been reached, (ref.shape < N_horizon)
         # set the following waypoints in the horizon to the last waypoint of the trajectory
         for stage in range(N_horizon):
-            print(ref.shape[0], stage)
+            #print(ref.shape[0], stage)
             if ref.shape[0] < N_horizon and ref.shape[0] != 0:
                 ocp_solver.set(stage, "p", ref[ref.shape[0]-1,:])
             else:

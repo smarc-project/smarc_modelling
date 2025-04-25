@@ -24,6 +24,7 @@ def MotionPlanningAlgorithm(realTimeDraw):
     map_instance = MapGen.generationFirstMap()
     complexity = MapGen.evaluateComplexityMap(map_instance)
     print("complexity:",complexity)
+    
     if realTimeDraw:
         ax, plt, fig = plot_map(map_instance, "top") # this is the one were the primitives are plotted
         ax2, plt2, fig2 = plot_map(map_instance, "side")
@@ -45,7 +46,7 @@ def MotionPlanningAlgorithm(realTimeDraw):
     # Skip search or not
     onlyOptimization = False
     if not onlyOptimization:
-        if complexity[0] + complexity[1] + complexity[2] == 0:
+        if complexity == 0:
             print(f"{bcolors.WARNING}single tree search{bcolors.ENDC}")
             trajectory, succesfulSearch, totalCost = a_star_search(ax, plt, map_instance, realTimeDraw, typeFunction, dec)
         else:
@@ -146,5 +147,5 @@ def MotionPlanningAlgorithm(realTimeDraw):
         
 if __name__ == "__main__":
 
-    #MotionPlanningAlgorithm(True)
-    runStatisticalAnalysis(1)
+    MotionPlanningAlgorithm(True)
+    #runStatisticalAnalysis(1, 2)    # (nTrials, chosenComplexity)

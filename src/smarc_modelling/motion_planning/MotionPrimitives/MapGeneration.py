@@ -80,21 +80,23 @@ def generationFirstMap():
         #start
     startrCell = random.randrange(numberVerticalTiles-4) + 2  #random CELL
     startcCell = random.randrange(numberHorizontalTiles-4) + 2 
-    #startrCell = 4      # row = meters//TILESIZE
-    #startcCell = 4
     startzCell = random.randrange(number3DTiles)
+    startrCell = 4
+    startcCell = 5
+    startzCell = 1                                                     
     map1[startzCell][startrCell][startcCell] = 2
 
         #goal center cell
     goalrCell = random.randrange(numberVerticalTiles-4) + 2     #random CELL
     goalcCell = random.randrange(numberHorizontalTiles - 4) + 2    #random CELL
-    #goalrCell = 4
-    #goalcCell = 4
     goalzCell = random.randrange(number3DTiles)
+    goalrCell = 11
+    goalcCell = 5
+    goalzCell = 1
 
     # Change the goal if goal==start position
     while goalrCell == startrCell and goalcCell == startcCell and goalzCell == startzCell:
-        goalrCell = random.randrange(numberVerticalTiles - 4 + 2)    #random CELL
+        goalrCell = random.randrange(numberVerticalTiles - 4) + 2    #random CELL
         goalcCell = random.randrange(numberHorizontalTiles - 4) + 2    #random CELL
         goalzCell = random.randrange(number3DTiles)
 
@@ -120,10 +122,14 @@ def generationFirstMap():
     eta0[0] = startingPixel[0]
     eta0[1] = startingPixel[1]
     eta0[2] = startingPixel[2]
-    eta0[3] = 1
-    eta0[4] = 0
-    eta0[5] = 0
-    eta0[6] = 0
+    #initial_yaw = np.deg2rad(random.randrange(-180, 180, 90))   # in deg
+    initial_yaw = np.deg2rad(0)   # in deg
+    initial_pitch = np.deg2rad(0) # in deg
+    initial_roll = np.deg2rad(0)  # in deg 
+    r = R.from_euler('zyx', [initial_yaw, initial_pitch, initial_roll])
+    q0 = r.as_quat()
+    eta0[3] = q0[3]
+    eta0[4:7] = q0[0:3]
     nu0 = np.zeros(6)   # Zero initial velocities
     u0 = np.zeros(6)    #The initial control inputs for SAM
     u0[0] = 50          #Vbs
@@ -133,7 +139,8 @@ def generationFirstMap():
     # SAM final state
     finalState = x0.copy()
     finalState[0:3] = arrivalPixel[0:3]
-    final_yaw = np.deg2rad(random.randrange(-180, 180, 90))   # in deg
+    #final_yaw = np.deg2rad(random.randrange(-180, 180, 90))   # in deg
+    final_yaw = np.deg2rad(-90)
     final_pitch = np.deg2rad(0) # in deg
     final_roll = np.deg2rad(0)  # in deg 
     r = R.from_euler('zyx', [final_yaw, final_pitch, final_roll])
@@ -173,24 +180,30 @@ def evaluateComplexityMap(map_instance):
     start_state = np.concatenate([start_position, start_quaternion])
     goal_state = np.concatenate([goal_position, goal_quaternion])
 
-    complexity = [0,0,0]    # (orientation, xyz position, z position)
-
-    ## Difference orientation goal/start (+2)
+    ## Compute the angle between the forward vectors and start_goal_vector (complexity 0)
     forward_start = compute_current_forward_vector(start_state)
     forward_goal = compute_current_forward_vector(goal_state)
     angle = calculate_angle_betweenVectors(forward_start, forward_goal)
-    if np.abs(np.rad2deg(angle)) > 5:
-        complexity[0] += 1
-
+    start_goal_vector = (goal_state[0]-start_state[0], goal_state[1]-start_state[1], goal_state[2]-start_state[2])
+    angle2 = calculate_angle_betweenVectors(start_goal_vector, forward_start)
+    
+    #if np.abs(np.rad2deg(angle)) < 7 and (np.abs(np.rad2deg(angle2)) < 7 or np.abs(np.rad2deg(angle2-np.pi)) < 7):
+    #    return 0
+    
     ## Distance between goal/start (+1)
-    linear_distance = np.sqrt((start_position[0] - goal_position[0])**2 + (start_position[1] - goal_position[1])**2 + (start_position[2] - goal_position[2])**2)
-    if linear_distance > 3: #max length of 1 primitive
-        complexity[1] += 1
+    #linear_distance = np.sqrt((start_position[0] - goal_position[0])**2 + (start_position[1] - goal_position[1])**2 + (start_position[2] - goal_position[2])**2)
 
     ## Difference in z positions goal/start (+5)
     difference_z = np.abs(goal_position[2] - start_position[2])
     xy_distance = np.sqrt((start_position[0] - goal_position[0])**2 + (start_position[1] - goal_position[1])**2)
-    if difference_z > xy_distance * np.tan(np.deg2rad(7)):
-        complexity[2] += 1
 
-    return complexity
+    # Complexity 3
+    if difference_z > 0 and xy_distance > 1:    # xyz 
+        return 3
+    elif difference_z > 0:  # only z
+        return 2
+    elif xy_distance < 3 and np.abs(np.rad2deg(angle)) < 7 and (np.abs(np.rad2deg(angle2)) < 7 or np.abs(np.rad2deg(angle2-np.pi)) < 7):    # single tree
+        return 0
+    else:                   # xy
+        return 1
+    

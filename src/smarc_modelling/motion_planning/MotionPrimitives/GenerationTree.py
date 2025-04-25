@@ -166,11 +166,12 @@ def reconstruct_path(current, parents_dict, resolution_dict, map_instance, ax, p
 
             # Interpolate the waypoints
             #res_list = linear_interpolation_waypoints(res_list)
-            for _ in range(5):
+            addedPoints = 15
+            for _ in range(addedPoints):
                 res_list.append(map_instance["final_state"])
 
             # Optimise them 
-            result_list, status = optimization_acados_singleTree(res_list[(len(res_list)-5)//2 :], map_instance)    # Only optimize half of the primitive
+            result_list, status = optimization_acados_singleTree(res_list[(len(res_list)-addedPoints)//2 :], map_instance)    # Only optimize half of the primitive
             if status == 0:
                 success = 1
                 res_list = result_list
@@ -180,7 +181,6 @@ def reconstruct_path(current, parents_dict, resolution_dict, map_instance, ax, p
                 print(f"{bcolors.FAIL}[ X ]{bcolors.ENDC}")
             end_opti = time.time()
             print(f"optimization time:...{end_opti-start_opti:.4f} seconds")
-            
         # Append vertices to the final list (reverted order)
         for vertex in res_list[::-1]:
             final_path.append(vertex)
@@ -831,7 +831,7 @@ def find_tree_intersection(g_cost_tree1, g_cost_tree2, list_connection_states, m
     '''
 
     moreThanMinimum = False
-    if len(list_connection_states) > 100:
+    if len(list_connection_states) > 1000:
         moreThanMinimum = True
     
     return (list_connection_states, moreThanMinimum)
@@ -982,14 +982,14 @@ def double_a_star_search(ax, plt, map_instance, realTimeDraw, typeF_function, de
             if arrivedPoint and arrivedPoint_secondTree and not moreThanMinimum:
                 
                 distance = 0
-                while len(list_connection_states) == 0 and distance <= 11:
+                while not moreThanMinimum and distance <= 11:
                     distance += 1
-                    angle = 10
+                    angle = 0
                     print("trying distance=", distance)
-                    while angle <= 180:
+                    while angle <= 150 and not moreThanMinimum:
                         angle += 10
-                        list_connection_states, moreThanMinimum = find_tree_intersection(g_cost, g_cost_secondTree, list_connection_states, distance, angle)
-                print("Angle (deg):", angle)
+                        print("Angle (deg):", angle)
+                        list_connection_states, moreThanMinimum = find_tree_intersection(g_cost, g_cost_secondTree, list_connection_states, distance, angle)      
                 moreThanMinimum = True
 
             currentNumOptimization = 0
@@ -997,7 +997,7 @@ def double_a_star_search(ax, plt, map_instance, realTimeDraw, typeF_function, de
                 print(f"{bcolors.OKBLUE}Double Astar is starting connecting the trees{bcolors.ENDC}")
                 while(status!=0):
 
-                    maxNumOptimizations = 5  
+                    maxNumOptimizations = 10  
                     if currentNumOptimization > maxNumOptimizations:
                         print(f"{bcolors.FAIL}EXCEEDED MAX NUMBER OF OPTIMIZATIONS! - exit {bcolors.ENDC}")
                         return list_connection_states, 0, "maxNumberOptimizations"
@@ -1114,13 +1114,13 @@ def double_a_star_search(ax, plt, map_instance, realTimeDraw, typeF_function, de
 
         # Find new neighbors (last point of the primitives) using the motion primitives
         if not arrivedPoint:
-            reached_states, last_states, arrivedPoint, final = get_neighbors(current_node, sim, map_instance, 1)
+            reached_states, last_states, neighbor_arrived, final = get_neighbors(current_node, sim, map_instance, 1)
             finalLast = final[0] # in case we arrived
             finalCost = final[1] # in case we arrived 
 
         # Find new neighbors for second tree (last point of the primitives) using the motion primitives
         if not arrivedPoint_secondTree:
-            reached_states_secondTree, last_states_secondTree, arrivedPoint_secondTree, final_secondTree = get_neighbors(current_node_secondTree, sim, map_instance, 2)
+            reached_states_secondTree, last_states_secondTree, neighbor_arrived_secondTree, final_secondTree = get_neighbors(current_node_secondTree, sim, map_instance, 2)
             finalLast_secondTree = final_secondTree[0] # in case we arrived
             finalCost_secondTree = final_secondTree[1] # in case we arrived 
 
@@ -1209,6 +1209,12 @@ def double_a_star_search(ax, plt, map_instance, realTimeDraw, typeF_function, de
 
                         # Save the last node of the primitive along its f_cost
                         heapq.heappush(open_set_secondTree, (f_cost_secondTree, Node(neighbor_secondTree)))   
+
+        # If a neighbor arrived to goal, avoid computing its neighbour (do not continue growing that tree!)
+        if neighbor_arrived:
+            arrivedPoint = True
+        if neighbor_arrived_secondTree:
+            arrivedPoint_secondTree = True
 
     # If we arrived here, no solution was found
     print("No solution found!")

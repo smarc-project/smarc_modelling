@@ -177,6 +177,7 @@ def create_ocp(model, x0, x_last, N, map_instance):
         pointB[2]
     )
 
+    '''
     constraint_RPM2 = vertcat(
         model.x[17] - model.x[18]
     )
@@ -189,7 +190,7 @@ def create_ocp(model, x0, x_last, N, map_instance):
     ocp.constraints.uh = np.array([
         0
     ])
-    
+    '''
     
     # At the end
     '''
@@ -244,6 +245,11 @@ def create_ocp(model, x0, x_last, N, map_instance):
     ocp.constraints.lbx = x_lbx
     ocp.constraints.ubx = x_ubx
     ocp.constraints.idxbx = np.arange(nx)
+
+    # Set constraints on the final state
+    ocp.constraints.lbx_e = x_lbx
+    ocp.constraints.ubx_e = x_ubx
+    ocp.constraints.idxbx_e = np.arange(nx)
 
     # Return ocp
     return ocp

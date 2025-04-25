@@ -390,6 +390,9 @@ class NMPC_trajectory:
         self.ocp.constraints.lbx = x_lbx
         self.ocp.constraints.ubx = x_ubx
         self.ocp.constraints.idxbx = np.arange(nx)
+        self.ocp.constraints.lbx_e = x_lbx
+        self.ocp.constraints.ubx_e = x_ubx
+        self.ocp.constraints.idxbx_e = np.arange(nx)
 
         # ----------------------- Solver Setup --------------------------
         # set prediction horizon
