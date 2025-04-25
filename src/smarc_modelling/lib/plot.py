@@ -270,26 +270,27 @@ def plot_function(x_axis, ref, simX, simU):
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
 
-    # Set axis limits
-    # ax.set_xlim([-21, 1])
-    # ax.set_ylim([-11, 11])
-    # ax.set_zlim([-1, 1])
 
     # Plot the trajectory
     ax.plot3D(x, y, z, label='Trajectory', lw=2, c='r')
     ax.plot3D(ref[:, 0], ref[:, 1], ref[:, 2], linestyle='--', label='Reference', lw=1, c='black')
     #ax.scatter(ref[:, 0], ref[:, 1], ref[:, 2], c='black')
 
+    # Set axis limits
+    ax.set_xlim([0, 5])
+    ax.set_ylim([0, 10])
+    ax.set_zlim([0, 3])
+    ax.set_box_aspect([1, 2, 1])  # Example: X:Y:Z ratio
+
+
     # Add directional arrows
-    arrow_step = 10  # Adjust this value to control the spacing of the arrows
+    arrow_step = 15  # Adjust this value to control the spacing of the arrows
     for i in range(0, len(simX) - arrow_step, arrow_step):
         c = np.sqrt((simX[i + arrow_step, 0] - simX[i, 0])**2 + (simX[i + arrow_step, 1] - simX[i, 1])**2 + (simX[i + arrow_step, 2] - simX[i, 2])**2)
         ax.quiver(simX[i,0], simX[i, 1], simX[i, 2], 
                   np.cos(psi[i])*np.cos(theta[i]), 
                   np.sin(psi[i]), 
                   -np.sin(theta[i]), color='b', length=1, normalize=True)
-
-
 
     # Add labels
     ax.set_xlabel('X')
@@ -299,6 +300,45 @@ def plot_function(x_axis, ref, simX, simU):
 
     # Invert the z_axis
     ax.invert_zaxis()
+
+
+
+    from mpl_toolkits.mplot3d import Axes3D
+    from matplotlib.animation import FuncAnimation
+
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+
+    # Set axis limits and labels
+    ax.set_xlim([0, 5])
+    ax.set_ylim([0, 10])
+    ax.set_zlim([0, 3])
+    ax.set_box_aspect([1, 2, 1])  # Example: X:Y:Z ratio
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    ax.set_zlabel('Z')
+    ax.invert_zaxis()
+    # Initialize the plot elements
+    trajectory_line, = ax.plot([], [], [], label='Trajectory', lw=2, c='r')
+    reference_line, = ax.plot(ref[:, 0], ref[:, 1], ref[:, 2], linestyle='--', label='Reference', lw=1, c='black')
+
+    # Update function for animation
+    def update(frame):
+        trajectory_line.set_data(simX[:frame, 0], simX[:frame, 1])
+        trajectory_line.set_3d_properties(simX[:frame, 2])
+        ax.view_init(elev=44.0, azim=-60.0)
+
+        return trajectory_line,
+
+    # Create the animation
+    frames = len(simX)
+    ani = FuncAnimation(fig, update, frames=frames, interval=50, blit=False)
+
+    # Save the animation as a GIF
+    filename = "3D_trajectory.gif"
+    ani.save(filename, writer='pillow')
+    print(f"3D GIF saved as {filename}")
+
 
     # Show the plot
     plt.show()
