@@ -79,8 +79,8 @@ def main():
     # load trajectory - Replace with your actual file path
     #file_path = "/home/admin/smarc_modelling/src/Trajectories/trajectoryComplexity3.csv"
     #file_path = "/home/admin/smarc_modelling/src/Trajectories/Complexity2Trajectory_0.csv"
-    file_path = "/home/admin/smarc_modelling/src/Trajectories/simX.csv"
-    #file_path = "/home/admin/smarc_modelling/src/Trajectories/case_hard3ok_original.csv"
+    #file_path = "/home/admin/smarc_modelling/src/Trajectories/case_medium_original.csv"
+    file_path = "/home/admin/smarc_modelling/src/Trajectories/REPORT/case_hard.csv"
 
     #file_path = "/home/admin/smarc_modelling/src/Trajectories/resolution01.csv"  
     trajectory = read_csv_to_array(file_path)
@@ -148,7 +148,10 @@ def main():
         t[i] = ocp_solver.get_stats('time_tot')
         simU[i, :] = ocp_solver.get(0, "u")
         X_eval = ocp_solver.get(0, "x")
-        simX[i+1, :] = integrator.simulate(x=simX[i, :], u=simU[i, :])
+        noise_vector = np.zeros(19)
+        #noise_vector[0:3] = np.array([(np.random.random()-0.5)/10,(np.random.random()-0.5)/10, (np.random.random()-0.5)/10])
+        simX[i+1, :] = integrator.simulate(x=simX[i, :]+noise_vector, u=simU[i, :])
+     
 
     # evaluate timings
     t *= 1000  # scale to milliseconds

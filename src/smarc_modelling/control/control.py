@@ -63,6 +63,7 @@ class NMPC:
         Q_diag[13:15] = 1e-2        # VBS, LCG
         Q_diag[15:17] = 1/50        # stern_angle, rudder_angle
         Q_diag[17:  ] = 1e-4        # RPM1 And RPM2
+        Q_diag[13:  ] = Q_diag[13:  ]*1e-2
         Q = np.diag(Q_diag)
 
         # Control rate of change weight matrix - control inputs as [x_vbs, x_lcg, delta_s, delta_r, rpm1, rpm2]
@@ -236,16 +237,16 @@ class NMPC_trajectory:
         # --------------------------- Cost setup ---------------------------------
         # State weight matrix
         Q_diag = np.ones(nx)
-        Q_diag[ 0:3 ] = 5e2         # Position
-        Q_diag[ 3:7 ] = 2.5e2         # Quaternion
-        Q_diag[ 7:10] = 20e1         # linear velocity
-        Q_diag[10:13] = 20e1         # Angular velocity
+        Q_diag[ 0:3 ] = 1         # Position
+        Q_diag[ 3:7 ] = 1         # Quaternion
+        Q_diag[ 7:10] = 1         # linear velocity
+        Q_diag[10:13] = 1         # Angular velocity
 
         # Control weight matrix - Costs set according to Bryson's rule (MPC course)
         Q_diag[13:15] = 1e-4        # VBS, LCG
         Q_diag[15:17] = 1/200        # stern_angle, rudder_angle
         Q_diag[17:  ] = 1e-6        # RPM1 And RPM2
-        Q_diag[13:  ] = Q_diag[13:  ]*1e-2
+        Q_diag[13:  ] = Q_diag[13:  ]
         Q = np.diag(Q_diag)
 
         # Control rate of change weight matrix - control inputs as [x_vbs, x_lcg, delta_s, delta_r, rpm1, rpm2]
@@ -253,7 +254,7 @@ class NMPC_trajectory:
         R_diag[ :2] = 1e-3
         R_diag[2:4] = 1e0
         R_diag[4: ] = 1e-5
-        R = np.diag(R_diag)
+        R = np.diag(R_diag)*1e-3
 
         # Stage costs
         self.model.p = ca.MX.sym('ref_param', nx+nu,1)
@@ -328,7 +329,7 @@ class NMPC_trajectory:
         self.ocp.solver_options.regularize_method = 'NO_REGULARIZE'
 
         solver_json = 'acados_ocp_' + self.model.name + '.json'
-        update_solver = True
+        update_solver = False
         if update_solver == False:
             acados_ocp_solver = AcadosOcpSolver(self.ocp, json_file = solver_json, generate=False, build=False)
 
