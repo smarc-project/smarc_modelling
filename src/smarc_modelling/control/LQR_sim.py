@@ -78,7 +78,7 @@ def main():
 
     # create LQR object to to access methods
     Ts = 0.1
-    lqr = LQR(dynamics_function, Ts)
+    lqr = LQR_integrator(dynamics_function, Ts)
 
 
     # Declare reference trajectory
