@@ -31,12 +31,13 @@ class BlueROV_PIML(object):
 
         # Model properties
         # Declaration of parameters for the BlueROV2 heavy configuration
-        self.g = 9.81       # Gravity acc  [kgm/s2]
-        self.V = 0.0134     # Volume of rov [m3]    0.011 enl. 6.dof
-        self.mass = 14.57       # Mass [kg] including DVL and Dropper            11.5 enl. 6-dof mod...
-        self.Ix = 0.2818      # Inertia x-axis [kgm2] including DVL and Dropper 0.16  enl. 6-DoF modelling...
-        self.Iy = 0.2450      # Inertia y-axis [kgm2] including DVL and Dropper 0.16
-        self.Iz = 0.3852      # Inertia z-axis [kgm2] including DVL and Dropper 0.16
+        # https://www.mdpi.com/2077-1312/10/12/1898
+        self.g = 9.81         # Gravity acc  [kgm/s2]
+        self.V = 0.0134       # Volume of rov [m3]    0.011 enl. 6.dof
+        self.mass = 13.5     # Mass [kg] including DVL and Dropper             11.5  enl. 6-dof mod...
+        self.Ix = 0.26      # Inertia x-axis [kgm2] including DVL and Dropper 0.16  enl. 6-DoF modelling...
+        self.Iy = 0.23      # Inertia y-axis [kgm2] including DVL and Dropper 0.16
+        self.Iz = 0.37      # Inertia z-axis [kgm2] including DVL and Dropper 0.16
         self.ro = 1000 #water density [kg/m3]
         self.delta = 0.0134  # water volume moved by ROV [m3] danish report
 
@@ -51,9 +52,9 @@ class BlueROV_PIML(object):
         self.zg = 0         # z-axis [m]
 
         # Added masses
-        self.Xa = 6.36     # Added mass x-axis [kg]            6.36 #Enl Open-Source benchmark....
-        self.Ya = 7.12     # Added mass y-axis [kg]            7.12
-        self.Za = 18.68    # Added mass z-axis [kg]            18.68
+        self.Xa = 6.36      # Added mass x-axis [kg]            6.36 #Enl Open-Source benchmark....
+        self.Ya = 7.12      # Added mass y-axis [kg]            7.12
+        self.Za = 18.68     # Added mass z-axis [kg]            18.68
         self.Ka = 0.189     # Added inertia x-axis [kgm2/rad]   0.189
         self.Ma = 0.135     # Added inertia y-axis [kgm2/rad]   0.135
         self.Na = 0.222     # Added inertia z-axis [kgm2/rad]   0.222

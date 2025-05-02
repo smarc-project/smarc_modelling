@@ -27,7 +27,7 @@ if __name__ == "__main__":
         points = vector[:10, :3].T
         print(np.shape(points))
         # Attaching 3D axis to the figure
-        ax.plot(points[0], points[1], -points[2], label=label)
+        ax.plot(-points[0], points[1], -points[2], label=label)
 
     # Settings for plot
     ax.set_xlabel("x [m]")
