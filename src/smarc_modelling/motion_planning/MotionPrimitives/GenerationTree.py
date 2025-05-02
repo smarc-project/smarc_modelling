@@ -140,13 +140,13 @@ def reconstruct_path(current, parents_dict, resolution_dict, map_instance, ax, p
 
     # Initialize the variables
     final_path = []
-    
     while current is not None:
 
         # Check if we are the starting node
         if parents_dict[current] is None:
             final_path.append(current.state)
             current = None 
+            success = 1
             continue
         
         # Get the list of vertices from resolution_dictionary
@@ -314,7 +314,9 @@ def compute_current_velocity_pointA(vertex):
     r_fwd_body = np.array([0.655, 0, 0])           # Position of forward point relative to CG in body frame
 
     # Ensure quaternion is in (x, y, z, w) format for scipy
-    rotation = R.from_quat(vertex[3:7])
+    q0 = vertex[3]
+    q1, q2, q3 = vertex[4:7]
+    rotation = R.from_quat([q1, q2, q3, q0])                    ####CHANGEDTHIS
     R_b2i = rotation.as_matrix()  # Body to inertial rotation matrix
 
     # Compute cross product in body frame
@@ -753,12 +755,16 @@ def getResolution(reached_states, dt_reference):
     return list_vertices
 
 def computeAngleDeg(state1, state2):
-        r1 = R.from_quat(state1[3:7])
-        r2 = R.from_quat(state2[3:7])
-        q_rel = r2 * r1.inv()
-        angle_rad = q_rel.magnitude()
+    q1 = state1[3:7]
+    q2 = state2[3:7]
 
-        return np.rad2deg(angle_rad)
+    r1 = R.from_quat([q1[1], q1[2], q1[3], q1[0]])  # (x, y, z, w)
+    r2 = R.from_quat([q2[1], q2[2], q2[3], q2[0]])
+
+    q_rel = r2 * r1.inv()
+    angle_rad = q_rel.magnitude()  # angle of relative rotation
+
+    return np.rad2deg(angle_rad)
 
 def find_tree_intersection(g_cost_tree1, g_cost_tree2, list_connection_states, minimumDistance=0.5, minimumAngle = 20):
     connection_node1 = None
@@ -795,41 +801,6 @@ def find_tree_intersection(g_cost_tree1, g_cost_tree2, list_connection_states, m
         #print(connection_node2)
     '''
 
-    '''
-    list_connection_states = []  #[(node1, node2), ...]
-    tree1_kdtree = KDTree(coords_tree1)
-    for idx2, coord2 in enumerate(coords_tree2):
-        
-        # Compute distance
-        distance, index = tree1_kdtree.query(coord2)
-
-        # Consider the two nodes
-        state_node1 = list(g_cost_tree1.keys())[index].state
-        state_node2 = list(g_cost_tree2.keys())[idx2].state
-
-        # Compute their orientation
-        r1 = R.from_quat(state_node1[3:7])
-        r2 = R.from_quat(state_node2[3:7])
-        q_rel = r2 * r1.inv()
-        angle_deg = np.rad2deg(q_rel.magnitude())
-
-        # Compute the cost of the connection
-        if angle_deg < 20 and distance < 2:
-            list_connection_states.append((state_node1, state_node2, distance))
-            #print(f"Intersection found between Tree1 and Tree2: {node1.state}, {node2.state}")
-            #return node1, node2  # Return the connecting nodes
-
-    # Run MPC if necessary
-    if len(list_connection_states) != 0:
-        #print("Found possible connections")
-        foundConnection = True
-        # Take the one which have a similar pitch
-        connection_node1, connection_node2 = findBestConnectionNodes(list_connection_states)
-        #print(connection_node1)
-        #print(connection_node2)
-    #print("No intersections!")
-    '''
-
     moreThanMinimum = False
     if len(list_connection_states) > 1000:
         moreThanMinimum = True
@@ -839,30 +810,6 @@ def find_tree_intersection(g_cost_tree1, g_cost_tree2, list_connection_states, m
 def findBestConnectionNodes(list_states):
     best_angle = np.inf
     best_dist = np.inf
-
-    # Using forward vector
-    '''
-    for state1, state2 in list_states:
-        forward_1 = compute_current_forward_vector(state1)  # in deg
-        forward_2 = compute_current_forward_vector(state2)  # in deg
-        angle_between_vectors = calculate_angle_betweenVectors(forward_1, forward_2)
-        if angle_between_vectors < best_angle:
-            best_angle = angle_between_vectors
-            best_state1 = state1
-            best_state2 = state2
-    '''
-    '''
-    # Using difference between quaternions
-    for state1, state2 in list_states:
-        r1 = R.from_quat(state1[3:7])
-        r2 = R.from_quat(state2[3:7])
-        q_rel = r2 * r1.inv()
-        angle_rad = q_rel.magnitude()
-        if angle_rad < best_angle:
-            best_angle = angle_rad
-            best_state1 = state1
-            best_state2 = state2
-    '''
 
     # Using current_v + forward angles
     for state1, state2 in list_states:
@@ -911,11 +858,12 @@ def find_f_vector(state):
 
 def compute_current_pitch(state):
 
-    q = state[3:7]
-    r = R.from_quat(q)
-    _, pitch, yaw = r.as_euler('xyz', degrees=True)
+    q0, q1, q2, q3 = state[3:7]
 
-    return pitch # in deg 
+    r = R.from_quat([q1, q2, q3, q0])  
+    _, pitch, _ = r.as_euler('xyz', degrees=True)
+
+    return pitch  # in degrees
 
 def compute_current_forward_vector(state):
 
@@ -946,6 +894,7 @@ def double_a_star_search(ax, plt, map_instance, realTimeDraw, typeF_function, de
     dt_resolution = glbv.RESOLUTION_DT
     flag = 0    # for number of iterations
     nMaxIterations = 300
+    maxTime = 300   # seconds
 
     # First tree variables
     x0 = map_instance["initial_state"]
@@ -972,7 +921,9 @@ def double_a_star_search(ax, plt, map_instance, realTimeDraw, typeF_function, de
 
     # Start the search
     list_connection_states = []  #[(node1, node2), ...]
-    while (flag < nMaxIterations):   ###Change this in the future
+    algorithm_start_time = time.time()
+    current_algorithm_time = algorithm_start_time
+    while (current_algorithm_time - algorithm_start_time < maxTime):   ###Change this in the future
         # Are there intersections?
         if flag > 0:
             #connection_node1, connection_node2, found_connection = find_tree_intersection(g_cost, g_cost_secondTree, list_connection_states)
@@ -1109,8 +1060,8 @@ def double_a_star_search(ax, plt, map_instance, realTimeDraw, typeF_function, de
         
 
         # Stop the algorithm if we exceed the maximum number of iterations
-        if flag > nMaxIterations:
-            break
+        #if flag > nMaxIterations:
+        #    break
 
         # Find new neighbors (last point of the primitives) using the motion primitives
         if not arrivedPoint:
@@ -1216,6 +1167,9 @@ def double_a_star_search(ax, plt, map_instance, realTimeDraw, typeF_function, de
         if neighbor_arrived_secondTree:
             arrivedPoint_secondTree = True
 
+        # Update the timer
+        current_algorithm_time = time.time()
+
     # If we arrived here, no solution was found
     print("No solution found!")
 
@@ -1236,6 +1190,7 @@ def a_star_search(ax, plt, map_instance, realTimeDraw, typeF_function, dec):
     dt_resolution = glbv.RESOLUTION_DT
     flag = 0    # for number of iterations
     nMaxIterations = 300
+    maxTime = 300 # seconds
 
     # First tree variables
     x0 = map_instance["initial_state"]
@@ -1249,7 +1204,9 @@ def a_star_search(ax, plt, map_instance, realTimeDraw, typeF_function, dec):
     arrivedPoint = False
 
     # Start the search
-    while (open_set): 
+    algorithm_start_time = time.time()
+    algorithm_current_time = algorithm_start_time
+    while (algorithm_current_time - algorithm_start_time < maxTime): 
         
         # Reconstruct the path of first tree if arrived to the goal
         if arrivedPoint:
@@ -1319,6 +1276,9 @@ def a_star_search(ax, plt, map_instance, realTimeDraw, typeF_function, dec):
 
                 # Save the last node of the primitive along its f_cost
                 heapq.heappush(open_set, (f_cost, Node(neighbor)))   
+        
+        # Update the current time
+        algorithm_current_time = time.time()
         
     # If we arrived here, no solution was found
     print("No solution found!")

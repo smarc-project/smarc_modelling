@@ -80,19 +80,13 @@ def generationFirstMap():
         #start
     startrCell = random.randrange(numberVerticalTiles-4) + 2  #random CELL
     startcCell = random.randrange(numberHorizontalTiles-4) + 2 
-    startzCell = random.randrange(number3DTiles)
-    startrCell = 4
-    startcCell = 5
-    startzCell = 1                                                     
+    startzCell = random.randrange(number3DTiles)                                           
     map1[startzCell][startrCell][startcCell] = 2
 
         #goal center cell
     goalrCell = random.randrange(numberVerticalTiles-4) + 2     #random CELL
     goalcCell = random.randrange(numberHorizontalTiles - 4) + 2    #random CELL
     goalzCell = random.randrange(number3DTiles)
-    goalrCell = 11
-    goalcCell = 5
-    goalzCell = 1
 
     # Change the goal if goal==start position
     while goalrCell == startrCell and goalcCell == startcCell and goalzCell == startzCell:
@@ -122,8 +116,7 @@ def generationFirstMap():
     eta0[0] = startingPixel[0]
     eta0[1] = startingPixel[1]
     eta0[2] = startingPixel[2]
-    #initial_yaw = np.deg2rad(random.randrange(-180, 180, 90))   # in deg
-    initial_yaw = np.deg2rad(0)   # in deg
+    initial_yaw = np.deg2rad(random.randrange(-180, 180, 90))   # in deg
     initial_pitch = np.deg2rad(0) # in deg
     initial_roll = np.deg2rad(0)  # in deg 
     r = R.from_euler('zyx', [initial_yaw, initial_pitch, initial_roll])
@@ -139,15 +132,13 @@ def generationFirstMap():
     # SAM final state
     finalState = x0.copy()
     finalState[0:3] = arrivalPixel[0:3]
-    #final_yaw = np.deg2rad(random.randrange(-180, 180, 90))   # in deg
-    final_yaw = np.deg2rad(-90)
+    final_yaw = np.deg2rad(random.randrange(-180, 180, 90))   # in deg
     final_pitch = np.deg2rad(0) # in deg
     final_roll = np.deg2rad(0)  # in deg 
     r = R.from_euler('zyx', [final_yaw, final_pitch, final_roll])
     q = r.as_quat()
     finalState[3] = q[3]
     finalState[4:7] = q[0:3]
-
 
     # Create the map instance to pass to other scripts
     map_instance = {

@@ -32,7 +32,7 @@ def runStatisticalAnalysis(numberTrials, chosenComplexity):
     # Start analysis
     print(f"{bcolors.HEADER}>> Analysis started{bcolors.ENDC}")
     for trial in range(numberTrials):
-
+        print(f"{bcolors.UNDERLINE}MAP NUMBER: {trial:.0f} {bcolors.ENDC}")
         # Generate the map
         complexity = -1
         while complexity != chosenComplexity:
@@ -57,11 +57,11 @@ def runStatisticalAnalysis(numberTrials, chosenComplexity):
             end_a_star = time.time()
         
         # Analyse the results
-        if successfulSearch:
+        if successfulSearch: 
             last_state = trajectory[-1]
         else:
             last_state = map_instance["initial_state"]
-        all_results.append((typeTree, complexity, successfulSearch, failingNotes, map_instance["initial_state"], map_instance["final_state"], last_state, start_a_star-end_a_star, len(trajectory)))
+        all_results.append((typeTree, complexity, successfulSearch, failingNotes, map_instance["initial_state"], map_instance["final_state"], last_state, end_a_star-start_a_star, len(trajectory)))
 
         # Save the trajectory
         trajectory_to_save = []
@@ -81,13 +81,14 @@ def runStatisticalAnalysis(numberTrials, chosenComplexity):
         print(f"{bcolors.OKGREEN}Results are stored in a_star_results.csv file!{bcolors.ENDC}")
 
         # Save the trajectory
-        print(f"{bcolors.HEADER}>> Save the trajectory >> saved_trajectory.csv{bcolors.ENDC}")
-        df = pd.DataFrame(trajectory, columns=["x", "y", "z", "q0", "q1", "q2", "q3", "u", "v", "w", "q", "p", "r", "V_bs", "l_cg", "ds", "dr", "rpm_1", "rpm_2"])
-        df.to_csv("saved_trajectory.csv", index=False)
-        print(f"{bcolors.OKGREEN}[ OK ]{bcolors.ENDC}")
+        #print(f"{bcolors.HEADER}>> Save the trajectory >> saved_trajectory.csv{bcolors.ENDC}")
+        #df = pd.DataFrame(trajectory, columns=["x", "y", "z", "q0", "q1", "q2", "q3", "u", "v", "w", "q", "p", "r", "V_bs", "l_cg", "ds", "dr", "rpm_1", "rpm_2"])
+        #df.to_csv("saved_trajectory.csv", index=False)
+        #print(f"{bcolors.OKGREEN}[ OK ]{bcolors.ENDC}")
 
         
         # Create GIF (!! It will be overwritten at each trial !!)
+        '''
         print(f"{bcolors.HEADER}>> Generate GIF{bcolors.ENDC}")
         ax, plt, fig = plot_map(map_instance, "gif")
         step = 10  # how many points to skip
@@ -97,6 +98,7 @@ def runStatisticalAnalysis(numberTrials, chosenComplexity):
         # Save the GIF
         ani.save('/home/parallels/Desktop/smarc_modelling-master/pics/torpedo_motion.gif', writer="ffmpeg", fps=5)
         print(f"{bcolors.OKGREEN}[ OK ]{bcolors.ENDC}")
+        '''
         
     
     # Draw all the maps 

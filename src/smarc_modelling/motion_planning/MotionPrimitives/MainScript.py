@@ -147,5 +147,7 @@ def MotionPlanningAlgorithm(realTimeDraw):
         
 if __name__ == "__main__":
 
-    MotionPlanningAlgorithm(True)
-    #runStatisticalAnalysis(1, 2)    # (nTrials, chosenComplexity)
+    #MotionPlanningAlgorithm(True)
+    runStatisticalAnalysis(1, 0)    # (nTrials, chosenComplexity)
+
+    ## Add if at least one tree arrives in the dataset

@@ -113,7 +113,7 @@ def update(frame, ax, plt, trajectory):
 
     # Get the current state
     vertex = trajectory[frame]
-    colorr = frame / (len(trajectory)-1)  # Normalize color based on frame
+    colorr = frame / (len(trajectory))  # Normalize color based on frame
 
     # Draw torpedo
     draw_torpedo(ax, vertex, colorr)
