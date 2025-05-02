@@ -19,7 +19,7 @@ from smarc_modelling.vehicles import *
 from smarc_modelling.lib import *
 from smarc_modelling.vehicles.SAM_LQR import SAM_LQR
 from smarc_modelling.vehicles.SAM_casadi import SAM_casadi
-from smarc_modelling.lib.plot import plot_function
+from smarc_modelling.lib.plot import plot_function, part_plot_function
 
 
 def read_csv_to_array(file_path: str):
@@ -78,7 +78,7 @@ def main():
 
     # create LQR object to to access methods
     Ts = 0.1
-    lqr = LQR_integrator(dynamics_function, Ts)
+    lqr = LQR(dynamics_function, Ts)
 
 
     # Declare reference trajectory
@@ -113,15 +113,21 @@ def main():
     for i in range(Nsim):
         print("-------------------------------------------------------------")
         print(f"Nsim: {i}")
-        time_start = time.time()
-        u = lqr.solve(x, u, x_lin, u_lin)
-        time_end = time.time()
-        t[i] = time_end - time_start
+        try:
+            time_start = time.time()
+            u = lqr.solve(x, u, x_lin, u_lin)
+            time_end = time.time()
+            t[i] = time_end - time_start
+            x_next = runge_kutta_4(casadi_dynamics, x, u, Ts)
+            x_next[3:7] = x_next[3:7]/scipy.linalg.norm(x_next[3:7])  # Normalize quaternion
         
-        x_next = runge_kutta_4(casadi_dynamics, x, u, Ts)
-        print(x_next[3:7])
-        x_next[3:7] = x_next[3:7]/scipy.linalg.norm(x_next[3:7])  # Normalize quaternion
-        
+        except:
+            print("LQR solver failed")
+            simNonlinear = simNonlinear[:i,:]
+            simU = simU[:i,:]
+            Nsim = simNonlinear.shape[0]-1
+            break
+
         if i < x_ref.shape[0]-1:
             x_lin = x_ref[i+1,:]
             u_lin = u_ref[i+1,:]
@@ -129,6 +135,8 @@ def main():
         x=x_next
         simNonlinear[i+1,:] = x_next
         simU[i+1,:] = u
+
+
 
     # evaluate timings
     t *= 1000  # scale to milliseconds
@@ -139,6 +147,8 @@ def main():
     sim = np.hstack([simNonlinear, simU])
     u_dot = np.zeros(simU.shape)
     #plot(x_axis, references, u_ref, simNonlinear[:-1], simU[:-1])
-    plot_function(x_axis, trajectory, sim[:-1], u_dot[:-1])
+    #plot_function(x_axis, trajectory, sim[:-1], u_dot[:-1])
+    part_plot_function(trajectory, sim[:-1], u_dot[:-1])
+
 if __name__ == '__main__':
     main()

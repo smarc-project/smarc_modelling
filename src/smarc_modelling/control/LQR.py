@@ -1,7 +1,7 @@
 import scipy.linalg 
 import numpy as np
 import casadi as ca
-
+from scipy.signal import cont2discrete
 
 # Add the LQR below -UPDATED TO ONLY INPUT FULL QUATERNIONS BUT ONLY USE THE 3 VECTORIAL
 class LQR:
@@ -89,10 +89,10 @@ class LQR:
 
         # Control rate of change weight matrix - control inputs as [x_vbs, x_lcg, delta_s, delta_r, rpm1, rpm2]
         R_diag = np.ones(6)
-        R_diag[ :2] = 1e-2
-        R_diag[2:4] = 1/200
-        R_diag[4: ] = 1e-5
-        R = np.diag(R_diag)*100
+        R_diag[ :2] = 1e-4
+        R_diag[2:4] = 1/50
+        R_diag[4: ] = 1e-6
+        R = np.diag(R_diag)
 
         
         P = scipy.linalg.solve_discrete_are(self.Ad, self.Bd, Q, R)
@@ -159,7 +159,7 @@ class LQR_integrator:
     def __init__(self, dynamics, Ts):
         self.Ts = Ts
         self.dynamics = dynamics
-        self.i = np.zeros((12,))
+        self.i = np.zeros((3,))
 
     def create_linearized_dynamics(self, nx: int, nu: int):
         """
@@ -175,12 +175,6 @@ class LQR_integrator:
         """
         x_sym = ca.MX.sym('x', nx, 1)
         u_sym = ca.MX.sym('u', nu, 1)
-        
-        # Create Casadi functions to calculate jacobian
-        # self.dfdx = ca.Function('dfdx', [x_sym, u_sym], [ca.jacobian(self.dynamics(x_sym, u_sym), x_sym)])
-        # self.dfdu = ca.Function('dfdu', [x_sym, u_sym], [ca.jacobian(self.dynamics(x_sym, u_sym), u_sym)])
-        # print(self.dfdx)
-        # A_d_sym, Bd_sym = self.continuous_to_discrete(self.Ac_sym, self.Bc_sym, dt = 0.01)
 
         self.A = ca.Function('Ac', [x_sym, u_sym], [ca.jacobian(self.dynamics(x_sym, u_sym), x_sym)])
         self.B = ca.Function('Bc', [x_sym, u_sym], [ca.jacobian(self.dynamics(x_sym, u_sym), u_sym)])
@@ -200,48 +194,28 @@ class LQR_integrator:
         """
         self.Ac = self.A(x_lin, u_lin)
         self.Bc = self.B(x_lin, u_lin) 
-        # A = np.array(self.Ac)
-        # B = np.array(self.Bc) 
-        # self.Bd = np.block([[B], [np.zeros((12,6))]])
+        A = np.array(self.Ac)
+        B = np.array(self.Bc) 
+        C = np.hstack([np.eye(3), np.zeros((3, 9))])
+        self.C = C
 
-        # self.Ad = np.block([[A, np.zeros(A.shape)],
-        #                     [np.eye(12), np.eye(12)]])      
+        # self.Ac = np.block([[A, np.zeros(C.T.shape)],
+        #                     [-C, np.zeros((C.shape[0], C.shape[0]))]])     
+        self.Ac = np.block([[A, np.zeros(C.T.shape)],
+                            [-C, np.zeros((C.shape[0], C.shape[0]))]]) 
+        self.Bc = np.block([[B], [np.zeros((3,6))]])
+ 
        
     def continuous_to_discrete(self, dt):
-        """
-        Convert continuous-time system matrices (A, B) to discrete-time (A_d, B_d) using zero-order hold.
-        
-        Parameters:
-        A (ca.MX): Continuous-time state matrix
-        B (ca.MX): Continuous-time input matrix
-        dt (float): Sampling time
-        
-        Returns:
-        A_d (ca.MX): Discrete-time state matrix
-        B_d (ca.MX): Discrete-time input matrix
-        """
-        # Convert to numpy matrices (Problem with casadi plugin)
-        A = np.array(self.Ac)
-        B = np.array(self.Bc)
+        self.Ad, self.Bd, _, _, _ = cont2discrete((self.Ac, self.Bc, self.C, np.zeros(self.Bc.shape)), dt)
 
-        #print(scipy.linalg.det(A))
-        # Discretize the A matrix (A_d = exp(A * dt))
-        self.Ad = scipy.linalg.expm(A * dt)
 
-        I = np.eye(A.shape[0])  # Identity matrix of the same size as A
-
-        # Discretize B using the trapezoidal rule (more accurate than Euler method)
-        Ad_inv = scipy.linalg.inv(self.Ad)
-        self.Bd = np.block([[np.dot(Ad_inv * (self.Ad + I), B)], [np.zeros((12,6))]])
-
-        self.Ad = np.block([[self.Ad, np.zeros(self.Ad.shape)],
-                            [-np.eye(12), np.eye(12)]])
         
     def compute_lqr_gain(self):
         # State weight matrix
-        Q_diag = np.ones(24)
-        Q_diag[ 0:3 ] = 1
-        Q_diag[ 3:6 ] = 1
+        Q_diag = np.ones(15)
+        Q_diag[ 0:3 ] = 10
+        Q_diag[ 3:6 ] = 10
         Q_diag[ 6:9] = 1
         Q_diag[9:12] = 1
         Q_diag[12:] = 1 #integrator
@@ -253,7 +227,7 @@ class LQR_integrator:
         R_diag[ :2] = 1e-4
         R_diag[2:4] = 1/50
         R_diag[4: ] = 1e-6
-        R = np.diag(R_diag)*1
+        R = np.diag(R_diag)*1e-2
 
         
         P = scipy.linalg.solve_discrete_are(self.Ad, self.Bd, Q, R)
@@ -274,12 +248,13 @@ class LQR_integrator:
         Li = self.L[:,12:]
         # Calculate control input
         # Since delta_u =-L*delta_x, delta_u = u-u_ref --> u = -L*delta_x + u_ref
-        u = -Lp @ (self.x_error(x, x_ref)) - Li @ (self.i)
-        self.i = self.i + (self.x_error(x, x_ref))
+        error = self.x_error(x, x_ref)
+        self.i += error[:3]
 
+        u = -Lp @ error - Li @ (self.i) + u_ref
+        print(f"u:   {u}\nu_p: {-Lp @ error}\nu_i: {-Li @ (self.i)}\nu_r: {u_ref}")
         # Convert output from casadi.DM to np.array 
         u = np.array(u).flatten()
-        print(u)
         return u
     
     def x_error(self, x, ref):
