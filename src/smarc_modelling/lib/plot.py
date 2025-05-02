@@ -699,3 +699,175 @@ def part_plot_function(ref, simX, simU):
 
     # Show the plot
     plt.show()
+
+def refplot(ref):
+    x_axis = np.linspace(0, (0.1)*ref.shape[0], ref.shape[0])
+    Uref = ref[:, 13:]
+    ref = ref[:,:13]  
+
+    psi = np.zeros(np.size(ref, 0))
+    theta = np.zeros(np.size(ref, 0))
+    phi = np.zeros(np.size(ref, 0))
+    for i in range(np.size(ref, 0)):
+        q = [ref[i, 3], ref[i, 4], ref[i, 5], ref[i, 6]]
+        psi[i], theta[i], phi[i] = gnc.quaternion_to_angles(q)
+
+    reference = np.zeros((np.size(ref, 0), 12))
+    reference[:, :3] = ref[:, :3]
+    reference[:, 3] = phi
+    reference[:, 4] = theta
+    reference[:, 5] = psi
+    reference[:, 6:]  = ref[:, 7:]
+    
+    ref = reference            
+
+    plt.figure()
+    plt.subplot(4,3,1)
+    plt.plot(x_axis,  ref[:, 0], linestyle='--', color='r')
+    plt.legend(["X", "X_ref"])
+    plt.ylabel("Position [m]")
+    plt.grid()
+
+    plt.subplot(4,3,2)
+    plt.plot(x_axis,  ref[:, 1], linestyle='--', color='r')
+    plt.legend(["Y", "Y_ref"])
+    plt.ylabel("Position [m]")
+    plt.grid()
+
+    plt.subplot(4,3,3)
+    plt.plot(x_axis,  ref[:, 2], linestyle='--', color='r')
+    plt.legend(["Z", "Z_ref"])
+    plt.ylabel("Position [m]")
+    plt.grid()
+
+    plt.subplot(4,3,4)
+    plt.plot(x_axis,  ref[:, 6], linestyle='--', color='r')
+    plt.legend([r"$\dotX$", r"$\dotX_{ref}$"])
+    plt.ylabel("X Velocity [m/s]")
+    plt.grid()
+
+    plt.subplot(4,3,5)
+    plt.plot(x_axis,  ref[:, 7], linestyle='--', color='r')
+    plt.legend([r"$\dotY$", r"$\dotY_{ref}$"])
+    plt.ylabel("Y Velocity [m/s]")
+    plt.grid()
+
+    plt.subplot(4,3,6)
+    plt.plot(x_axis,  ref[:, 8], linestyle='--', color='r')
+    plt.legend([r"$\dotZ$", r"$\dotZ_{ref}$"])
+    plt.ylabel("Z Velocity [m/s]")
+    plt.grid()
+
+    plt.subplot(4,3,7)
+    plt.plot(x_axis, np.rad2deg(ref[:, 3]), linestyle='--', color='r')
+    plt.legend([r"$\phi$", r"$\phi_{ref}$"])
+    plt.ylabel("Roll [deg]")    
+    plt.grid()
+
+    plt.subplot(4,3,8)
+    plt.plot(x_axis, np.rad2deg(ref[:, 4]), linestyle='--', color='r')
+    plt.legend([r"$\theta$", r"$\theta_{ref}$"])
+    plt.ylabel("Pitch [deg]")
+    plt.grid()
+
+    plt.subplot(4,3,9)
+    plt.plot(x_axis, np.rad2deg(ref[:, 5]), linestyle='--', color='r')
+    plt.legend([r"$\psi$", r"$\psi_{ref}$"])
+    plt.ylabel("Yaw [deg]")
+    plt.grid()
+
+    plt.subplot(4,3,10)
+    plt.plot(x_axis,  ref[:, 9], linestyle='--', color='r')
+    plt.legend([r"$\dot\phi$", r"$\dot\phi_{ref}$"])
+    plt.ylabel("Angular Velocity [rad/s]")
+    plt.grid()
+
+    plt.subplot(4,3,11)
+    plt.plot(x_axis,  ref[:, 10], linestyle='--', color='r')
+    plt.legend([r"$\dot\theta$", r"$\dot\theta_{ref}$"])
+    plt.ylabel("Angular Velocity [rad/s]")
+    plt.grid()
+
+    plt.subplot(4,3,12)
+    plt.plot(x_axis,  ref[:, 11], linestyle='--', color='r')
+    plt.legend([r"$\dot\psi$", r"$\dot\psi_{ref}$"])
+    plt.ylabel("Angular Velocity [rad/s]")
+    plt.grid()
+
+
+    # Control Inputs
+    plt.figure()
+    plt.subplot(4,3,1)
+    plt.step(x_axis, Uref[:, 0], linestyle='--', color='r')
+    plt.legend([r"VBS", r"VBS_{ref}"])
+    plt.ylabel("VBS input") 
+    plt.grid()
+
+    plt.subplot(4,3,2)
+    plt.step(x_axis, Uref[:, 2], linestyle='--', color='r')
+    plt.title("Control inputs")
+    plt.legend([r"Stern angle", r"s_{ref}"])
+    plt.ylabel(r" Degrees [$\degree$]")
+    plt.grid()
+
+    plt.subplot(4,3,3)
+    plt.step(x_axis, Uref[:, 4], linestyle='--', color='r')
+
+    plt.legend([r"RPM1", r"RPM1_{ref}"])
+    plt.ylabel("Motor RPM")
+    plt.grid()
+
+
+    plt.subplot(4,3,7)
+    plt.step(x_axis, Uref[:, 1], linestyle='--', color='r')
+    plt.legend([r"LCG", r"LCG_{ref}"])
+    plt.ylabel("LCG input")
+    plt.grid()
+
+    plt.subplot(4,3,8)
+    plt.step(x_axis, Uref[:, 3], linestyle='--', color='r')
+    plt.legend([r"Rudder angle", r"r_{ref}"])
+    plt.ylabel(r" degrees [$\degree$]")
+    plt.grid()
+
+    plt.subplot(4,3,9)
+    plt.step(x_axis, Uref[:, 5], linestyle='--', color='r')
+    plt.legend([r"RPM2", r"RPM2_{ref}"])
+    plt.ylabel("Motor RPM")
+    plt.grid()
+
+    # Create a figure and a 3D axis
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+
+    # Plot the trajectory
+    ax.plot3D(ref[:, 0], ref[:, 1], ref[:, 2], linestyle='--', label='Reference', lw=1, c='black')
+
+    # Set axis limits
+    ax.set_xlim([0, 5])
+    ax.set_ylim([0, 10])
+    ax.set_zlim([0, 3])
+    ax.set_box_aspect([1, 2, 1])  # Example: X:Y:Z ratio
+
+
+    # Add directional arrows
+    arrow_step = 15  # Adjust this value to control the spacing of the arrows
+    for i in range(0, len(ref) - arrow_step, arrow_step):
+        c = np.sqrt((ref[i + arrow_step, 0] - ref[i, 0])**2 + (ref[i + arrow_step, 1] - ref[i, 1])**2 + (ref[i + arrow_step, 2] - ref[i, 2])**2)
+        ax.quiver(ref[i,0], ref[i, 1], ref[i, 2], 
+                  np.cos(psi[i])*np.cos(theta[i]), 
+                  np.sin(psi[i]), 
+                  -np.sin(theta[i]), color='black', length=1, normalize=True)
+
+    # Add labels
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    ax.set_zlabel('Z')
+    ax.legend()
+
+    # Invert the z_axis
+    ax.invert_zaxis()
+
+
+    # Show the plot
+    plt.show()

@@ -67,6 +67,20 @@ def runge_kutta_4(f, x, u, dt):
 
     return np.array(x_next).flatten()
 
+def save_csv(trajectory, t):
+    """
+    Saves a NumPy array to a CSV file.
+
+    Parameters:
+    trajectory (np.array): The NumPy array to save.
+    file_path (str): The path to the CSV file.
+    """
+    np.savetxt("/home/admin/smarc_modelling/src/Trajectories/REPORT/easy/LQR/easy6.csv"
+               , trajectory, delimiter=',', header="X,Y,Z,phi,theta,psi,vx,vy,vz,p,q,r,control", comments='')
+    np.savetxt("/home/admin/smarc_modelling/src/Trajectories/REPORT/easy/LQR/time_easy6.csv"
+               , t, delimiter=',', header="time (ms)", comments='')
+    print("CSV file saved successfully.")
+
 def main():
     # Extract the CasADi model
     sam = SAM_LQR()
@@ -82,7 +96,7 @@ def main():
 
 
     # Declare reference trajectory
-    file_path = "/home/admin/smarc_modelling/src/Trajectories/REPORT/case_medium.csv"
+    file_path = "/home/admin/smarc_modelling/src/Trajectories/REPORT/easy/case_easy3.csv"
     trajectory = read_csv_to_array(file_path)
 
     Nsim = trajectory.shape[0]
@@ -148,6 +162,7 @@ def main():
     u_dot = np.zeros(simU.shape)
     #plot(x_axis, references, u_ref, simNonlinear[:-1], simU[:-1])
     #plot_function(x_axis, trajectory, sim[:-1], u_dot[:-1])
+    #save_csv(sim, t)
     part_plot_function(trajectory, sim[:-1], u_dot[:-1])
 
 if __name__ == '__main__':

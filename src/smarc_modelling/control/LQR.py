@@ -81,9 +81,9 @@ class LQR:
         # State weight matrix
         Q_diag = np.ones(12)
         Q_diag[ 0:3 ] = 1
-        Q_diag[ 3:6 ] = 1
+        Q_diag[ 3:6 ] = 4
         Q_diag[ 6:9] = 1
-        Q_diag[9:] = 1
+        Q_diag[9:] = 5
         Q = np.diag(Q_diag)
 
 
@@ -92,7 +92,7 @@ class LQR:
         R_diag[ :2] = 1e-4
         R_diag[2:4] = 1/50
         R_diag[4: ] = 1e-6
-        R = np.diag(R_diag)
+        R = np.diag(R_diag)*3
 
         
         P = scipy.linalg.solve_discrete_are(self.Ad, self.Bd, Q, R)
@@ -138,15 +138,20 @@ class LQR:
         q = x[3:7]
 
         # Since unit quaternion, quaternion inverse is equal to its conjugate
-        q_conj = ca.vertcat(q[0], -q[1], -q[2], -q[3])
-        q = q_conj
+        q_conj = ca.vertcat(q_ref[0], -q_ref[1], -q_ref[2], -q_ref[3])
+        q_ref = q_conj
         # q_error = q_ref @ q^-1
-        #q_w = q_ref[0] * q[0] - q_ref[1] * q[1] - q_ref[2] * q[2] - q_ref[3] * q[3]
+        q_w = q_ref[0] * q[0] - q_ref[1] * q[1] - q_ref[2] * q[2] - q_ref[3] * q[3]
         q_x = q_ref[0] * q[1] + q_ref[1] * q[0] + q_ref[2] * q[3] - q_ref[3] * q[2]
         q_y = q_ref[0] * q[2] - q_ref[1] * q[3] + q_ref[2] * q[0] + q_ref[3] * q[1]
         q_z = q_ref[0] * q[3] + q_ref[1] * q[2] - q_ref[2] * q[1] + q_ref[3] * q[0]
 
-        q_error = ca.vertcat(q_x, q_y, q_z)
+
+        q_error = ca.vertcat(q_w, q_x, q_y, q_z)
+
+        q_error = q_error / ca.norm_2(q_error)
+
+        q_error = ca.vertcat(q_error[1], q_error[2], q_error[3])
 
         pos_error = x[:3] - ref[:3] #+ np.array([(np.random.random()-0.5)/5,(np.random.random()-0.5)/5, (np.random.random()-0.5)/5])
         vel_error = x[7:13] - ref[7:13]
@@ -214,8 +219,8 @@ class LQR_integrator:
     def compute_lqr_gain(self):
         # State weight matrix
         Q_diag = np.ones(15)
-        Q_diag[ 0:3 ] = 10
-        Q_diag[ 3:6 ] = 10
+        Q_diag[ 0:3 ] = 1
+        Q_diag[ 3:6 ] = 1
         Q_diag[ 6:9] = 1
         Q_diag[9:12] = 1
         Q_diag[12:] = 1 #integrator
@@ -227,7 +232,7 @@ class LQR_integrator:
         R_diag[ :2] = 1e-4
         R_diag[2:4] = 1/50
         R_diag[4: ] = 1e-6
-        R = np.diag(R_diag)*1e-2
+        R = np.diag(R_diag)*5
 
         
         P = scipy.linalg.solve_discrete_are(self.Ad, self.Bd, Q, R)
@@ -251,7 +256,7 @@ class LQR_integrator:
         error = self.x_error(x, x_ref)
         self.i += error[:3]
 
-        u = -Lp @ error - Li @ (self.i) + u_ref
+        u = -Lp @ error - Li @ (self.i)
         print(f"u:   {u}\nu_p: {-Lp @ error}\nu_i: {-Li @ (self.i)}\nu_r: {u_ref}")
         # Convert output from casadi.DM to np.array 
         u = np.array(u).flatten()
@@ -273,15 +278,20 @@ class LQR_integrator:
         q = x[3:7]
 
         # Since unit quaternion, quaternion inverse is equal to its conjugate
-        q_conj = ca.vertcat(q[0], -q[1], -q[2], -q[3])
-        q = q_conj
+        q_conj = ca.vertcat(q_ref[0], -q_ref[1], -q_ref[2], -q_ref[3])
+        q_ref = q_conj
         # q_error = q_ref @ q^-1
-        #q_w = q_ref[0] * q[0] - q_ref[1] * q[1] - q_ref[2] * q[2] - q_ref[3] * q[3]
+        q_w = q_ref[0] * q[0] - q_ref[1] * q[1] - q_ref[2] * q[2] - q_ref[3] * q[3]
         q_x = q_ref[0] * q[1] + q_ref[1] * q[0] + q_ref[2] * q[3] - q_ref[3] * q[2]
         q_y = q_ref[0] * q[2] - q_ref[1] * q[3] + q_ref[2] * q[0] + q_ref[3] * q[1]
         q_z = q_ref[0] * q[3] + q_ref[1] * q[2] - q_ref[2] * q[1] + q_ref[3] * q[0]
 
-        q_error = ca.vertcat(q_x, q_y, q_z)
+
+        q_error = ca.vertcat(q_w, q_x, q_y, q_z)
+
+        q_error = q_error / ca.norm_2(q_error)
+
+        q_error = ca.vertcat(q_error[1], q_error[2], q_error[3])
 
         pos_error = x[:3] - ref[:3] #+ np.array([(np.random.random()-0.5)/5,(np.random.random()-0.5)/5, (np.random.random()-0.5)/5])
         vel_error = x[7:13] - ref[7:13]
@@ -402,7 +412,7 @@ class LQR_transform2:
         R_diag[ :2] = 1e-2
         R_diag[2:4] = 1/200
         R_diag[4: ] = 1e-5
-        R = np.diag(R_diag)*100
+        R = np.diag(R_diag)*1
 
         
         P = scipy.linalg.solve_discrete_are(self.Ad, self.Bd, Q, R)
@@ -463,7 +473,8 @@ class LQR_transform2:
 
         # Since unit quaternion, quaternion inverse is equal to its conjugate
         q_conj = ca.vertcat(q[0], -q[1], -q[2], -q[3])
-        q = q_conj
+        q = q_ref
+        q_ref = q_conj
         # q_error = q_ref @ q^-1
         #q_w = q_ref[0] * q[0] - q_ref[1] * q[1] - q_ref[2] * q[2] - q_ref[3] * q[3]
         q_x = q_ref[0] * q[1] + q_ref[1] * q[0] + q_ref[2] * q[3] - q_ref[3] * q[2]
