@@ -9,7 +9,7 @@
 import numpy as np
 from smarc_modelling.vehicles.SAM_PIML import SAM_PIML # Customized SAM using PIML predictions for D
 from smarc_modelling.vehicles.BlueROV_PIML import BlueROV_PIML
-from smarc_modelling.piml.utils.utiity_functions import load_data_from_bag
+from smarc_modelling.piml.utils.utility_functions import load_data_from_bag
 import matplotlib.pyplot as plt
 import torch
 
@@ -30,11 +30,11 @@ class VEHICLE_SIM:
         elif vehicle == "BROV":
             self.vehicle = BlueROV_PIML(h=dt, piml_type=model_type)
         else: 
-            print("Selected vehicle for VEHC_SIM does not exist")
+            print("Selected vehicle for VEHICLE_SIM does not exist")
             return
         
-        # Calculating how many sim steps we need
-        self.n_sim = int(max(time_vec)-int(min(time_vec))/self.dt)
+        # Calculating how many sim steps we need to cover full time
+        self.n_sim = int((int(max(time_vec)) - int(min(time_vec)))/self.dt)
 
         # Time tracking for when to update controls
         self.idx = 0
@@ -44,18 +44,21 @@ class VEHICLE_SIM:
 
     def run_sim(self):
         
+        print(f" Running simulator...")
         # For storing results of sim
         data = np.empty((len(self.x0), self.n_sim))
         data[:,0] = self.x0
+        idx_max = len(self.controls)
 
         # Euler forward integration
         for i in range(self.n_sim-1):
+        
             data[:,i+1] = data[:,i] + self.vehicle.dynamics(data[:,i], self.controls[self.idx]) * (self.dt)
             self.t += self.dt
             # Update index for controls when we have new data based on current time
-            if self.t >= self.times[self.idx]:
+            if self.t > self.times[self.idx]:
                 self.idx += 1
-
+                self.idx = min([self.idx, idx_max-1]) # At the end of sim we just run with the last control input
         return data
 
 

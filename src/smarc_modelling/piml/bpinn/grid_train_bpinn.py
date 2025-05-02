@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-from smarc_modelling.piml.pinn.pinn import PINN, loss_function
+from smarc_modelling.piml.bpinn.bpinn import BPINN, loss_function
 from smarc_modelling.piml.utils.utility_functions import load_data_from_bag
 from smarc_modelling.piml.piml_simulator import VEHICLE_SIM
 import torch
@@ -34,7 +34,7 @@ if __name__ == "__main__":
                 shape.append(36) # Output layer
                 
                 # Initalize model
-                model = PINN(shape)
+                model = BPINN(shape)
                 optimizer = torch.optim.Adam(model.parameters(), lr=lr_0)
 
                 # Adaptive learning rate
@@ -42,12 +42,13 @@ if __name__ == "__main__":
 
                 # Early stopping with validation loss
                 best_val_loss = float("inf")
-                patience = 50000
+                patience = 5000
                 counter = 0
                 best_model_state = None
 
                 # Training loop
                 epochs = 500000
+                print(f" Starting training with these params, layers:{layers}, size:{size}, lr_0:{lr_0}")
                 for epoch in range(epochs):
 
                     model.train()
@@ -85,12 +86,13 @@ if __name__ == "__main__":
                 
                 # Calculating the model error
                 model.load_state_dict(best_model_state) # Loading the best model state
-                torch.save({"model_shape": shape, "state_dict": model.state_dict()}, "src/smarc_modelling/piml/models/pinn.pt") 
+                torch.save({"model_shape": shape, "state_dict": model.state_dict()}, "src/smarc_modelling/piml/models/bpinn.pt") 
                 model.eval() # Just to doubly ensure that it is in eval mode
 
                 try: 
+
                     # Running the SAM simulator to get predicted validation path
-                    sam_pinn = VEHICLE_SIM("pinn", 0.01, x_val[0], t_val, u_cmd_val, "SAM")
+                    sam_pinn = VEHICLE_SIM("bpinn", 0.01, x_val[0], t_val, u_cmd_val, "SAM")
                     results = sam_pinn.run_sim()[:, 0:13].T
 
                     # Error from results

@@ -5,7 +5,7 @@
 import torch
 import torch.nn as nn
 import numpy as np
-from smarc_modelling.piml.utils.utiity_functions import load_data_from_bag
+from smarc_modelling.piml.utils.utility_functions import load_data_from_bag
 import sys
 import matplotlib.pyplot as plt
 
@@ -69,9 +69,8 @@ def loss_function(model, x, Dv_comp, Mv_dot, Cv, g_eta, tau, nu):
 
 def init_pinn_model(file_name: str):
     # For easy initialization of model in other files
-    # TODO: Maybe pass model dict name
     dict_path = "src/smarc_modelling/piml/models/" + file_name
-    dict_file = torch.load("src/smarc_modelling/piml/models/pinn.pt", weights_only=True)
+    dict_file = torch.load(dict_path, weights_only=True)
     model = PINN(dict_file["model_shape"])
     model.load_state_dict(dict_file["state_dict"])
     model.eval()

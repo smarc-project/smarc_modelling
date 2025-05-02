@@ -62,6 +62,7 @@ from smarc_modelling.lib.gnc import *
 
 # For PIML model prediction
 from smarc_modelling.piml.pinn.pinn import init_pinn_model, pinn_predict
+from smarc_modelling.piml.bpinn.bpinn import init_bpinn_model, bpinn_predict
 
 
 class SolidStructure:
@@ -278,6 +279,10 @@ class SAM_PIML():
         if self.piml_type == "pinn":
             print(f" Physics Informed Neural Network model initialized!")
             self.piml_model = init_pinn_model("pinn.pt")
+
+        if self.piml_type == "bpinn":
+            print(f" Bayesian - Physics Informed Neural Network model intialized!")
+            self.piml_model = init_bpinn_model("bpinn.pt")
 
     def init_vehicle(self):
         """
@@ -529,6 +534,8 @@ class SAM_PIML():
 
         if self.piml_type == "pinn":
             self.D = pinn_predict(self.piml_model, eta, nu, u)
+        elif self.piml_type == "bpinn":
+            self.D = bpinn_predict(self.piml_model, eta, nu, u)
 
     def calculate_g(self):
         """

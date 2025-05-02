@@ -157,3 +157,4 @@ def get_state_and_control():
 if __name__ == '__main__':
     states, control = get_state_and_control()
     print(np.shape(states), np.shape(control))
+    np.vstack((states, control))

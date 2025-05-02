@@ -1,6 +1,10 @@
-import casadi as ca
 import numpy as np
 from smarc_modelling.piml.pinn.pinn import init_pinn_model, pinn_predict
+from smarc_modelling.piml.utils.utility_functions import eta_quat_to_deg, angular_vel_to_quat_vel
+import os
+import yaml
+
+# Heavily modified to not use casadi anymore & implementing PIML stuff
 
 class BlueROV_PIML(object):
     def __init__(self,
@@ -22,8 +26,8 @@ class BlueROV_PIML(object):
         self.dt = h #sampling time
 
         # Casadi Variabels
-        self.x = ca.MX.sym('x', self.n,1)
-        self.u = ca.MX.sym('u', self.m,1)
+        self.x = np.zeros((self.n, 1))
+        self.u = np.zeros((self.m, 1))
 
         # Model properties
         # Declaration of parameters for the BlueROV2 heavy configuration
@@ -116,30 +120,29 @@ class BlueROV_PIML(object):
         :return: state time derivative
         :rtype: ca.MX
         """
-
-        eta = x[:int(self.n/2)] # Earth fixed pos and angles
-        nu = x[int(self.n/2):] # Body fixed velocities
-        u = tao # Controls
+        
+        eta = eta_quat_to_deg(x[0:7])
+        nu = x[7:13]
+        u_fb = x[13:19]
+        u = tao # Controls commands
+    
 
         # Model matrices
         J = self.create_J(eta) # Create transformation matrix
         M = self.create_M() # nxn inertia matrix including hydrodynamic added mass
         C = self.create_C(nu) # nxn nonlinear matrix with Coriolis, centrifugal and added mass terms
         D = self.create_D(eta, nu, u) # nxn nonlinear matrix dissipative terms 
-        T = self.T # mxn Thruster transform matrix
-        F = self.create_F(tao) # mx1 Force vector
+        FT = self.create_F(tao) # mx1 Force vector (already multiplied with T upon return)
         g = self.create_g(eta) # nx1 vector of restoring forces and moments
-        # B = ca.MX.zeros(self.n, self.n) #nxm thruster characteristic input matrix 
         M_inv = np.linalg.inv(M) # Invert M
-        self.T_inv = np.linalg.pinv(T)
-        self.T_hat_inv=self.Create_Ardu_T() # Creates inverse matrix for thruster conversion
-        
+  
         # Nonlinear model
-        detadt = ca.mtimes(J,nu)
-        dnudt = ca.mtimes(M_inv,(ca.mtimes(T,F) - g - ca.mtimes(D,nu) - ca.mtimes(C,nu))) # Missing tether
-        self.dxdt = ca.vertcat(detadt, dnudt)
-        self.dxdt_sym = ca.Function('dxdt', [x, tao], [self.dxdt])
-
+        detadt = np.dot(J,nu) # This is in angles
+        detadt = angular_vel_to_quat_vel(eta, detadt) # Convert it quaternion
+        dnudt = (M_inv @ (FT.T - g.T - np.matmul(nu, D) - np.matmul(nu, C)).T).reshape(-1)
+        dudt = [0, 0, 0, 0, 0, 0, 0, 0] # No control dynamics we read these from the bag
+        self.dxdt = np.hstack((detadt, dnudt, dudt))
+        
         return self.dxdt # xdot
     
 
@@ -150,37 +153,37 @@ class BlueROV_PIML(object):
         :type state: ca.MX
         """
         #get angles
-        phi = eta[3] #roll
-        theta = eta[4] #pitch
-        psi = eta[5] #yaw
+        phi = eta[3] #roll (x)
+        theta = eta[4] #pitch (y)
+        psi = eta[5] #yaw (z)
 
         #submatrices
         zeros = np.zeros((3, 3)) #zeros
-        J1 = ca.MX.zeros(3,3) #inertia matrix
-        J1[0,0] = ca.cos(psi) * ca.cos(theta)
-        J1[0,1] = -ca.sin(psi) * ca.cos(phi) + ca.cos(psi) * ca.sin(theta) * ca.sin(phi)
-        J1[0,2] = ca.sin(psi) * ca.sin(phi) + ca.cos(psi) * ca.cos(phi) * ca.sin(theta)
-        J1[1,0] = ca.sin(psi) * ca.cos(theta)
-        J1[1,1] = ca.cos(psi) * ca.cos(phi) + ca.sin(phi) * ca.sin(theta) * ca.sin(psi)
-        J1[1,2] = -ca.cos(psi) * ca.sin(phi) + ca.sin(theta) * ca.sin(psi) * ca.cos(phi)
-        J1[2,0] = -ca.sin(theta)
-        J1[2,1] = ca.cos(theta) * ca.sin(phi)
-        J1[2,2] = ca.cos(theta) * ca.cos(phi)
+        J1 = np.zeros((3,3)) #inertia matrix
+        J1[0,0] = np.cos(psi) * np.cos(theta)
+        J1[0,1] = -np.sin(psi) * np.cos(phi) + np.cos(psi) * np.sin(theta) * np.sin(phi)
+        J1[0,2] = np.sin(psi) * np.sin(phi) + np.cos(psi) * np.cos(phi) * np.sin(theta)
+        J1[1,0] = np.sin(psi) * np.cos(theta)
+        J1[1,1] = np.cos(psi) * np.cos(phi) + np.sin(phi) * np.sin(theta) * np.sin(psi)
+        J1[1,2] = -np.cos(psi) * np.sin(phi) + np.sin(theta) * np.sin(psi) * np.cos(phi)
+        J1[2,0] = -np.sin(theta)
+        J1[2,1] = np.cos(theta) * np.sin(phi)
+        J1[2,2] = np.cos(theta) * np.cos(phi)
 
-        J2 = ca.MX.zeros(3,3)
+        J2 = np.zeros((3,3))
         J2[0,0] = 1
-        J2[0,1] = ca.sin(phi)*ca.tan(theta)
-        J2[0,2] = ca.cos(phi)*ca.tan(theta)
-        J2[1,1] = ca.cos(phi)
-        J2[1,2] = -ca.sin(phi)
-        J2[2,1] = ca.sin(phi)/ca.cos(theta)
-        J2[2,2] = ca.cos(phi)/ca.cos(theta)
+        J2[0,1] = np.sin(phi)*np.tan(theta)
+        J2[0,2] = np.cos(phi)*np.tan(theta)
+        J2[1,1] = np.cos(phi)
+        J2[1,2] = -np.sin(phi)
+        J2[2,1] = np.sin(phi)/np.cos(theta)
+        J2[2,2] = np.cos(phi)/np.cos(theta)
         
         
         #build Rigid body inertia C_rb coriolis matrix
-        row1 = ca.vertcat(J1,zeros)
-        row2 = ca.vertcat(zeros,J2)
-        J = ca.horzcat(row1,row2)
+        row1 = np.vstack((J1,zeros))
+        row2 = np.vstack((zeros,J2))
+        J = np.hstack((row1,row2))
         return J
 
 
@@ -221,7 +224,7 @@ class BlueROV_PIML(object):
 
         #submatrices
         zeros = np.zeros((3, 3)) #zeros
-        I_matrix = ca.MX.zeros(3,3) #inertia matrix
+        I_matrix = np.zeros((3,3)) #inertia matrix
         #print(I_matrix)
         I_matrix[0,1] = -self.Iz*r
         I_matrix[0,2] = -self.Iy*q
@@ -232,7 +235,7 @@ class BlueROV_PIML(object):
         #print(I_matrix)
 
         #diag matrix
-        diag_matrix = ca.MX.zeros(3,3)
+        diag_matrix = np.zeros((3,3))
         #print(diag_matrix)
         diag_matrix[0,1] = self.mass*w
         diag_matrix[0,2] = -self.mass*v
@@ -243,13 +246,13 @@ class BlueROV_PIML(object):
         #print(diag_matrix)
         
         #build Rigid body inertia C_rb coriolis matrix
-        row1 = ca.vertcat(zeros,diag_matrix)
-        row2 = ca.vertcat(diag_matrix,I_matrix)
-        C_RB = ca.horzcat(row1,row2)
+        row1 = np.vstack((zeros,diag_matrix))
+        row2 = np.vstack((diag_matrix,I_matrix))
+        C_RB = np.hstack((row1,row2))
         #print(C_rb)
 
         #added mass coriolis
-        matrix_c = ca.MX.zeros(3,3) #bottom right matrix
+        matrix_c = np.zeros((3,3)) #bottom right matrix
         #print(I_matrix)
         matrix_c[0,1] = -self.Na*r
         matrix_c[0,2] = self.Ma*q
@@ -260,7 +263,7 @@ class BlueROV_PIML(object):
         #print(I_matrix)
 
         #diag matrix
-        diag_matrix2 = ca.MX.zeros(3,3)
+        diag_matrix2 = np.zeros((3,3))
         #print(diag_matrix)
         diag_matrix2[0,1] = -self.Za*w
         diag_matrix2[0,2] = self.Ya*v
@@ -271,20 +274,20 @@ class BlueROV_PIML(object):
         #print(diag_matrix)
         
         #build Rigid body inertia C_A coriolis matrix
-        row1 = ca.vertcat(zeros,diag_matrix2)
-        row2 = ca.vertcat(diag_matrix2,matrix_c)
-        C_A = ca.horzcat(row1,row2)
+        row1 = np.vstack((zeros,diag_matrix2))
+        row2 = np.vstack((diag_matrix2,matrix_c))
+        C_A = np.hstack((row1,row2))
 
         C =  C_RB + C_A
         return C
     
 
-    def create_D(self, eta, nu, u):
+    def create_D(self, eta, nu, u_):
         """
         D matrix
         """
 
-        if self.piml_type == "":
+        if self.piml_type == None:
             # White box matrix
             #get elements
             u = nu[0]
@@ -295,7 +298,7 @@ class BlueROV_PIML(object):
             r = nu[5]
 
             #linear damping
-            D_l = ca.MX.eye(int(self.n/2))
+            D_l = np.eye(int(self.n/2))
             D_l[0,0] = self.Xul
             D_l[1,1] = self.Yvl
             D_l[2,2] = self.Zwl
@@ -304,32 +307,37 @@ class BlueROV_PIML(object):
             D_l[5,5] = self.Nrl
 
             #nonlinear damping
-            D_nl = ca.MX.eye(int(self.n/2))
-            D_nl[0,0] = self.Xun*ca.fabs(u)
-            D_nl[1,1] = self.Yvn*ca.fabs(v)
-            D_nl[2,2] = self.Zwn*ca.fabs(w)
-            D_nl[3,3] = self.Kpn*ca.fabs(p)
-            D_nl[4,4] = self.Mqn*ca.fabs(q)
-            D_nl[5,5] = self.Nrn*ca.fabs(r)
+            D_nl = np.eye(int(self.n/2))
+            D_nl[0,0] = self.Xun*abs(u)
+            D_nl[1,1] = self.Yvn*abs(v)
+            D_nl[2,2] = self.Zwn*abs(w)
+            D_nl[3,3] = self.Kpn*abs(p)
+            D_nl[4,4] = self.Mqn*abs(q)
+            D_nl[5,5] = self.Nrn*abs(r)
 
             D = D_l + D_nl
 
         if self.piml_type == "pinn":
-            self.D = pinn_predict(self.piml_model, eta, nu, u)
+            self.D = pinn_predict(self.piml_model, eta, nu, u_)
 
         return D
     
 
-    def create_F(self,tao):
+    def create_F(self, tao):
         """
-        returns symbolic vector of thruster force
+        enables predicting force using np ndarrays
         """
+        tao = tao.reshape((8, 1)) # Add dim for mult
+        K = (6136*tao + 108700)/(tao**3 + 89*tao**2 + 9258*tao + 108700)
+        K_mat = np.diag(K.flatten())
+        tao = tao - 1500
+        tao = np.matmul(K_mat, tao)
 
-        F=-140.3*(tao**9)+389.9*(tao**7)-404.1*(tao**5)+176*(tao**3)+8.9*(tao**1)
+        # Define the nonlinear force expression
+        F = -140.3 * (tao**9) + 389.9 * (tao**7) - 404.1 * (tao**5) + 176 * (tao**3) + 8.9 * tao
 
-        self.Force=ca.Function('F',[tao],[F])
-        
-        return F
+        # Return the force
+        return np.matmul(self.T, F)
 
 
     def create_g(self,eta):
@@ -345,12 +353,25 @@ class BlueROV_PIML(object):
         B = self.ro*self.g*self.delta #bouyancy
 
         #populate g vector
-        g = ca.MX.zeros(int(self.n/2),1)
-        g[0] = (W-B)*ca.sin(theta)
-        g[1] = -(W-B)*ca.cos(theta)*ca.sin(phi)
-        g[2] = -(W-B)*ca.cos(theta)*ca.cos(phi)
-        g[3] = self.yb*B*ca.cos(theta)*ca.cos(phi)-(self.zb*B*ca.cos(theta)*ca.sin(phi))
-        g[4] = -self.zb*B*ca.sin(theta)-(self.xb*B*ca.cos(theta)*ca.cos(phi))
-        g[5] = self.xb*B*ca.cos(theta)*ca.sin(phi)+(self.yb*B*ca.sin(theta))
+        g = np.zeros((int(self.n/2),1))
+        g[0] = (W-B)*np.sin(theta)
+        g[1] = -(W-B)*np.cos(theta)*np.sin(phi)
+        g[2] = -(W-B)*np.cos(theta)*np.cos(phi)
+        g[3] = self.yb*B*np.cos(theta)*np.cos(phi)-(self.zb*B*np.cos(theta)*np.sin(phi))
+        g[4] = -self.zb*B*np.sin(theta)-(self.xb*B*np.cos(theta)*np.cos(phi))
+        g[5] = self.xb*B*np.cos(theta)*np.sin(phi)+(self.yb*B*np.sin(theta))
 
         return g
+    
+    def load_file(self):
+        script_dir = os.path.dirname(os.path.realpath(__file__))
+        config_dir = os.path.join(script_dir, '..', 'piml', 'brov', 'config')
+        mpc_param_file = config_dir+"/MPC_Params.yaml"
+        # print("script: "+ mpc_param_file)
+        # print(os.path.isfile(mpc_param_file))
+        with open(mpc_param_file, "r") as file:
+            config = yaml.safe_load(file)
+        return config
+    
+    # brov_mpc/brov_mpc/lib
+    # brov_mpc/config
