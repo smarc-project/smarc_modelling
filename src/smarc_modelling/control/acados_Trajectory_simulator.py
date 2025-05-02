@@ -63,6 +63,23 @@ def read_csv_to_array(file_path: str):
     
     return np.array(data)
 
+# Plot the trajectory
+def save_csv(trajectory, t):
+    """
+    Saves a NumPy array to a CSV file.
+
+    Parameters:
+    trajectory (np.array): The NumPy array to save.
+    file_path (str): The path to the CSV file.
+    """
+    np.savetxt("/home/admin/smarc_modelling/src/Trajectories/REPORT/easy/MPC/easy9.csv"
+               , trajectory, delimiter=',', header="X,Y,Z,phi,theta,psi,vx,vy,vz,p,q,r,control", comments='')
+    np.savetxt("/home/admin/smarc_modelling/src/Trajectories/REPORT/easy/MPC/time_easy9.csv"
+               , t, delimiter=',', header="time (ms)", comments='')
+    print("CSV file saved successfully.")
+
+
+
 def main():
     # Extract the CasADi model
     sam = SAM_casadi()
@@ -80,7 +97,7 @@ def main():
     #file_path = "/home/admin/smarc_modelling/src/Trajectories/trajectoryComplexity3.csv"
     #file_path = "/home/admin/smarc_modelling/src/Trajectories/Complexity2Trajectory_0.csv"
     #file_path = "/home/admin/smarc_modelling/src/Trajectories/case_medium_original.csv"
-    file_path = "/home/admin/smarc_modelling/src/Trajectories/REPORT/case_hard.csv"
+    file_path = "/home/admin/smarc_modelling/src/Trajectories/REPORT/easy/case_easy9.csv"
 
     #file_path = "/home/admin/smarc_modelling/src/Trajectories/resolution01.csv"  
     trajectory = read_csv_to_array(file_path)
@@ -159,16 +176,16 @@ def main():
 
 
     # plot results
-    print(f"x_axis: {x_axis.shape}")
-    print(f"refs: {trajectory.shape}")
-    print(f"simX: {simX.shape}")
-    print(f"simU: {simU.shape}")
+    # print(f"x_axis: {x_axis.shape}")
+    # print(f"refs: {trajectory.shape}")
+    # print(f"simX: {simX.shape}")
+    # print(f"simU: {simU.shape}")
 
     # Extract the optimal control sequence
     optimal_u = simX[:, 13:]
-    
-    # Plot the trajectory
-    plot.plot_function(x_axis, trajectory, simX[:-1], simU)
+    save_csv(simX,t)
+
+    #plot.plot_function(x_axis, trajectory, simX[:-1], simU)
     ocp_solver = None
 
 
