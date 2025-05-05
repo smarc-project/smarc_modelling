@@ -163,6 +163,44 @@ def generationFirstMap():
 
     return map_instance
 
+def generateMapInstance(start_state, goal_state):
+    """
+    Given a start state and a goal state, this function generates a map_instance dictionary compatible with the motion primitives algorithm.
+    """
+
+    # Define a TileSize:
+    TILESIZE = 0.5  #meters
+
+    # Get the start and goal positions
+    startingPixel = (start_state[0], start_state[1], start_state[2])
+    arrivalPixel = (goal_state[0], goal_state[1], goal_state[2])
+
+    # Get the start and goal areas
+    startrCell = startingPixel[1] // TILESIZE
+    startcCell = startingPixel[0] // TILESIZE
+    startzCell = startingPixel[2] // TILESIZE
+    goalrCell = arrivalPixel[1] // TILESIZE
+    goalcCell = arrivalPixel[0] // TILESIZE
+    goalzCell = arrivalPixel[2] // TILESIZE
+
+
+    # Create the map instance to pass to other scripts
+    map_instance = {
+        "x_max": 5, #meters
+        "y_max": 10,    #meters
+        "z_max": 3, #meters
+        "obstacleDict": [], #not important for the tank
+        "start_pos": startingPixel, #(x,y,z)
+        "start_area": (startrCell, startcCell, startzCell),
+        "goal_area": (goalrCell, goalcCell, goalzCell),    #(CELLy, CELLx, CELLz)  <---This is the one working for sure
+        "goal_pixel": arrivalPixel,   #(x,y,z) 
+        "final_state": goal_state,
+        "TileSize": TILESIZE,
+        "initial_state": start_state
+    }
+
+    return map_instance
+
 def evaluateComplexityMap(map_instance):
     start_position = map_instance["start_pos"]
     goal_position = map_instance["goal_pixel"]

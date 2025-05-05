@@ -144,10 +144,68 @@ def MotionPlanningAlgorithm(realTimeDraw):
         # Show animation
         print(f"{bcolors.OKGREEN}[ OK ]{bcolors.ENDC}")
     print(f"{bcolors.OKGREEN}THE END{bcolors.ENDC}")
-        
+
+def MotionPlanningROS(map_instance):
+    """
+    This is the function called by the ROS node. It takes:
+    -)  map_instance as the input, as defined in the GenerationMap.py script
+    and outputs:
+    -)  a list of waypoints adnd a successful Flag
+    """
+
+    
+    print("START")
+    complexity = MapGen.evaluateComplexityMap(map_instance)
+    print("complexity:",complexity)
+    
+    # Which cost function you want to use (1-Astar 2-AdaptiveAstar 3-HeadingConstraint) 
+    typeFunction = 3
+
+    # The tuning parameter in the algorithm (if using typeFunction=3)
+    dec = 0.1
+
+    # Search the path
+    print(f"{bcolors.HEADER}>> Trajectory search{bcolors.ENDC}")
+    start_time = time.time()
+    if complexity == 0:
+        print(f"{bcolors.WARNING}single tree search{bcolors.ENDC}")
+        trajectory, succesfulSearch, totalCost = a_star_search(None, None, map_instance, False, typeFunction, dec)
+    else:
+        print(f"{bcolors.WARNING}double tree search{bcolors.ENDC}")
+        trajectory, succesfulSearch, totalCost = double_a_star_search(None, None, map_instance, False, typeFunction, dec)
+    print(f"{bcolors.OKGREEN}[ OK ]{bcolors.ENDC}")
+    end_time = time.time()
+
+    # Computational time (seconds)
+    print(f"{bcolors.HEADER}>> A star analysis{bcolors.ENDC}")
+    print(f"total time for Astar:...{end_time-start_time:.4f} seconds")
+    
+    # Number of vertices in the trajectory
+    print(f"length of trajectory: {len(trajectory):.2f} vertices>>")
+    print(f"{bcolors.OKGREEN}[ OK ]{bcolors.ENDC}")
+
+    # Save the trajectory into saved_trajectory.csv file
+    print(f"{bcolors.HEADER}>> Save the trajectory >> saved_trajectory.csv{bcolors.ENDC}")
+    df = pd.DataFrame(trajectory, columns=["x", "y", "z", "q0", "q1", "q2", "q3", "u", "v", "w", "q", "p", "r", "V_bs", "l_cg", "ds", "dr", "rpm_1", "rpm_2"])
+    df.to_csv("saved_trajectory.csv", index=False)
+    print(f"{bcolors.OKGREEN}[ OK ]{bcolors.ENDC}")
+    
+    print(f"{bcolors.OKGREEN}THE END{bcolors.ENDC}")
+
+    return (trajectory, succesfulSearch)
+
 if __name__ == "__main__":
 
     #MotionPlanningAlgorithm(True)
-    runStatisticalAnalysis(1, 0)    # (nTrials, chosenComplexity)
+    #runStatisticalAnalysis(1, 0)    # (nTrials, chosenComplexity)
 
+
+    # Try it for the ROS package
+    map_instance = MapGen.generationFirstMap()
+    start_state = map_instance["initial_state"]
+    goal_state = map_instance["final_state"]
+    
+    map_instance2 = MapGen.generateMapInstance(start_state, goal_state)
+    trajectory, successfulFlag = MotionPlanningROS(map_instance2)
+    draw_map_and_toredo(map_instance2, trajectory)
     ## Add if at least one tree arrives in the dataset
