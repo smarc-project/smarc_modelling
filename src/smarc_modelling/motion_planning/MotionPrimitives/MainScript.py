@@ -199,13 +199,15 @@ if __name__ == "__main__":
     #MotionPlanningAlgorithm(True)
     #runStatisticalAnalysis(1, 0)    # (nTrials, chosenComplexity)
 
-
+    '''
     # Try it for the ROS package
     map_instance = MapGen.generationFirstMap()
     start_state = map_instance["initial_state"]
     goal_state = map_instance["final_state"]
-    
+
     map_instance2 = MapGen.generateMapInstance(start_state, goal_state)
     trajectory, successfulFlag = MotionPlanningROS(map_instance2)
     draw_map_and_toredo(map_instance2, trajectory)
+    '''
+    
     ## Add if at least one tree arrives in the dataset
