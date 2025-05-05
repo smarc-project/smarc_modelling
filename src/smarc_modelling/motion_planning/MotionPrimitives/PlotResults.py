@@ -236,7 +236,26 @@ def draw_torpedo(ax, vertex, colorr, length=1.5, radius=0.095, resolution=20):
     # Add to CG velocity
     v_fwd_inertial = v_CG_inertial + v_relative_inertial
     ax.quiver(vertex[0], vertex[1], vertex[2], vx, vy, vz, color='b', length=velocity_vector_norm, normalize=True)
+
+def draw_map_and_toredo(map_instance, trajectory):
+    ax, plt, fig = plot_map(map_instance, "top") # this is the one were the primitives are plotted
+    ind = 0
+    for vertex in trajectory:
+
+        # Print the velocity for each vertex in the trajectory
+        q0, q1, q2, q3 = vertex[3:7]
+        globalV = body_to_global_velocity((q0, q1, q2, q3), vertex[7:10])
+        print(f"Velocity {ind:.0f} = {np.linalg.norm(globalV): .2f} m/s")
+
+        # Draw torpedo in the two created plots
+        norm_index = (ind / len(trajectory)) 
+        draw_torpedo(ax, vertex, norm_index)
+
+        ind += 1
     
+    # Show the results
+    plt.show()
+
 def plot_waypoints(res_list, col, mark):
     # Convert the list to a numpy array for easier indexing
     res_array = np.array(res_list)

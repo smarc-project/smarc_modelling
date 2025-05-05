@@ -143,25 +143,6 @@ def create_ocp(model, x0, x_last, N, map_instance):
     # Constraints
     ocp.constraints.x0 = x0
     
-    # Terminal state constraints: Goal area bounds
-    '''
-    TILESIZE = map_instance["TileSize"]
-    arrivalx_min = TILESIZE * map_instance["goal_area"][1]
-    arrivalx_max = arrivalx_min + TILESIZE
-    arrivaly_min = TILESIZE * map_instance["goal_area"][0]
-    arrivaly_max = arrivaly_min + TILESIZE
-    arrivalz_min = TILESIZE * map_instance["goal_area"][2]
-    arrivalz_max = arrivalz_min + TILESIZE
-    '''
-    # Define terminal state constraints as symbolic expressions
-    '''
-    goal_constraints_cg = vertcat(
-        model.x[0],  # x position
-        model.x[1],  # y position
-        model.x[2]   # z position
-    )
-    '''
-    
     # Goal constraint for front of SAM
 
     pointA = compute_A_point_forward_casadi(model.x)
