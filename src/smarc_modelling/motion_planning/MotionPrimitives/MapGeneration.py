@@ -163,13 +163,13 @@ def generationFirstMap():
 
     return map_instance
 
-def generateMapInstance(start_state, goal_state):
+def generateMapInstance(start_state, goal_state, map_boundaries, map_res):
     """
     Given a start state and a goal state, this function generates a map_instance dictionary compatible with the motion primitives algorithm.
     """
 
     # Define a TileSize:
-    TILESIZE = 0.5  #meters
+    TILESIZE = map_res  #meters
 
     # Get the start and goal positions
     startingPixel = (start_state[0], start_state[1], start_state[2])
@@ -186,9 +186,9 @@ def generateMapInstance(start_state, goal_state):
 
     # Create the map instance to pass to other scripts
     map_instance = {
-        "x_max": 5, #meters
-        "y_max": 10,    #meters
-        "z_max": 3, #meters
+        "x_max": map_boundaries[0], #meters
+        "y_max": map_boundaries[1],    #meters
+        "z_max": map_boundaries[2], #meters
         "obstacleDict": [], #not important for the tank
         "start_pos": startingPixel, #(x,y,z)
         "start_area": (startrCell, startcCell, startzCell),

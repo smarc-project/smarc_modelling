@@ -145,16 +145,22 @@ def MotionPlanningAlgorithm(realTimeDraw):
         print(f"{bcolors.OKGREEN}[ OK ]{bcolors.ENDC}")
     print(f"{bcolors.OKGREEN}THE END{bcolors.ENDC}")
 
-def MotionPlanningROS(map_instance):
+def MotionPlanningROS(start_state, goal_state, map_boundaries, map_resolution):
     """
     This is the function called by the ROS node. It takes:
-    -)  map_instance as the input, as defined in the GenerationMap.py script
-    and outputs:
-    -)  a list of waypoints adnd a successful Flag
+    -)  start_state (np.array)
+    -)  goal_state (np.array)
+    -)  map_boundaries ((max_x, max_y, max_z))
+    -)  map_resolution (float)
+
+    And the output is:
+    -)  a list of waypoints ans a successful Flag
     """
 
+    print(">> Creating the map")
+    map_instance = MapGen.generateMapInstance(start_state, goal_state, map_boundaries, map_resolution)
+    print(f"{bcolors.OKGREEN}[ OK ]{bcolors.ENDC}")
     
-    print("START")
     complexity = MapGen.evaluateComplexityMap(map_instance)
     print("complexity:",complexity)
     
@@ -194,20 +200,23 @@ def MotionPlanningROS(map_instance):
 
     return (trajectory, succesfulSearch)
 
+'''
 if __name__ == "__main__":
 
     #MotionPlanningAlgorithm(True)
     #runStatisticalAnalysis(1, 0)    # (nTrials, chosenComplexity)
 
-    '''
+    
     # Try it for the ROS package
     map_instance = MapGen.generationFirstMap()
     start_state = map_instance["initial_state"]
     goal_state = map_instance["final_state"]
+    map_bounds = (5, 10, 3)
+    map_res = 0.5
 
-    map_instance2 = MapGen.generateMapInstance(start_state, goal_state)
-    trajectory, successfulFlag = MotionPlanningROS(map_instance2)
-    draw_map_and_toredo(map_instance2, trajectory)
-    '''
+    trajectory, successfulFlag = MotionPlanningROS(start_state, goal_state, map_bounds, map_res)
+    draw_map_and_toredo(map_instance, trajectory)
+    
     
     ## Add if at least one tree arrives in the dataset
+'''
