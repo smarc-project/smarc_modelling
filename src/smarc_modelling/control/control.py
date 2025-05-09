@@ -1,7 +1,12 @@
 # Script for the acados NMPC model
-from acados_template import AcadosOcp, AcadosOcpSolver, AcadosSimSolver, AcadosModel
+
+import os
+
+from acados_template import AcadosOcp, AcadosOcpSolver, AcadosSimSolver, AcadosModel, AcadosSim
 import numpy as np
 import casadi as ca
+
+
 
 class NMPC:
     def __init__(self, model, Ts, N_horizon):
@@ -152,7 +157,7 @@ class NMPC:
         return x_error
 
 class NMPC_trajectory:
-    def __init__(self, casadi_model, Ts, N_horizon):
+    def __init__(self, casadi_model, Ts, N_horizon, build=False, acados_dir=''):
         '''
         Input:
         casadi_model == Casadi model
@@ -167,6 +172,14 @@ class NMPC_trajectory:
         self.Ts    = Ts
         self.Tf    = Ts*N_horizon
         self.N_horizon = N_horizon
+        self.build = build          
+        self.acados_dir = acados_dir
+
+        # TODO: Add a acadso sim object for the integration
+        # Then you can hopefully specify the build path!
+        self.sim = AcadosSim()
+        self.sim.model = self.model
+
         
     # Function to create a Acados model from the casadi model
     def export_dynamics_model(self, casadi_model):
@@ -192,6 +205,7 @@ class NMPC_trajectory:
         model.f_impl_expr = f_impl
 
         return model
+
     def setup(self, x0):
         nx = self.model.x.rows()
         nu = self.model.u.rows()
@@ -283,17 +297,44 @@ class NMPC_trajectory:
         self.ocp.solver_options.sim_method_newton_iter = 3 #3 default
 
         self.ocp.solver_options.nlp_solver_type = 'SQP_RTI'
-        self.ocp.solver_options.nlp_solver_max_iter = 80
+        self.ocp.solver_options.nlp_solver_max_iter = 1 #80
         self.ocp.solver_options.tol    = 1e-6       # NLP tolerance. 1e-6 is default for tolerances
         self.ocp.solver_options.qp_tol = 1e-6       # QP tolerance
 
         self.ocp.solver_options.globalization = 'MERIT_BACKTRACKING'
         self.ocp.solver_options.regularize_method = 'NO_REGULARIZE'
 
-        solver_json = 'acados_ocp_' + self.model.name + '.json'
-        acados_ocp_solver = AcadosOcpSolver(self.ocp, json_file = solver_json)
+        #solver_json = 'acados_ocp_' + self.model.name + '.json'
+        #acados_ocp_solver = AcadosOcpSolver(self.ocp, json_file = solver_json)
 
-        # create an integrator with the same settings as used in the OCP solver.
+        ## create an integrator with the same settings as used in the OCP solver.
+        #acados_integrator = AcadosSimSolver(self.ocp, json_file = solver_json)
+
+        solver_json = 'acados_ocp_' + self.model.name + '.json'                                                      
+        #build_dir = self.acados_dir + "/c_generated_code/" + solver_json                                             
+
+        # Set directory for code generation
+        this_file_dir = os.path.dirname(os.path.abspath(__file__))
+        package_root = os.path.abspath(os.path.join(this_file_dir, '..'))
+        codegen_dir = os.path.join(package_root, 'mpc_codegen')
+        os.makedirs(codegen_dir, exist_ok=True)
+        self.ocp.code_export_directory = codegen_dir
+        print(f"ext package acados dir: {codegen_dir}")                                                                            
+
+        acados_ocp_solver = AcadosOcpSolver(self.ocp, json_file = solver_json, generate=self.build, build=self.build)
+                                                                                                                     
+        # Disturbances
+        self.sim.parameter_values = self.ocp.parameter_values
+
+        # Solver options
+        self.sim.solver_options.T = self.Ts
+
+        self.sim.solver_options.integrator_type = 'IRK'
+
+        self.sim.code_export_directory = self.acados_dir + "/c_generated_code/"
+
+        # create an integrator with the same settings as used in the OCP solver
+        #acados_integrator = AcadosSimSolver(self.sim, json_file = build_dir
         acados_integrator = AcadosSimSolver(self.ocp, json_file = solver_json)
 
         return acados_ocp_solver, acados_integrator
