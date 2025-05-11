@@ -133,12 +133,12 @@ def create_ocp(model, x0, x_last, N, map_instance):
     
     # Terminal state constraints: Goal area bounds
     TILESIZE = map_instance["TileSize"]
-    arrivalx_min = TILESIZE * map_instance["goal_area"][1]
-    arrivalx_max = arrivalx_min + TILESIZE
-    arrivaly_min = TILESIZE * map_instance["goal_area"][0]
-    arrivaly_max = arrivaly_min + TILESIZE
-    arrivalz_min = TILESIZE * map_instance["goal_area"][2]
-    arrivalz_max = arrivalz_min + TILESIZE
+    arrivalx_min = map_instance["goal_pixel"][0] - 0.5 * TILESIZE
+    arrivalx_max = map_instance["goal_pixel"][0] + 0.5 * TILESIZE
+    arrivaly_min = map_instance["goal_pixel"][1] - 0.5 * TILESIZE
+    arrivaly_max = map_instance["goal_pixel"][1] + 0.5 * TILESIZE
+    arrivalz_min = map_instance["goal_pixel"][2] - 0.5 * TILESIZE
+    arrivalz_max = map_instance["goal_pixel"][2] + 0.5 * TILESIZE
     
     # Define terminal state constraints as symbolic expressions
     goal_constraints_cg = vertcat(
@@ -199,14 +199,18 @@ def create_ocp(model, x0, x_last, N, map_instance):
     '''
 
     # Constraint: x in XFREE
-    xMax = map_instance["x_max"] 
-    yMax = map_instance["y_max"] 
-    zMax = map_instance["z_max"] 
+    bound = 0.1
+    xMax = map_instance["x_max"] - bound
+    yMax = map_instance["y_max"] - bound
+    zMax = map_instance["z_max"] - bound
+    xMin = map_instance["x_min"] + bound
+    yMin = map_instance["y_min"] + bound
+    zMin = map_instance["z_min"] + bound
 
     ocp.model.con_h_expr = vertcat(goal_constraints_pointA, constraints_point_B)
     ocp.constraints.lh = np.array([
-        0, 0, 0, 
-        0, 0, 0
+        xMin, yMin, zMin, 
+        xMin, yMin, zMin
     ])
     ocp.constraints.uh = np.array([
         xMax, yMax, zMax, 

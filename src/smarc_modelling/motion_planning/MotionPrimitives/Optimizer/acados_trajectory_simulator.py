@@ -63,7 +63,7 @@ def read_csv_to_array(file_path: str):
     
     return np.array(data)
 
-def main(trajectory, Q, N_hor, T_s):       ##CHANGE: input trajectory
+def main(trajectory, Q, N_hor, T_s, map_instance):       ##CHANGE: input trajectory
     # Extract the CasADi model
     sam = SAM_casadi()
 
@@ -99,7 +99,7 @@ def main(trajectory, Q, N_hor, T_s):       ##CHANGE: input trajectory
     trajectory = np.concatenate((trajectory, Uref), axis=1) 
 
     # Run the MPC setup
-    ocp_solver, integrator = nmpc.setup(x0)
+    ocp_solver, integrator = nmpc.setup(x0, map_instance)
 
     # Initialize the state and control vector as David does
     for stage in range(N_horizon + 1):
@@ -171,6 +171,3 @@ def main(trajectory, Q, N_hor, T_s):       ##CHANGE: input trajectory
 
     ocp_solver = None
     '''
-
-if __name__ == '__main__':
-    main()

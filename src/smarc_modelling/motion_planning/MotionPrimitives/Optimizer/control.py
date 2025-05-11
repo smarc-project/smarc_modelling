@@ -282,7 +282,7 @@ class NMPC_trajectory:
 
         return model
     
-    def setup(self, x0):
+    def setup(self, x0, map_instance):
         nx = self.model.x.rows()
         nu = self.model.u.rows()
 
@@ -362,13 +362,16 @@ class NMPC_trajectory:
             pointB[2]
         )
         bound = 0.1
-        xMax = 5 - bound
-        yMax = 10 - bound
-        zMax = 3 - bound
+        xMax = map_instance["x_max"] - bound
+        yMax = map_instance["y_max"] - bound
+        zMax = map_instance["z_max"] - bound
+        xMin = map_instance["x_min"] + bound
+        yMin = map_instance["y_min"] + bound
+        zMin = map_instance["z_min"] + bound
         self.ocp.model.con_h_expr = vertcat(goal_constraints_pointA, constraints_point_B)
         self.ocp.constraints.lh = np.array([
-            0 + bound, 0 + bound, 0 + bound, 
-            0 + bound, 0 + bound, 0 + bound 
+            xMin, yMin, zMin, 
+            xMin, yMin, zMin 
         ])
         self.ocp.constraints.uh = np.array([
             xMax, yMax, zMax, 

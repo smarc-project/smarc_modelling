@@ -65,73 +65,6 @@ def body_to_global_velocity(quaternion, body_velocity):
     
     return global_velocity
 
-def load_trajectory_from_csv(filename):
-    """
-    Reads trajectory data from a CSV file and returns it as a list of states.
-
-    Args:
-        filename (str): The path to the CSV file.
-
-    Returns:
-        list: A list of states, where each state is a list or tuple of the values
-              from a row in the CSV.
-    """
-    trajectory = []
-    with open(filename, 'r') as csvfile:
-        reader = csv.reader(csvfile)
-        # Skip the header row if it exists (optional)
-        header = next(reader, None)
-
-        for row in reader:
-            # Convert the string values to appropriate data types (e.g., float, int)
-            # Assuming your states are numerical, you'll likely need to convert.
-            try:
-                state = [float(value) for value in row]
-                state = np.asarray(state, dtype=np.float32)
-            except ValueError:
-                print(f"Warning: Could not convert row to numbers: {row}. Skipping.")
-                continue
-            trajectory.append(state)
-    return trajectory
-
-def testOptimization(map_instance):
-            
-            '''MODIFY!'''
-
-            start_opti = time.time()
-            print("<starting optimization>")
-            # Load trajectory
-            res_list = load_trajectory_from_csv('/home/parallels/Desktop/smarc_modelling-master/data/OptimizationTrajectory.csv')
-            # Interpolate the waypoints
-            res_list = linear_interpolation_waypoints(res_list)
-            
-            result_list, status = optimization_acados_singleTree(res_list, map_instance)
-            if status == 0:
-                res_list = result_list
-                print(f"{bcolors.OKGREEN}[ OK ]{bcolors.ENDC}")
-            else:
-                print(f"{bcolors.FAIL}[ X ]{bcolors.ENDC}")
-            
-            end_opti = time.time()
-            print(f"optimization time:...{end_opti-start_opti:.4f} seconds")
-            return res_list
-
-def linear_interpolation_waypoints(waypoints):
-    res_list = []
-    N = len(waypoints)
-    for ii in range(N):
-        # Add the current waypoint to the result list
-        res_list.append(waypoints[ii])
-        
-        # If not the last waypoint, calculate the midpoint
-        if ii == N-1:
-            for _ in range(N): #OPTIMIZE IT!
-                #midpoint = 0.5 * (np.array(waypoints[ii]) + np.array(waypoints[ii + 1]))
-                midpoint = np.array(waypoints[ii])
-                res_list.append(midpoint.tolist())
-            
-    return res_list
-
 def reconstruct_path(current, parents_dict, resolution_dict, map_instance, ax, pltt):
     """
     This function reconstructs the path from the goal to the start. 
@@ -157,15 +90,8 @@ def reconstruct_path(current, parents_dict, resolution_dict, map_instance, ax, p
         if len(final_path) == 0:
             start_opti = time.time()
             print("<starting optimization>")
-            #print(res_list)
-
-            # Save trajectory
-            #df = pd.DataFrame(res_list, columns=["x", "y", "z", "q0", "q1", "q2", "q3", "u", "v", "w", "q", "p", "r", "V_bs", "l_cg", "ds", "dr", "rpm_1", "rpm_2"])
-            #df.to_csv('/home/parallels/Desktop/smarc_modelling-master/data/OptimizationTrajectory.csv', index=False)
-            print("initial length:...", len(res_list))
 
             # Interpolate the waypoints
-            #res_list = linear_interpolation_waypoints(res_list)
             addedPoints = 15
             for _ in range(addedPoints):
                 res_list.append(map_instance["final_state"])
@@ -272,26 +198,6 @@ def compute_current_orientationVector(state, map_inst, numberTree, type = "norma
     backward_vector_norm = np.linalg.norm(backward_vector)
     forward_vector /= forward_vector_norm
     backward_vector /= backward_vector_norm
-
-    # OLD -Compute angle 
-    '''
-    # Velocity vector
-    vx, vy, vz = body_to_global_velocity((q0, q1, q2, q3), state[7:10])
-    v_vector = np.array([vx, vy, vz])
-
-    angle = calculate_angle_betweenVectors(v_vector, forward_vector)
-    if angle < np.deg2rad(90):
-        orientation_vector = forward_vector # is normalized
-    else:
-        orientation_vector = backward_vector # is normalized
-    '''
-
-    # Compute orientation closer to goal direction
-    '''
-    match type:
-        case "pointA":
-            state = compute_A_point_forward(state)
-    '''
 
     angle = calculate_angle_goalVector(state, forward_vector, map_inst, numberTree, type)
     if angle < np.pi/2:
@@ -442,7 +348,7 @@ def calculate_f(neighbor, map_instance, tentative_g, heuristic_cost, dec, typeF,
             total_f = (tentative_g**2 + heuristic_cost**2) / tentative_g
 
         case 3:
-            '''# 3 # Using goal-distance projection on current velocity vector'''
+            '''# 3 # Using the heading A star'''
 
             # Define current and goal positions
             x = neighbor[0]
@@ -493,238 +399,6 @@ def calculate_f(neighbor, map_instance, tentative_g, heuristic_cost, dec, typeF,
 
             total_f = (tentative_g**2 + heuristic**2) / tentative_g
 
-        case 4:
-
-            '''# Computing Case 3'''
-            
-            # Define current and goal positions
-            x = neighbor[0]
-            y = neighbor[1]
-            z = neighbor[2]
-            x_goal = map_instance["goal_pixel"][0]
-            y_goal = map_instance["goal_pixel"][1]
-            z_goal = map_instance["goal_pixel"][2]
-
-            # Define the distance between position and goal
-            dx = x_goal - x
-            dy = y_goal - y
-            dz = z_goal - z
-
-            # Define current linear velocity vector
-            q0, q1, q2, q3 = neighbor[3:7]
-            vx, vy, vz = body_to_global_velocity((q0, q1, q2, q3), neighbor[7:10])
-            v_vector = np.array([vx, vy, vz])
-
-            # Define the goal vector
-            goal_vector = np.array([dx, dy, dz])
-            goal_vector_norm = np.linalg.norm(goal_vector)
-            
-            # Compute the best orientation vector and normalize it
-            orientation_vector = compute_current_orientationVector(neighbor, map_instance, numberTree)
-            orientation_vector_norm = np.linalg.norm(orientation_vector)
-            if orientation_vector_norm != 0:
-                orientation_vector /= np.linalg.norm(orientation_vector)
-
-            # Find the angle between final_vector and goal
-            final_vector = orientation_vector + v_vector
-            angle_between_vectors = calculate_angle_goalVector(neighbor, final_vector, map_instance, numberTree)
-
-            # Compute d and c distances
-            maxAngle = np.deg2rad(7)
-            if angle_between_vectors > maxAngle:
-                angleBrake = angle_between_vectors - maxAngle
-                d = -1**2 / (-2*dec)
-                c = np.sqrt(goal_vector_norm**2 + d**2 - 2*goal_vector_norm*d*np.cos(angleBrake))
-                heuristic = c + d
-            else:
-                heuristic = goal_vector_norm
-            
-            '''Adding the difference between the two tips'''
-            # Compute the goal_vector tip position
-            goal_vector_tip = map_instance["goal_pixel_pointA"]
-            cg_position = np.array([x, y, z])
-
-            # Compute forward orientation vector tip position
-            rotation = R.from_quat([q1, q2, q3, q0])
-            body_forward = np.array([1, 0.0, 0.0])
-            forward_vector = rotation.apply(body_forward)
-            forward_vector_norm = np.linalg.norm(forward_vector)
-            forward_vector /= forward_vector_norm
-            #current_fwd_vector = cg_position + forward_vector
-
-            # Compute current velocity of pointA
-            v_pointA = compute_current_velocity_pointA(neighbor)
-
-            # Sum them up 
-            current_vector_tip = forward_vector + v_pointA + cg_position
-
-            # Compute the difference between the tips
-            difference_tips = np.linalg.norm(goal_vector_tip - current_vector_tip)
-
-            # Add it to the heuristic
-            heuristic += difference_tips
-
-            # Total cost function
-            total_f = heuristic + tentative_g
-
-                
-            '''Computing Case 3 for pointA'''
-            '''
-            # Velocity vector at pointA (global frame)
-            v_CG_inertial = np.array([vx, vy, vz])        # Linear velocity of CG in inertial frame
-            rr, ww, vv = neighbor[10:13]
-            omega_body = np.array([rr, ww, vv])              # Angular velocity in body frame
-            r_fwd_body = np.array([0.655, 0, 0])           # Position of forward point relative to CG in body frame
-            q = np.array([q0, q1, q2, q3])                # Quaternion (x, y, z, w) or (w, x, y, z)
-            rotation = R.from_quat([q1, q2, q3, q0])
-            R_b2i = rotation.as_matrix()  # Body to inertial rotation matrix
-            v_relative_body = np.cross(omega_body, r_fwd_body)
-            v_relative_inertial = R_b2i @ v_relative_body
-            v_vector = v_CG_inertial + v_relative_inertial
-            
-
-            # Define current and goal positions for pointA
-            x, y, z = compute_A_point_forward(neighbor)
-            x_goal = map_instance["goal_pixel_pointA"][0]
-            y_goal = map_instance["goal_pixel_pointA"][1]
-            z_goal = map_instance["goal_pixel_pointA"][2]
-
-            # Define the distance between position and goal
-            dx = x_goal - x
-            dy = y_goal - y
-            dz = z_goal - z
-
-            # Define the goal vector
-            goal_vector = np.array([dx, dy, dz])
-            goal_vector_norm = np.linalg.norm(goal_vector)
-
-            
-            # Compute the best orientation vector and normalize it
-            orientation_vector = compute_current_orientationVector(neighbor, map_instance,"pointA") 
-            orientation_vector_norm = np.linalg.norm(orientation_vector)
-            if orientation_vector_norm != 0:
-                orientation_vector /= np.linalg.norm(orientation_vector)
-
-            # Find the angle between final_vector and goal
-            final_vector = orientation_vector + v_vector
-            angle_between_vectors = calculate_angle_goalVector([x, y, z], final_vector, map_instance, "pointA")   
-
-            # Compute d and c distances
-            if angle_between_vectors > maxAngle:
-                angleBrake = angle_between_vectors - maxAngle
-                d = -1**2 / (-2*dec)
-                c = np.sqrt(goal_vector_norm**2 + d**2 - 2*goal_vector_norm*d*np.cos(angleBrake))
-                heuristic += c + d
-            else:
-                heuristic += goal_vector_norm
-            
-            total_f = (tentative_g**2 + heuristic**2) / tentative_g
-            '''
-            '''
-            # Define current and goal positions
-            x_cg = neighbor[0]
-            y_cg = neighbor[1]
-            z_cg = neighbor[2]
-            pointA = compute_A_point_forward(neighbor)
-            x_goal_cg = map_instance["goal_pixel"][0]
-            y_goal_cg = map_instance["goal_pixel"][1]
-            z_goal_cg = map_instance["goal_pixel"][2]
-            x_goal_pointA = map_instance["goal_pixel_pointA"][0]
-            y_goal_pointA = map_instance["goal_pixel_pointA"][1]
-            z_goal_pointA = map_instance["goal_pixel_pointA"][2]
-
-            # Define the distance between position and goal
-            dx_cg = x_goal_cg - x_cg
-            dy_cg = y_goal_cg - y_cg
-            dz_cg = z_goal_cg - z_cg
-            dx_pointA = x_goal_pointA - pointA[0]
-            dy_pointA = y_goal_pointA - pointA[1]
-            dz_pointA = z_goal_pointA - pointA[2]
-
-            # Define the goal vectors
-            goal_vector_cg = np.array([dx_cg, dy_cg, dz_cg])
-            goal_vector_cg_norm = np.linalg.norm(goal_vector_cg)    #a
-            goal_vector_pointA = np.array([dx_pointA, dy_pointA, dz_pointA])
-            goal_vector_pointA_norm = np.linalg.norm(goal_vector_pointA)    #d
-
-            # Define the ramaining vectors for computing the areas
-            dx_b = x_goal_pointA - x_cg
-            dy_b = y_goal_pointA - y_cg
-            dz_b = z_goal_pointA - z_cg
-            b_norm = np.linalg.norm([dx_b, dy_b, dz_b]) #b
-            c_norm = 0.655   #c  (half length of SAM)
-            e_norm = 0.655   #e  (half length of SAM)
-
-            # Computing the area using Heron's formula
-            S1 = 0.25 * np.sqrt(4 * goal_vector_cg_norm**2 * b_norm**2 - (goal_vector_cg_norm**2 + b_norm**2 - c_norm**2)**2)
-            S2 = 0.25 * np.sqrt(4 * b_norm**2 * e_norm**2 - (b_norm**2 + e_norm**2 - goal_vector_pointA_norm**2)**2)
-            S = S1 + S2
-
-            # Heuristic 
-            heuristic = 2*S + goal_vector_pointA_norm
-
-            # Plus case 3
-            # Define current linear velocity vector
-            q0, q1, q2, q3 = neighbor[3:7]
-            vx, vy, vz = body_to_global_velocity((q0, q1, q2, q3), neighbor[7:10])
-            v_vector = np.array([vx, vy, vz])
-            
-            # Compute the best orientation vector and normalize it
-            orientation_vector = compute_current_orientationVector(neighbor, map_instance)
-            orientation_vector_norm = np.linalg.norm(orientation_vector)
-            if orientation_vector_norm != 0:
-                orientation_vector /= np.linalg.norm(orientation_vector)
-
-            # Find the angle between final_vector and goal
-            final_vector = orientation_vector + v_vector
-            angle_between_vectors = calculate_angle_goalVector(neighbor, final_vector, map_instance)
-
-            # Compute d and c distances
-            maxAngle = np.deg2rad(7)
-            if angle_between_vectors > maxAngle:
-                angleBrake = angle_between_vectors - maxAngle
-                d = -1**2 / (-2*dec)
-                c = np.sqrt(goal_vector_cg_norm**2 + d**2 - 2*goal_vector_cg_norm*d*np.cos(angleBrake))
-                heuristic += c + d
-            else:
-                heuristic += goal_vector_cg_norm
-
-            
-            total_f = (tentative_g**2 + heuristic**2) / tentative_g
-            '''
-
-        case 5:
-            # Define current and goal positions
-            x = neighbor[0]
-            y = neighbor[1]
-            z = neighbor[2]
-            x_goal = map_instance["goal_pixel"][0]
-            y_goal = map_instance["goal_pixel"][1]
-            z_goal = map_instance["goal_pixel"][2]
-            finalRoll = np.rad2deg(map_instance["goal_pixel"][0])
-            finalPitch = np.rad2deg(map_instance["goal_pixel"][1])
-            finalYaw = np.rad2deg(map_instance["goal_pixel"][2])
-
-            # Define the distance between position and goal
-            dx = x_goal - x
-            dy = y_goal - y
-            dz = z_goal - z
-
-            # Define current linear velocity vector
-            q0, q1, q2, q3 = neighbor[3:7]
-
-            # Define the goal vector
-            goal_vector = np.array([dx, dy, dz])
-            goal_vector_norm = np.linalg.norm(goal_vector)
-
-            d = goal_vector_norm
-            r = R.from_quat([q1, q2, q3, q0])
-            roll, pitch, yaw = r.as_euler('xyz', degrees=True)
-
-            heuristic = np.sqrt(d**2 + (pitch - finalPitch)**2 + (yaw - finalYaw)**2)
-            #total_f = (tentative_g**2 + heuristic**2) / tentative_g
-            total_f = tentative_g + heuristic
-
         case _:
             print("Non valid cost function f...")
             total_f = 0
@@ -732,6 +406,8 @@ def calculate_f(neighbor, map_instance, tentative_g, heuristic_cost, dec, typeF,
     return total_f
 
 def getResolution(reached_states, dt_reference):
+    '''Used for getting the correct resolution of the path... i.e. waypoints every dt'''
+
     # Change to global
     dt_primitives = glbv.DT_PRIMITIVES
     dt_current = 0
@@ -767,9 +443,8 @@ def computeAngleDeg(state1, state2):
     return np.rad2deg(angle_rad)
 
 def find_tree_intersection(g_cost_tree1, g_cost_tree2, list_connection_states, minimumDistance=0.5, minimumAngle = 20):
-    connection_node1 = None
-    connection_node2 = None
-    foundConnection = False
+    '''Function used for connecting the two trees in Double-Tree '''
+
     coords_tree1 = np.array([node.state[:3] for node in g_cost_tree1])  # x, y, z only
     coords_tree2 = np.array([node.state[:3] for node in g_cost_tree2])
 
@@ -784,22 +459,6 @@ def find_tree_intersection(g_cost_tree1, g_cost_tree2, list_connection_states, m
 
             if np.abs(angle_deg) < minimumAngle:
                 list_connection_states.append((node1.state, node2.state))
-                #list_connection_states.append(node1.state)
-                #list_connection_states.append(node2.state)
-
-            #print(f"Intersection found between Tree1 and Tree2: {node1.state}, {node2.state}")
-            #return node1, node2  # Return the connecting nodes
-
-    '''
-    # Run MPC if necessary
-    if len(list_connection_states) != 0:
-        #print("Found possible connections")
-        foundConnection = True
-        # Take the one which have a similar pitch
-        connection_node1, connection_node2 = findBestConnectionNodes(list_connection_states)
-        #print(connection_node1)
-        #print(connection_node2)
-    '''
 
     moreThanMinimum = False
     if len(list_connection_states) > 1000:
@@ -809,12 +468,9 @@ def find_tree_intersection(g_cost_tree1, g_cost_tree2, list_connection_states, m
 
 def findBestConnectionNodes(list_states):
     best_angle = np.inf
-    best_dist = np.inf
 
     # Using current_v + forward angles
     for state1, state2 in list_states:
-        #f1 = find_f_vector(state1)
-        #f2 = find_f_vector(state2)
         v1 = body_to_global_velocity(state1[3:7], state1[7:10])
         v2 = - body_to_global_velocity(state2[3:7], state2[7:10])
         angle_deg = np.rad2deg(calculate_angle_betweenVectors(v1, v2))
@@ -834,27 +490,6 @@ def findBestConnectionNodes(list_states):
     connection_list.append(best_state2)
     
     return connection_list
-
-    #Using the distance
-    '''
-    for state1, state2, distance in list_states:
-        dist = distance
-        if dist < best_dist:
-            best_dist = dist
-            best_state1 = state1
-            best_state2 = state2
-    '''
-
-    #return best_state1, best_state2
-
-def find_f_vector(state):
-
-    """The f vector is the sum between the current v_global and the current forward orientation"""
-
-    current_v = body_to_global_velocity(state[3:7], state[7:10])
-    current_forward = compute_current_forward_vector(state)
-
-    return current_v + current_forward
 
 def compute_current_pitch(state):
 
@@ -926,7 +561,6 @@ def double_a_star_search(ax, plt, map_instance, realTimeDraw, typeF_function, de
     while (current_algorithm_time - algorithm_start_time < maxTime):   ###Change this in the future
         # Are there intersections?
         if flag > 0:
-            #connection_node1, connection_node2, found_connection = find_tree_intersection(g_cost, g_cost_secondTree, list_connection_states)
             status = 1
 
             list_connection_states, moreThanMinimum = find_tree_intersection(g_cost, g_cost_secondTree, list_connection_states, 1, 50)
@@ -984,9 +618,6 @@ def double_a_star_search(ax, plt, map_instance, realTimeDraw, typeF_function, de
                     
                     # Optimizing the connection
                     print(f"{bcolors.OKBLUE}Optimizing path for connection{bcolors.ENDC}")
-                    #df = pd.DataFrame(list_connection_full, columns=["x", "y", "z", "q0", "q1", "q2", "q3", "u", "v", "w", "q", "p", "r", "V_bs", "l_cg", "ds", "dr", "rpm_1", "rpm_2"])
-                    #df.to_csv("list_connection_full.csv", index=False)
-                    #list_connection_full = load_trajectory_from_csv('/home/parallels/Desktop/smarc_modelling-master/list_connection_full.csv')
 
                     connection_list_optimized, status = optimization_acados_doubleTree(list_connection_full, map_instance)
                     
@@ -1017,7 +648,7 @@ def double_a_star_search(ax, plt, map_instance, realTimeDraw, typeF_function, de
                     array_waypoints = np.asarray(waypoints[::-1])
                     N_hor = array_waypoints.shape[0] // 2
                     T_s = 0.1
-                    optimized_waypoints, status = main(array_waypoints, Q, N_hor, T_s)
+                    optimized_waypoints, status = main(array_waypoints, Q, N_hor, T_s, map_instance)
                     if status != 0:
                         print(f"{bcolors.FAIL}Optimization failed - change connection points{bcolors.ENDC}")
                         continue
@@ -1057,11 +688,6 @@ def double_a_star_search(ax, plt, map_instance, realTimeDraw, typeF_function, de
         if not arrivedPoint_secondTree:
             _, current_node_secondTree = heapq.heappop(open_set_secondTree)   #removes and returns the node with lowest f value
             current_g_secondTree = g_cost_secondTree[current_node_secondTree]
-        
-
-        # Stop the algorithm if we exceed the maximum number of iterations
-        #if flag > nMaxIterations:
-        #    break
 
         # Find new neighbors (last point of the primitives) using the motion primitives
         if not arrivedPoint:

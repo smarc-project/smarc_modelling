@@ -3,7 +3,7 @@ import numpy as np
 from smarc_modelling.vehicles import *
 from smarc_modelling.lib import *
 import smarc_modelling.motion_planning.MotionPrimitives.MapGeneration as MapGen
-from smarc_modelling.motion_planning.MotionPrimitives.GenerationTree import a_star_search, double_a_star_search, body_to_global_velocity, testOptimization
+from smarc_modelling.motion_planning.MotionPrimitives.GenerationTree import a_star_search, double_a_star_search, body_to_global_velocity
 from smarc_modelling.motion_planning.MotionPrimitives.PlotResults import *
 from smarc_modelling.motion_planning.MotionPrimitives.trm_colors import *
 from smarc_modelling.motion_planning.MotionPrimitives.StatisticalAnalysis import runStatisticalAnalysis
@@ -13,15 +13,14 @@ import pandas as pd
 from scipy.spatial.transform import Rotation as R
 from scipy.spatial import ckdtree
 
-def MotionPlanningAlgorithm(realTimeDraw):
+def MotionPlanningAlgorithm(realTimeDraw, map_instance):
     """
     realTimeDraw: plot the results, True or False
     """
 
     # Generate and draw the map
     print("START")
-    print(f"{bcolors.HEADER}>> Generate the map{bcolors.ENDC}")
-    map_instance = MapGen.generationFirstMap()
+    print(f"{bcolors.HEADER}>> Analyse the complexity of the map{bcolors.ENDC}")
     complexity = MapGen.evaluateComplexityMap(map_instance)
     print("complexity:",complexity)
     
@@ -43,17 +42,13 @@ def MotionPlanningAlgorithm(realTimeDraw):
         ax = None 
         plt = None
 
-    # Skip search or not
-    onlyOptimization = False
-    if not onlyOptimization:
-        if complexity == 0:
-            print(f"{bcolors.WARNING}single tree search{bcolors.ENDC}")
-            trajectory, succesfulSearch, totalCost = a_star_search(ax, plt, map_instance, realTimeDraw, typeFunction, dec)
-        else:
-            print(f"{bcolors.WARNING}double tree search{bcolors.ENDC}")
-            trajectory, succesfulSearch, totalCost = double_a_star_search(ax, plt, map_instance, realTimeDraw, typeFunction, dec)
+    # Search
+    if complexity == 0:
+        print(f"{bcolors.WARNING}single tree search{bcolors.ENDC}")
+        trajectory, succesfulSearch, totalCost = a_star_search(ax, plt, map_instance, realTimeDraw, typeFunction, dec)
     else:
-        trajectory = testOptimization(map_instance)
+        print(f"{bcolors.WARNING}double tree search{bcolors.ENDC}")
+        trajectory, succesfulSearch, totalCost = double_a_star_search(ax, plt, map_instance, realTimeDraw, typeFunction, dec)
     print(f"{bcolors.OKGREEN}[ OK ]{bcolors.ENDC}")
     end_time = time.time()
 
@@ -81,24 +76,6 @@ def MotionPlanningAlgorithm(realTimeDraw):
         globalV = body_to_global_velocity((q0, q1, q2, q3), vertex[7:10])
         print(f"Velocity {ind:.0f} = {np.linalg.norm(globalV): .2f} m/s")
 
-        # Case 4 ---TO CONTINUE
-        '''
-        v_CG_inertial = np.array([globalV[0], globalV[1], globalV[2]])        # Linear velocity of CG in inertial frame
-        rr, ww, vv = vertex[10:13]
-        omega_body = np.array([rr, ww, vv])              # Angular velocity in body frame
-        r_fwd_body = np.array([0.655, 0, 0])           # Position of forward point relative to CG in body frame
-        # Ensure quaternion is in (x, y, z, w) format for scipy
-        rotation = R.from_quat([q1, q2, q3, q0])
-        R_b2i = rotation.as_matrix()  # Body to inertial rotation matrix
-        # Compute cross product in body frame
-        v_relative_body = np.cross(omega_body, r_fwd_body)
-        # Rotate to inertial frame
-        v_relative_inertial = R_b2i @ v_relative_body
-        # Add to CG velocity
-        v_fwd_inertial = v_CG_inertial + v_relative_inertial
-        #print(f" Velocity of pointA:", v_fwd_inertial)
-        '''
-
         if realTimeDraw:
             # Draw torpedo in the two created plots
             norm_index = (ind / len(trajectory)) 
@@ -106,6 +83,7 @@ def MotionPlanningAlgorithm(realTimeDraw):
             draw_torpedo(ax, vertex, norm_index)
             draw_torpedo(ax2, vertex, norm_index)
 
+            '''
             # Draw the velocity vector for each vertex (global velocity)
             x,y,z = vertex[:3]
             pointA = compute_A_point_forward(vertex)
@@ -118,7 +96,8 @@ def MotionPlanningAlgorithm(realTimeDraw):
             #ax.quiver(pointA[0], pointA[1], pointA[2], v_fwd_inertial[0], v_fwd_inertial[1], v_fwd_inertial[2], color='b', length=velocity_vector_norm, normalize=True)
             #ax.quiver(x, y, z, vx, vy, vz, color='b', length=velocity_vector_norm, normalize=True)
             #ax2.quiver(x, y, z, vx, vy, vz, color='b', length=velocity_vector_norm, normalize=True)
-
+        '''
+            
         ind += 1
 
     # Show the map, path and SAM 
@@ -203,20 +182,42 @@ def MotionPlanningROS(start_state, goal_state, map_boundaries, map_resolution):
 '''
 if __name__ == "__main__":
 
-    #MotionPlanningAlgorithm(True)
-    #runStatisticalAnalysis(1, 0)    # (nTrials, chosenComplexity)
+    # SAM initial state 
+    eta0 = np.zeros(7)
+    eta0[0] = 1.25
+    eta0[1] = 6.75
+    eta0[2] = 0.75
+    eta0[3] = 1
+    eta0[4] = 0
+    eta0[5] = 0
+    eta0[6] = 0
+    nu0 = np.zeros(6)   # Zero initial velocities
+    u0 = np.zeros(6)    #The initial control inputs for SAM
+    u0[0] = 50          #Vbs
+    u0[1] = 50          #lcg
+    x0 = np.concatenate([eta0, nu0, u0])
+    
+    # SAM final state
+    finalState = x0.copy()
+    finalState[0] = 1.25
+    finalState[1] = 3.75
+    finalState[2] = 0.75
+    finalState[3] = 1
+    finalState[4] = 0
+    finalState[5] = 0
+    finalState[6] = 0
+    
+    # Define the map
+    map_bounds = (2.5, 10, 3, -2.5, 0, 0)   # (x_max, y_max, z_max, x_min, y_min, z_min)
+    map_res = 0.5   # Resolution of the map_grid (used for goal area)
 
-    
-    # Try it for the ROS package
-    map_instance = MapGen.generationFirstMap()
-    start_state = map_instance["initial_state"]
-    goal_state = map_instance["final_state"]
-    map_bounds = (5, 10, 3)
-    map_res = 0.5
+    # Generate a map instance compatible with the algorithm 
+    map_instance = MapGen.generateMapInstance(x0, finalState, map_bounds, map_res)
 
-    trajectory, successfulFlag = MotionPlanningROS(start_state, goal_state, map_bounds, map_res)
-    draw_map_and_toredo(map_instance, trajectory)
-    
-    
-    ## Add if at least one tree arrives in the dataset
+    # Test with images and GIF
+    MotionPlanningAlgorithm(True, map_instance)
+
+    # Test for ROS and draw the final path
+    #trajectory, successfulFlag = MotionPlanningROS(x0, finalState, map_bounds, map_res)
+    #draw_map_and_toredo(map_instance, trajectory)
 '''

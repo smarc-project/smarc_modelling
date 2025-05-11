@@ -138,7 +138,6 @@ class SAM_PRIMITIVES():
 
             # If arrived at the goal
             if not arrivedPointBefore and (arrived(current_cg, map_instance, numberTree) or arrived(pointA, map_instance, numberTree) or arrived(pointB, map_instance, numberTree)):
-            #if not arrivedPointBefore and pointArrivedToGoal(current_cg, map_instance["goal_pixel"]) and pointArrivedToGoal(pointA, map_instance["goal_pixel_pointA"]):
                 arrivedPointBefore = True
                 finalState = data[:, i+1]
                 

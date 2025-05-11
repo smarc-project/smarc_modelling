@@ -21,9 +21,13 @@ def plot_map(map_data, typePlot):
     map_x_max = map_data["x_max"]   #number of column-wise
     map_y_max = map_data["y_max"]   #number of row-wise
     map_z_max = map_data["z_max"]
+    map_x_min = map_data["x_min"]
+    map_y_min = map_data["y_min"]
+    map_z_min = map_data["z_min"]
     obstacles = map_data["obstacleDict"]    #in the grid (row, column and z)
     start_pos = map_data["start_pos"]   #(x,y,z)
     goal_pixel = map_data["goal_pixel"] #(x,y,z)
+    start_area = map_data["start_area"]
     goal_area = map_data["goal_area"]
     TILESIZE = map_data["TileSize"]
 
@@ -32,16 +36,16 @@ def plot_map(map_data, typePlot):
     ax = fig.add_subplot(111, projection='3d')
 
     # Plot map as 3D surface 
-    x_grid = np.arange(0, map_x_max, TILESIZE)
-    y_grid = np.arange(0, map_y_max, TILESIZE)
-    z_grid = np.arange(0, map_z_max, TILESIZE)
+    x_grid = np.arange(map_x_min, map_x_max, TILESIZE)
+    y_grid = np.arange(map_y_min, map_y_max, TILESIZE)
+    z_grid = np.arange(map_z_min, map_z_max, TILESIZE)
     xx, yy , zz = np.meshgrid(x_grid, y_grid, z_grid)   # Shape: (numberVertical, numberHorizontal, number3D) == (y,x,z)
 
     # Create color grid for map visualization
     color_grid = np.full_like(xx, "white", dtype=object)    #(rows, columns, z)
     for obs in obstacles:
         color_grid[obs[0], obs[1], obs[2]] = "black"
-    color_grid[int(start_pos[1] // TILESIZE), int(start_pos[0] // TILESIZE), int(start_pos[2] // TILESIZE)] = "green"
+    color_grid[int(start_area[0]), int(start_area[1]), int(start_area[2])] = "green"
     color_grid[int(goal_area[0]), int(goal_area[1]), int(goal_area[2])] = "red"
 
     # Plot colored tiles from color_grid
@@ -98,13 +102,10 @@ def plot_map(map_data, typePlot):
             ax.view_init(elev=75, azim=90)  # top view
 
     # Set the limits for the axis
-    ax.set_xlim(0, map_x_max)
-    ax.set_ylim(0, map_y_max)
-    ax.set_zlim(0, map_z_max)
-    ax.set_xlim(0, map_x_max)
-    ax.set_ylim(0, map_y_max)
-    ax.set_zlim(0, map_z_max)
-    ax.set_box_aspect([map_x_max, map_y_max, map_z_max])
+    ax.set_xlim(map_x_min, map_x_max)
+    ax.set_ylim(map_y_min, map_y_max)
+    ax.set_zlim(map_z_min, map_z_max)
+    ax.set_box_aspect([np.abs(map_x_min) + np.abs(map_x_max), np.abs(map_y_min) + np.abs(map_y_max), np.abs(map_z_min) + np.abs(map_z_max)])
 
     # return the plot setup
     return (ax, plt, fig)
@@ -117,35 +118,6 @@ def update(frame, ax, plt, trajectory):
 
     # Draw torpedo
     draw_torpedo(ax, vertex, colorr)
-
-def load_trajectory_from_csv(filename):
-    """
-    Reads trajectory data from a CSV file and returns it as a list of states.
-
-    Args:
-        filename (str): The path to the CSV file.
-
-    Returns:
-        list: A list of states, where each state is a list or tuple of the values
-              from a row in the CSV.
-    """
-    trajectory = []
-    with open(filename, 'r') as csvfile:
-        reader = csv.reader(csvfile)
-        # Skip the header row if it exists (optional)
-        header = next(reader, None)
-        if header:
-            print(f"Header row: {header}")
-        for row in reader:
-            # Convert the string values to appropriate data types (e.g., float, int)
-            # Assuming your states are numerical, you'll likely need to convert.
-            try:
-                state = [float(value) for value in row]
-            except ValueError:
-                print(f"Warning: Could not convert row to numbers: {row}. Skipping.")
-                continue
-            trajectory.append(state)
-    return trajectory
 
 def draw_torpedo(ax, vertex, colorr, length=1.5, radius=0.095, resolution=20):
     """
