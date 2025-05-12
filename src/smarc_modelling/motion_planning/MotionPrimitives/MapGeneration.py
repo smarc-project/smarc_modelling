@@ -145,6 +145,9 @@ def generationFirstMap():
         "x_max": mapWidth,
         "y_max": mapHeight,
         "z_max": map3DSize,
+        "x_min": 0,
+        "y_min": 0,
+        "z_min": 0,
         "obstacleDict": obstaclesDictionary,
         "start_pos": startingPixel, #(x,y,z)
         "start_area": (startrCell, startcCell, startzCell),
@@ -175,20 +178,50 @@ def generateMapInstance(start_state, goal_state, map_boundaries, map_res):
     startingPixel = (start_state[0], start_state[1], start_state[2])
     arrivalPixel = (goal_state[0], goal_state[1], goal_state[2])
 
-    # Get the start and goal areas
-    startrCell = startingPixel[1] // TILESIZE
-    startcCell = startingPixel[0] // TILESIZE
-    startzCell = startingPixel[2] // TILESIZE
-    goalrCell = arrivalPixel[1] // TILESIZE
-    goalcCell = arrivalPixel[0] // TILESIZE
-    goalzCell = arrivalPixel[2] // TILESIZE
+    # Get the start area
+    lengthX = np.abs(map_boundaries[0]) + np.abs(map_boundaries[3])
+    lengthY = np.abs(map_boundaries[1]) + np.abs(map_boundaries[4])
+    lengthZ = np.abs(map_boundaries[2]) + np.abs(map_boundaries[5])
 
+    if startingPixel[1] < 0:
+        startrCell = int(np.abs(map_boundaries[4]) / TILESIZE - 1) - np.abs(startingPixel[1]) // TILESIZE
+    else: 
+        startrCell = int(np.abs(map_boundaries[4]) / TILESIZE) + startingPixel[1] // TILESIZE
+    
+    if startingPixel[0] < 0:
+        startcCell = int(np.abs(map_boundaries[3]) / TILESIZE - 1) - np.abs(startingPixel[0]) // TILESIZE
+    else:
+        startcCell = int(np.abs(map_boundaries[3]) / TILESIZE) + startingPixel[0] // TILESIZE
+
+    if startingPixel[2] < 0:
+        startzCell = int(np.abs(map_boundaries[5]) / TILESIZE - 1) - np.abs(startingPixel[2]) // TILESIZE
+    else:
+        startzCell = int(np.abs(map_boundaries[5]) / TILESIZE) + startingPixel[2] // TILESIZE
+
+    # Get the goal area
+    if arrivalPixel[1] < 0:
+        goalrCell = int(np.abs(map_boundaries[4]) / TILESIZE - 1) - np.abs(arrivalPixel[1]) // TILESIZE
+    else: 
+        goalrCell = int(np.abs(map_boundaries[4]) / TILESIZE) + arrivalPixel[1] // TILESIZE
+    
+    if arrivalPixel[0] < 0:
+        goalcCell = int(np.abs(map_boundaries[3]) / TILESIZE - 1) - np.abs(arrivalPixel[0]) // TILESIZE
+    else:
+        goalcCell = int(np.abs(map_boundaries[3]) / TILESIZE) + arrivalPixel[0] // TILESIZE
+    
+    if arrivalPixel[2] < 0:
+        goalzCell = int(np.abs(map_boundaries[5]) / TILESIZE - 1) - np.abs(arrivalPixel[2]) // TILESIZE
+    else:
+        goalzCell = int(np.abs(map_boundaries[5]) / TILESIZE) + arrivalPixel[2] // TILESIZE
 
     # Create the map instance to pass to other scripts
     map_instance = {
         "x_max": map_boundaries[0], #meters
         "y_max": map_boundaries[1],    #meters
         "z_max": map_boundaries[2], #meters
+        "x_min": map_boundaries[3],
+        "y_min": map_boundaries[4],
+        "z_min": map_boundaries[5],
         "obstacleDict": [], #not important for the tank
         "start_pos": startingPixel, #(x,y,z)
         "start_area": (startrCell, startcCell, startzCell),

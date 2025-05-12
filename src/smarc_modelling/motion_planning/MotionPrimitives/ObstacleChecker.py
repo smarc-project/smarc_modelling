@@ -31,42 +31,21 @@ def arrived(current, map_instance, numberTree):
     # Compute goal area
     TILESIZE = map_instance["TileSize"]
     if numberTree == 1:
-        arrivalx_min = TILESIZE * map_instance["goal_area"][1]
-        arrivalx_max = arrivalx_min + TILESIZE
-        arrivaly_min = TILESIZE * map_instance["goal_area"][0]
-        arrivaly_max = arrivaly_min + TILESIZE
-        arrivalz_min = TILESIZE * map_instance["goal_area"][2]
-        arrivalz_max = arrivalz_min + TILESIZE
+        arrivalx_min = map_instance["goal_pixel"][0] - 0.5 * TILESIZE
+        arrivalx_max = map_instance["goal_pixel"][0] + 0.5 * TILESIZE
+        arrivaly_min = map_instance["goal_pixel"][1] - 0.5 * TILESIZE
+        arrivaly_max = map_instance["goal_pixel"][1] + 0.5 * TILESIZE
+        arrivalz_min = map_instance["goal_pixel"][2] - 0.5 * TILESIZE
+        arrivalz_max = map_instance["goal_pixel"][2] + 0.5 * TILESIZE
     else:
-        arrivalx_min = TILESIZE * map_instance["start_area"][1]
-        arrivalx_max = arrivalx_min + TILESIZE
-        arrivaly_min = TILESIZE * map_instance["start_area"][0]
-        arrivaly_max = arrivaly_min + TILESIZE
-        arrivalz_min = TILESIZE * map_instance["start_area"][2]
-        arrivalz_max = arrivalz_min + TILESIZE
+        arrivalx_min = map_instance["start_pos"][0] - 0.5 * TILESIZE
+        arrivalx_max = map_instance["start_pos"][0] + 0.5 * TILESIZE
+        arrivaly_min = map_instance["start_pos"][1] - 0.5 * TILESIZE
+        arrivaly_max = map_instance["start_pos"][1] + 0.5 * TILESIZE
+        arrivalz_min = map_instance["start_pos"][2] - 0.5 * TILESIZE
+        arrivalz_max = map_instance["start_pos"][2] + 0.5 * TILESIZE
 
     if (x<arrivalx_min or x>arrivalx_max) or (y<arrivaly_min or y>arrivaly_max)  or (z<arrivalz_min or z>arrivalz_max):
-        return False
-    
-    if glbv.ARRIVED_PRIM == 0:
-        print("DONE!")
-        glbv.ARRIVED_PRIM = 1
-        
-    return True
-
-def pointArrivedToGoal(current, goal_pixel):
-    """
-    This function returns True if (x,y,z) is within the goal, False otherwise
-    """
-
-    # Get (x,y,z)
-    x = current[0]
-    y = current[1]
-    z = current[2]
-
-    distance = np.sqrt((x - goal_pixel[0])**2 + (y - goal_pixel[1])**2 + (z - goal_pixel[2])**2)
-
-    if distance > 0.2:
         return False
     
     if glbv.ARRIVED_PRIM == 0:
@@ -81,9 +60,9 @@ def IsOutsideTheMap(x,y,z, map_instance):
     """
 
     # Boundaries of the map
-    xMin = 0 
-    yMin = 0 
-    zMin = 0 
+    xMin = map_instance["x_min"]
+    yMin = map_instance["y_min"]
+    zMin = map_instance["z_min"]
     xMax = map_instance["x_max"] 
     yMax = map_instance["y_max"] 
     zMax = map_instance["z_max"] 
