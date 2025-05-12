@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 import mpl_toolkits.mplot3d.axes3d as p3
 import time 
-import pandas as pd
+#import pandas as pd
 from mpl_toolkits.mplot3d import Axes3D
 from scipy.spatial.transform import Rotation as R
 from scipy.stats import norm
@@ -76,8 +76,8 @@ def runStatisticalAnalysis(numberTrials, chosenComplexity):
         all_maps.append(map_instance)
 
         # Store the data in the dataset
-        df = pd.DataFrame(all_results, columns=["typeTree", "complexity", "success", "failingNotes", "desired_initial_state", "desired_final_state", "actual_final_state", "time_seconds", "number_vertices"])
-        df.to_csv("a_star_results.csv", index=False)
+        #df = pd.DataFrame(all_results, columns=["typeTree", "complexity", "success", "failingNotes", "desired_initial_state", "desired_final_state", "actual_final_state", "time_seconds", "number_vertices"])
+        #df.to_csv("a_star_results.csv", index=False)
         print(f"{bcolors.OKGREEN}Results are stored in a_star_results.csv file!{bcolors.ENDC}")
 
         # Save the trajectory

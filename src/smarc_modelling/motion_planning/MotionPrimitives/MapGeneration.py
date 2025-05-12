@@ -6,7 +6,7 @@ import numpy as np
 import random
 from smarc_modelling.motion_planning.MotionPrimitives.GenerationTree import compute_current_forward_vector, calculate_angle_betweenVectors
 from scipy.spatial.transform import Rotation as R
-import pandas as pd
+#import pandas as pd
 
 def generationFirstMap():
     """Define random seed"""
@@ -159,10 +159,10 @@ def generationFirstMap():
     }
 
     # Saving map_instance
-    map_resume = []
-    map_resume.append((map_instance["start_area"], map_instance["goal_area"], np.rad2deg(final_yaw)))
-    df = pd.DataFrame(map_resume, columns=["start_area", "goal_area", "final_yaw"])
-    df.to_csv("last_map_instance.csv", index=False)
+    #map_resume = []
+    #map_resume.append((map_instance["start_area"], map_instance["goal_area"], np.rad2deg(final_yaw)))
+    #df = pd.DataFrame(map_resume, columns=["start_area", "goal_area", "final_yaw"])
+    #df.to_csv("last_map_instance.csv", index=False)
 
     return map_instance
 
