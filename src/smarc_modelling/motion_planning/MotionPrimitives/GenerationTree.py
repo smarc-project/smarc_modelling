@@ -10,7 +10,6 @@ from scipy.spatial.transform import Rotation as R
 from scipy.spatial import KDTree
 import time
 import multiprocessing
-import pandas as pd
 import csv
 from smarc_modelling.motion_planning.MotionPrimitives.MotionPrimitives import SAM_PRIMITIVES
 from smarc_modelling.motion_planning.MotionPrimitives.ObstacleChecker import calculate_angle_betweenVectors, calculate_angle_goalVector, compute_A_point_forward
