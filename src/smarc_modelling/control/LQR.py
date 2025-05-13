@@ -401,18 +401,18 @@ class LQR_transform2:
         # State weight matrix
         Q_diag = np.ones(12)
         Q_diag[ 0:3 ] = 1
-        Q_diag[ 3:6 ] = 1
+        Q_diag[ 3:6 ] = 4
         Q_diag[ 6:9] = 1
-        Q_diag[9:] = 1
+        Q_diag[9:] = 5
         Q = np.diag(Q_diag)
 
 
         # Control rate of change weight matrix - control inputs as [x_vbs, x_lcg, delta_s, delta_r, rpm1, rpm2]
         R_diag = np.ones(6)
-        R_diag[ :2] = 1e-2
-        R_diag[2:4] = 1/200
-        R_diag[4: ] = 1e-5
-        R = np.diag(R_diag)*1
+        R_diag[ :2] = 1e-4
+        R_diag[2:4] = 1/50
+        R_diag[4: ] = 1e-6
+        R = np.diag(R_diag)*3
 
         
         P = scipy.linalg.solve_discrete_are(self.Ad, self.Bd, Q, R)
@@ -456,35 +456,29 @@ class LQR_transform2:
         :return: error vector
         """
         # Extract the reference quaternion
-        q_ref0 = ref[3]
-        q_ref1 = ref[4]
-        q_ref2 = ref[5]
-        q_ref3 = ref[6]
-
-        q_ref = ca.vertcat(q_ref0, q_ref1, q_ref2, q_ref3)
+        q_ref = ref[3:7]
 
         # Extract current quaternion
-        q0 = x[3]
-        q1 = x[4]
-        q2 = x[5]
-        q3 = x[6]
-
-        q = ca.vertcat(q0, q1, q2, q3)
+        q = x[3:7]
 
         # Since unit quaternion, quaternion inverse is equal to its conjugate
-        q_conj = ca.vertcat(q[0], -q[1], -q[2], -q[3])
-        q = q_ref
+        q_conj = ca.vertcat(q_ref[0], -q_ref[1], -q_ref[2], -q_ref[3])
         q_ref = q_conj
         # q_error = q_ref @ q^-1
-        #q_w = q_ref[0] * q[0] - q_ref[1] * q[1] - q_ref[2] * q[2] - q_ref[3] * q[3]
+        q_w = q_ref[0] * q[0] - q_ref[1] * q[1] - q_ref[2] * q[2] - q_ref[3] * q[3]
         q_x = q_ref[0] * q[1] + q_ref[1] * q[0] + q_ref[2] * q[3] - q_ref[3] * q[2]
         q_y = q_ref[0] * q[2] - q_ref[1] * q[3] + q_ref[2] * q[0] + q_ref[3] * q[1]
         q_z = q_ref[0] * q[3] + q_ref[1] * q[2] - q_ref[2] * q[1] + q_ref[3] * q[0]
 
-        q_error = ca.vertcat(q_x, q_y, q_z)
+
+        q_error = ca.vertcat(q_w, q_x, q_y, q_z)
+
+        q_error = q_error / ca.norm_2(q_error)
+
+        q_error = ca.vertcat(q_error[1], q_error[2], q_error[3])
 
         pos_error = x[:3] - ref[:3] #+ np.array([(np.random.random()-0.5)/5,(np.random.random()-0.5)/5, (np.random.random()-0.5)/5])
-        vel_error = x[6:12] - ref[6:12]
+        vel_error = x[7:13] - ref[7:13]
         x_error = ca.vertcat(pos_error, q_error, vel_error)
 
         return x_error

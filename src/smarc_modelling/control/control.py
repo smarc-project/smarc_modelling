@@ -139,7 +139,7 @@ class NMPC:
         self.ocp.solver_options.regularize_method = 'NO_REGULARIZE'
 
         solver_json = 'acados_ocp_' + self.model.name + '.json'
-        update_solver = False
+        update_solver = True
         if update_solver == False:
             acados_ocp_solver = AcadosOcpSolver(self.ocp, json_file = solver_json, generate=False, build=False)
 
@@ -237,8 +237,8 @@ class NMPC_trajectory:
         # --------------------------- Cost setup ---------------------------------
         # State weight matrix
         Q_diag = np.ones(nx)
-        Q_diag[ 0:3 ] = 1         # Position
-        Q_diag[ 3:7 ] = 1        # Quaternion
+        Q_diag[ 0:3 ] = 1        # Position
+        Q_diag[ 3:7 ] = 1       # Quaternion
         Q_diag[ 7:10] = 1         # linear velocity
         Q_diag[10:13] = 1         # Angular velocity
 
@@ -329,7 +329,7 @@ class NMPC_trajectory:
         self.ocp.solver_options.regularize_method = 'NO_REGULARIZE'
 
         solver_json = 'acados_ocp_' + self.model.name + '.json'
-        update_solver = False
+        update_solver = True
         if update_solver == False:
             acados_ocp_solver = AcadosOcpSolver(self.ocp, json_file = solver_json, generate=False, build=False)
 

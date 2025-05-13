@@ -75,9 +75,9 @@ def save_csv(trajectory, t):
     trajectory (np.array): The NumPy array to save.
     file_path (str): The path to the CSV file.
     """
-    np.savetxt("/home/admin/smarc_modelling/src/Trajectories/REPORT/easy/LQR/easy6.csv"
+    np.savetxt("/home/admin/smarc_modelling/src/Trajectories/REPORT/hard/LQR/hard9.csv"
                , trajectory, delimiter=',', header="X,Y,Z,phi,theta,psi,vx,vy,vz,p,q,r,control", comments='')
-    np.savetxt("/home/admin/smarc_modelling/src/Trajectories/REPORT/easy/LQR/time_easy6.csv"
+    np.savetxt("/home/admin/smarc_modelling/src/Trajectories/REPORT/hard/LQR/time_hard9.csv"
                , t, delimiter=',', header="time (ms)", comments='')
     print("CSV file saved successfully.")
 
@@ -96,7 +96,7 @@ def main():
 
 
     # Declare reference trajectory
-    file_path = "/home/admin/smarc_modelling/src/Trajectories/REPORT/easy/case_easy3.csv"
+    file_path = "/home/admin/smarc_modelling/src/Trajectories/REPORT/medium/case_medium9.csv"
     trajectory = read_csv_to_array(file_path)
 
     Nsim = trajectory.shape[0]
@@ -127,20 +127,19 @@ def main():
     for i in range(Nsim):
         print("-------------------------------------------------------------")
         print(f"Nsim: {i}")
-        try:
-            time_start = time.time()
-            u = lqr.solve(x, u, x_lin, u_lin)
-            time_end = time.time()
-            t[i] = time_end - time_start
-            x_next = runge_kutta_4(casadi_dynamics, x, u, Ts)
-            x_next[3:7] = x_next[3:7]/scipy.linalg.norm(x_next[3:7])  # Normalize quaternion
+        time_start = time.time()
+        u = lqr.solve(x, u, x_lin, u_lin)
+        time_end = time.time()
+        t[i] = time_end - time_start
+        x_next = runge_kutta_4(casadi_dynamics, x, u, Ts)
+        x_next[3:7] = x_next[3:7]/scipy.linalg.norm(x_next[3:7])  # Normalize quaternion
         
-        except:
-            print("LQR solver failed")
-            simNonlinear = simNonlinear[:i,:]
-            simU = simU[:i,:]
-            Nsim = simNonlinear.shape[0]-1
-            break
+        # except:
+        #     print("LQR solver failed")
+        #     simNonlinear = simNonlinear[:i,:]
+        #     simU = simU[:i,:]
+        #     Nsim = simNonlinear.shape[0]-1
+        #     break
 
         if i < x_ref.shape[0]-1:
             x_lin = x_ref[i+1,:]
@@ -149,7 +148,7 @@ def main():
         x=x_next
         simNonlinear[i+1,:] = x_next
         simU[i+1,:] = u
-
+        print(x)
 
 
     # evaluate timings
@@ -162,7 +161,7 @@ def main():
     u_dot = np.zeros(simU.shape)
     #plot(x_axis, references, u_ref, simNonlinear[:-1], simU[:-1])
     #plot_function(x_axis, trajectory, sim[:-1], u_dot[:-1])
-    #save_csv(sim, t)
+    save_csv(sim, t)
     part_plot_function(trajectory, sim[:-1], u_dot[:-1])
 
 if __name__ == '__main__':
