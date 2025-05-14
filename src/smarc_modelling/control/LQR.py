@@ -129,7 +129,6 @@ class LQR:
         :param ref: Reference vector
         :return: error vector
         """
-        print(x.shape, ref.shape)
 
         # Extract the reference quaternion
         q_ref = ref[3:7]

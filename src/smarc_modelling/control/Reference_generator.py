@@ -211,7 +211,7 @@ def read_csv_to_array(file_path: str):
     
     return np.array(data)
 
-def save_csv(trajectory):
+def save_csv(trajectory, name):
     """
     Saves a NumPy array to a CSV file.
 
@@ -219,29 +219,31 @@ def save_csv(trajectory):
     trajectory (np.array): The NumPy array to save.
     file_path (str): The path to the CSV file.
     """
-    np.savetxt("/home/admin/smarc_modelling/src/Trajectories/REPORT/easy/case_easy9.csv", trajectory, delimiter=',', header="X,Y,Z,phi,theta,psi,vx,vy,vz,p,q,r", comments='')
+    np.savetxt(name, trajectory, delimiter=',', header="X,Y,Z,phi,theta,psi,vx,vy,vz,p,q,r", comments='')
 def main():
-    # Declare reference trajectory
-    file_path = "/home/admin/smarc_modelling/src/Trajectories/REPORT/easy/case_easy.csv"
-    trajectory = read_csv_to_array(file_path)
+    # Declare reference trajectory'
+    case = "easy"  # easy, medium or hard
+    length = 100
+    file_path = "/home/admin/smarc_modelling/src/Trajectories/report_update/"+ case + "/trajectories/case_" + case +"0.csv"
+    trajectory_org = read_csv_to_array(file_path)
 
-    # HARD
-    # trajectory[0, 0] = trajectory[0, 0] + (np.random.random()-0.5)
-    # trajectory[0, 1] = trajectory[0, 1] - (np.random.random()/2)
-    # trajectory[0, 2] = trajectory[0, 2] + (np.random.random()-0.5)
+    for i in range(1, length):
+        trajectory_org = read_csv_to_array(file_path)
+        trajectory = trajectory_org
+        if case == "easy" or case == "hard":
+            trajectory[0, 0] = trajectory[0, 0] + (np.random.random()-0.5)
+            trajectory[0, 1] = trajectory[0, 1] - (np.random.random()/2)
+            trajectory[0, 2] = trajectory[0, 2] + (np.random.random()-0.5)
+        else:
+        # Medium
+            trajectory[0, 0] = trajectory[0, 0] + (np.random.random()/2)
+            trajectory[0, 1] = trajectory[0, 1] + (np.random.random()-0.5)
+            trajectory[0, 2] = trajectory[0, 2] + (np.random.random()-0.5)
 
-    # Medium
-    # trajectory[0, 0] = trajectory[0, 0] + (np.random.random()/2)
-    # trajectory[0, 1] = trajectory[0, 1] + (np.random.random()-0.5)
-    # trajectory[0, 2] = trajectory[0, 2] + (np.random.random()-0.5)
+        save_file_path = "/home/admin/smarc_modelling/src/Trajectories/report_update/"+ case + "/trajectories/case_" + case + str(i) +".csv"
+        print(save_file_path)
 
-    # Easy
-    trajectory[0, 0] = trajectory[0, 0] + (np.random.random()-0.5)
-    trajectory[0, 1] = trajectory[0, 1] - (np.random.random()/2)
-    trajectory[0, 2] = trajectory[0, 2] + (np.random.random()-0.5)
-
-    save_csv(trajectory)
-    #refplot(trajectory)
+        save_csv(trajectory, save_file_path)
 
 if __name__ == '__main__':
     main()
