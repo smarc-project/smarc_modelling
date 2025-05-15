@@ -8,7 +8,7 @@
 
 import numpy as np
 from smarc_modelling.vehicles.SAM_PIML import SAM_PIML # Customized SAM using PIML predictions for D
-from smarc_modelling.vehicles.BlueROV_PIML import BlueROV_PIML
+from smarc_modelling.vehicles.BlueROV_PIML_2 import BlueROV_PIML
 from smarc_modelling.piml.utils.utility_functions import load_data_from_bag
 import matplotlib.pyplot as plt
 import torch

@@ -1,6 +1,6 @@
 import numpy as np
 from smarc_modelling.piml.pinn.pinn import init_pinn_model, pinn_predict
-from smarc_modelling.piml.utils.utility_functions import eta_quat_to_deg, angular_vel_to_quat_vel
+from smarc_modelling.piml.utils.utility_functions import eta_quat_to_rad, angular_vel_to_quat_vel
 import os
 import yaml
 
@@ -32,14 +32,14 @@ class BlueROV_PIML(object):
         # Model properties
         # Declaration of parameters for the BlueROV2 heavy configuration
         # https://www.mdpi.com/2077-1312/10/12/1898
-        self.g = 9.81         # Gravity acc  [kgm/s2]
-        self.V = 0.0134       # Volume of rov [m3]    0.011 enl. 6.dof
-        self.mass = 13.5     # Mass [kg] including DVL and Dropper             11.5  enl. 6-dof mod...
-        self.Ix = 0.26      # Inertia x-axis [kgm2] including DVL and Dropper 0.16  enl. 6-DoF modelling...
-        self.Iy = 0.23      # Inertia y-axis [kgm2] including DVL and Dropper 0.16
-        self.Iz = 0.37      # Inertia z-axis [kgm2] including DVL and Dropper 0.16
-        self.ro = 1000 #water density [kg/m3]
-        self.delta = 0.0134  # water volume moved by ROV [m3] danish report
+        self.g = 9.82         # Gravity acc  [kgm/s2]
+        self.V = 0.0134       # Volume of rov [m3]    0.011  enl. 6.dof
+        self.mass = 14      # Mass [kg] including DVL and Dropper             11.5  enl. 6-dof mod...
+        self.Ix = 0.26        # Inertia x-axis [kgm2] including DVL and Dropper 0.16  enl. 6-DoF modelling...
+        self.Iy = 0.23        # Inertia y-axis [kgm2] including DVL and Dropper 0.16
+        self.Iz = 0.37        # Inertia z-axis [kgm2] including DVL and Dropper 0.16
+        self.ro = 1000        # Water density [kg/m3]
+        self.delta = 0.0134   # Water volume moved by ROV [m3] danish report
 
         # Center of bouyancy coordinates
         self.xb = 0         # Deviation from mass center in x-axis [m]
@@ -52,7 +52,7 @@ class BlueROV_PIML(object):
         self.zg = 0         # z-axis [m]
 
         # Added masses
-        self.Xa = 6.36      # Added mass x-axis [kg]            6.36 #Enl Open-Source benchmark....
+        self.Xa = 6.36      # Added mass x-axis [kg]            6.36  enl. Open-Source benchmark....
         self.Ya = 7.12      # Added mass y-axis [kg]            7.12
         self.Za = 18.68     # Added mass z-axis [kg]            18.68
         self.Ka = 0.189     # Added inertia x-axis [kgm2/rad]   0.189
@@ -86,7 +86,7 @@ class BlueROV_PIML(object):
         self.Bd = None
         self.Kd = None
         self.B_delay = None #delay
-        self.tao = tao #delay
+        self.tao = None #delay
 
         # Load yaml file
         config = self.load_file()
@@ -107,7 +107,7 @@ class BlueROV_PIML(object):
         self.piml_type = piml_type
         if self.piml_type == "pinn":
             print(f" Physics Informed Neural Network model initialized!")
-            self.piml_model = init_pinn_model("pinn_brov.pt")
+            self.piml_model = init_pinn_model("brov_pinn.pt")
 
 
     def dynamics(self, x, tao):
@@ -122,12 +122,11 @@ class BlueROV_PIML(object):
         :rtype: ca.MX
         """
         
-        eta = eta_quat_to_deg(x[0:7])
-        nu = x[7:13]
+        eta = eta_quat_to_rad(x[0:7]) # x y z p q r (Converted from quat)
+        nu = x[7:13] # Already comes in angles
         u_fb = x[13:19]
         u = tao # Controls commands
     
-
         # Model matrices
         J = self.create_J(eta) # Create transformation matrix
         M = self.create_M() # nxn inertia matrix including hydrodynamic added mass
@@ -136,11 +135,24 @@ class BlueROV_PIML(object):
         FT = self.create_F(tao) # mx1 Force vector (already multiplied with T upon return)
         g = self.create_g(eta) # nx1 vector of restoring forces and moments
         M_inv = np.linalg.inv(M) # Invert M
+
+        # print("Current set of forces")
+        # print("FT: ", FT.T)
+        # print("g:  ", g.T)
+        # print("Dv: ", np.matmul(nu, D))
+        # print("Cv: ", np.matmul(nu, C))
+        # print("\n")
+
+        # print("D: ", D)
+        # print("\n")
+
+        # print(eta_quat_to_rad([1, 2, 3, 1, 0, 0, 1]))
+        # print("\n")
   
         # Nonlinear model
         detadt = np.dot(J,nu) # This is in angles
-        detadt = angular_vel_to_quat_vel(eta, detadt) # Convert it quaternion
-        dnudt = (M_inv @ (FT.T - g.T - np.matmul(nu, D) - np.matmul(nu, C)).T).reshape(-1)
+        detadt = angular_vel_to_quat_vel(eta, detadt) # Convert it to quaternion
+        dnudt = (M_inv @ (FT.T - g.T - np.matmul(nu, D) - np.matmul(nu, C)).T).reshape(-1) # Fossen's equation
         dudt = [0, 0, 0, 0, 0, 0, 0, 0] # No control dynamics we read these from the bag
         self.dxdt = np.hstack((detadt, dnudt, dudt))
         
@@ -306,7 +318,7 @@ class BlueROV_PIML(object):
             D_l[3,3] = self.Kpl
             D_l[4,4] = self.Mql
             D_l[5,5] = self.Nrl
-
+      
             #nonlinear damping
             D_nl = np.eye(int(self.n/2))
             D_nl[0,0] = self.Xun*abs(u)
@@ -315,10 +327,11 @@ class BlueROV_PIML(object):
             D_nl[3,3] = self.Kpn*abs(p)
             D_nl[4,4] = self.Mqn*abs(q)
             D_nl[5,5] = self.Nrn*abs(r)
-
+      
             D = D_l + D_nl
 
-        if self.piml_type == "pinn":
+        elif self.piml_type == "pinn":
+            print("PINN predicted D")
             self.D = pinn_predict(self.piml_model, eta, nu, u_)
 
         return D
@@ -329,15 +342,16 @@ class BlueROV_PIML(object):
         enables predicting force using np ndarrays
         """
         tao = tao.reshape((8, 1)) # Add dim for mult
-        K = (6136*tao + 108700)/(tao**3 + 89*tao**2 + 9258*tao + 108700)
-        K_mat = np.diag(K.flatten())
-        tao = tao - 1500
-        tao = np.matmul(K_mat, tao)
+
+        # Normalize forces
+        tao = (tao - 1500) / 400
+        # print(tao)
 
         # Define the nonlinear force expression
         F = -140.3 * (tao**9) + 389.9 * (tao**7) - 404.1 * (tao**5) + 176 * (tao**3) + 8.9 * tao
 
         # Return the force
+        # print(np.matmul(self.T, F))
         return np.matmul(self.T, F)
 
 

@@ -532,7 +532,7 @@ class SAM_PIML():
             self.D[3,2] = self.y_cp * self.Zww * np.abs(self.nu_r[2])
             self.D[4,2] = -self.x_cp * self.Zww * np.abs(self.nu_r[2])
 
-        if self.piml_type == "pinn":
+        elif self.piml_type == "pinn":
             self.D = pinn_predict(self.piml_model, eta, nu, u)
         elif self.piml_type == "bpinn":
             self.D = bpinn_predict(self.piml_model, eta, nu, u)
@@ -648,15 +648,7 @@ class SAM_PIML():
         ## From Fossen 2021, eq. 2.78:
         om = nu[3:6]  # Angular velocity
         q0, q1, q2, q3 = q
-        T_q_n_b = 0.5 * np.array([
-                                 [-q1, -q2, -q3],
-                                 [q0, -q3, q2],
-                                 [q3, q0, -q1],
-                                 [-q2, q1, q0]
-                                 ])
-        q_dot = T_q_n_b @ om + self.gamma/2 * (1 - q.T.dot(q)) * q
 
-        return np.concatenate([pos_dot, q_dot])
 
     def actuator_dynamics(self, u_cur, u_ref):
         """

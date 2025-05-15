@@ -5,7 +5,7 @@
 import torch
 import torch.nn as nn
 import numpy as np
-from smarc_modelling.piml.utils.utility_functions import load_data_from_bag_brov
+from smarc_modelling.piml.utils.utility_functions import load_multiple_data_from_bag_brov, load_data_from_bag_brov
 import sys
 import matplotlib.pyplot as plt
 
@@ -58,14 +58,13 @@ def loss_function(model, x, Dv_comp, Mv_dot, Cv, g_eta, tau, nu):
     D_pred = model(x)
 
     # Calculate MSE physics loss using Fossen Dynamics Model
-    # TODO: Add this back in when we have the correct controls in bag
-    # physics_loss = torch.mean((Mv_dot + Cv + (torch.bmm(nu.unsqueeze(1), D_pred).squeeze(1)) + g_eta - torch.matmul(tau, T).squeeze(1))**2)
+    physics_loss = torch.mean((Mv_dot + Cv + (torch.bmm(nu.unsqueeze(1), D_pred).squeeze(1)) + g_eta - tau)**2)
 
     # Calculate data loss
     data_loss = torch.mean((Dv_comp - (torch.bmm(nu.unsqueeze(1), D_pred).squeeze(1)))**2)
 
     # Final loss is just the sum
-    return data_loss #physics_loss + data_loss
+    return physics_loss + data_loss
 
 
 def brov_init_pinn_model(file_name: str = "brov_pinn.pt"):
@@ -106,8 +105,11 @@ if __name__ == "__main__":
     # Loading training data
     print(f" Loading training data...")
 
-    train_path = "src/smarc_modelling/piml/data/brovbags/brovbag_train"
-    eta, nu, u, u_cmd, Dv_comp, Mv_dot, Cv, g_eta, tau, t = load_data_from_bag_brov(train_path, "torch")
+    training_set = ["src/smarc_modelling/piml/data/brovbags/brovbag_train_1", "src/smarc_modelling/piml/data/brovbags/brovbag_train_2",
+                    "src/smarc_modelling/piml/data/brovbags/brovbag_train_3", "src/smarc_modelling/piml/data/brovbags/brovbag_train_4",
+                    "src/smarc_modelling/piml/data/brovbags/brovbag_train_5"]
+    eta, nu, u, u_cmd, Dv_comp, Mv_dot, Cv, g_eta, tau, t = load_multiple_data_from_bag_brov(training_set, "torch")
+
     x = torch.cat([eta, nu, u], dim=1) # State vector
 
     # Loading validation data
@@ -118,8 +120,8 @@ if __name__ == "__main__":
     x_val = torch.cat([eta_val, nu_val, u_val], dim=1)
 
     # Initialize model and optimizer
-    shape = [19, 32, 64, 128, 128, 64, 36]
-    shape = [19, 256, 256, 256, 36]
+    shape = [21, 32, 64, 128, 128, 128, 128, 128, 128, 64, 36]
+    shape = [21, 256, 256, 256, 36]
     model = BROV_PINN(shape)
     optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
 
@@ -179,7 +181,7 @@ if __name__ == "__main__":
             counter += 1
 
         if epoch % 500 == 0:
-            print(f" Still training, epoch {epoch}, loss: {loss.item()}, lr: {optimizer.param_groups[0]['lr']}")
+            print(f" Still training, epoch {epoch}, loss: {loss.item()}, validation loss: {val_loss.item()}, lr: {optimizer.param_groups[0]['lr']}")
         
         if counter >= patience:
             print(f" Stopping early due to no improvement after {patience} epochs from epoch: {epoch-counter}")

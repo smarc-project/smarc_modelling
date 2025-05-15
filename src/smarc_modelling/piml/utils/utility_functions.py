@@ -122,7 +122,6 @@ def load_rosbag(bag_path):
     
     return time, eta, nu, acc, u_control, u_control_ref
 
-
 def load_rosbag_brov(bag_path):
     # Same as load_rosbag but is structured for bag from BlueROV instead of SAM
 
@@ -256,7 +255,6 @@ def load_rosbag_brov(bag_path):
 
     return time, eta, nu, acc, u_control, u_control_ref
 
-
 def load_data_from_bag(data_file: str="", return_type: str=""):
     from smarc_modelling.vehicles.SAM import SAM
 
@@ -332,9 +330,8 @@ def load_data_from_bag(data_file: str="", return_type: str=""):
             time
         )
 
-
 def load_data_from_bag_brov(data_file: str="", return_type: str=""):
-    from smarc_modelling.vehicles.BlueROV_PIML import BlueROV_PIML
+    from smarc_modelling.vehicles.BlueROV_PIML_2 import BlueROV_PIML
 
     # Processing data into right format from ROS bag
     time, eta, nu, acc, u_cmd, u_fb = load_rosbag_brov(data_file)
@@ -406,7 +403,63 @@ def load_data_from_bag_brov(data_file: str="", return_type: str=""):
             tau,
             time
         )
-        
+
+def load_multiple_data_from_bag_brov(data_vector, return_type):
+
+    eta = np.zeros((1,7))
+    nu = np.zeros((1,6))
+    u_fb = np.zeros((1,8))
+    u_cmd = np.zeros((1,8))
+    Dv_comp = np.zeros((1,6))
+    Mv_dot = np.zeros((1,6))
+    Cv = np.zeros((1,6))
+    g_eta = np.zeros((1,6))
+    tau = np.zeros((1,6))
+    time = np.zeros((1, 1))
+
+    for data_file in data_vector:
+        print(f" Loading {data_file}... ")
+        new_eta, new_nu, new_u_fb, new_u_cmd, new_Dv_comp, new_Mv_dot, new_Cv, new_g_eta, new_tau, new_time = load_data_from_bag_brov(data_file, "")
+        eta = np.vstack([eta, new_eta])
+        nu = np.vstack([nu, new_nu])
+        u_fb = np.vstack([u_fb, new_u_fb])
+        u_cmd = np.vstack([u_cmd, new_u_cmd])
+        Dv_comp = np.vstack([Dv_comp, new_Dv_comp])
+        Mv_dot = np.vstack([Mv_dot, new_Mv_dot])
+        Cv = np.vstack([Cv, new_Cv])
+        g_eta = np.vstack([g_eta, new_g_eta])
+        tau = np.vstack([tau, new_tau])
+        time = np.vstack([time, new_time.reshape(-1, 1)])
+
+
+    if return_type == "torch": # Return all values as torch tensors
+        return(
+            torch.tensor(eta, dtype=torch.float32),
+            torch.tensor(nu, dtype=torch.float32),
+            torch.tensor(u_fb, dtype=torch.float32),
+            torch.tensor(u_cmd, dtype=torch.float32),
+            torch.tensor(Dv_comp, dtype=torch.float32),
+            torch.tensor(Mv_dot, dtype=torch.float32),
+            torch.tensor(Cv, dtype=torch.float32),
+            torch.tensor(g_eta, dtype=torch.float32),
+            torch.tensor(tau, dtype=torch.float32),
+            torch.tensor(time, dtype=torch.float32)
+        )
+    else: # Return all values as numpy matrices
+        return(
+            eta,
+            nu,
+            u_fb,
+            u_cmd,
+            Dv_comp,
+            Mv_dot,
+            Cv,
+            g_eta,
+            tau,
+            time
+        )
+
+
 
 def load_data(data_file: str = "", return_type: str=""):
     from smarc_modelling.vehicles.SAM import SAM
@@ -497,11 +550,18 @@ def load_data(data_file: str = "", return_type: str=""):
             time
         )
     
-def eta_quat_to_deg(eta):
+def eta_quat_to_rad(eta):
     pose = eta[0:3]
     quat = eta[3:]
     euler = R.from_quat(quat).as_euler("xyz", degrees=False)
     return np.hstack([pose, euler])
+
+def eta_quat_to_deg(eta):
+    eta = eta_quat_to_rad(eta)
+    eta[3] *= (180/np.pi)
+    eta[4] *= (180/np.pi)
+    eta[5] *= (180/np.pi)
+    return eta
 
 def angular_vel_to_quat_vel(eta, nu):
 
@@ -509,9 +569,6 @@ def angular_vel_to_quat_vel(eta, nu):
     angle = eta[3:]
     q = R.from_euler("xyz", angle).as_quat()
     q = q/np.linalg.norm(q)
-
-    # Convert quaternion to DCM for position kinematics
-    C = quaternion_to_dcm(q)
 
     # Position dynamics: ṗ = C * v
     pos_dot = nu[0:3]
