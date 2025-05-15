@@ -114,16 +114,11 @@ class SyncSubscriber(Node):
         self.vbs_fb = Subscriber(self, PercentStamped, "/piml/vbs_fb")
 
         # Thrusters
-        self.thruster1_cmd_sub = self.create_subscription(ThrusterRPM, "/piml/thruster1_cmd", self.thruster1_cmd_cb, 10) # Missing stamp
-        self.thruster2_cmd_sub = self.create_subscription(ThrusterRPM, "/piml/thruster2_cmd", self.thruster2_cmd_cb, 10) # Missing stamp
+        self.thruster1_cmd_sub = self.create_subscription(ThrusterRPMStamped, "/piml/thruster1_cmd", self.thruster1_cmd_cb, 10) # Missing stamp
+        self.thruster2_cmd_sub = self.create_subscription(ThrusterRPMStamped, "/piml/thruster2_cmd", self.thruster2_cmd_cb, 10) # Missing stamp
         self.thruster1_fb = Subscriber(self, ThrusterFeedback, "/piml/thruster1_fb") # Missing stamp
         self.thruster2_fb = Subscriber(self, ThrusterFeedback, "/piml/thruster2_fb") # Missing stamp
-
-        self.thruster1_cmd_sub = self.create_subscription(ThrusterFeedback, "/piml/thruster1_fb", self.thruster1_fb_cb, 10)
-        self.thruster2_cmd_sub = self.create_subscription(ThrusterFeedback, "/piml/thruster2_fb", self.thruster2_fb_cb, 10)
-        self.lcg_cmd_sub = self.create_subscription(PercentStamped, "/piml/lcg_cmd", self.lcg_cmd_cb, 10)
-        self.vbs_cmd_sub = self.create_subscription(PercentStamped, "/piml/vbs_cmd", self.vbs_cmd_cb, 10)
-
+    
         # Pose & Velocities
         self.odom = Subscriber(self, Odometry, "/mocap/sam_mocap/odom")
 
