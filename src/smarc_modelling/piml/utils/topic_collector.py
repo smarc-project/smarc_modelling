@@ -45,6 +45,7 @@ class AddTimestamp(Node):
     def add_stamp_odom(self, msg):
         msg_stamped = msg
         msg_stamped.header.stamp = self.get_clock().now().to_msg()
+        self.odom_pub.publish(msg_stamped)
 
     def add_stamp_vbs_fb(self, msg):
         msg_stamped = msg
@@ -120,15 +121,14 @@ class SyncSubscriber(Node):
         self.thruster2_fb = Subscriber(self, ThrusterFeedback, "/piml/thruster2_fb") # Missing stamp
     
         # Pose & Velocities
-        self.odom = Subscriber(self, Odometry, "/mocap/sam_mocap/odom")
+        self.odom = Subscriber(self, Odometry, "/piml/odom")
 
         # All the topics we want synched
         sub_list = [self.lcg_cmd, self.lcg_fb, self.vbs_cmd, self.vbs_fb, self.thruster1_fb, self.thruster2_fb, self.odom]
-        temp_list = [self.lcg_fb, self.vbs_fb, self.odom]
 
         # Set up the ApproximateTimeSynchronizer
         self.synched_message = ApproximateTimeSynchronizer(
-            temp_list,
+            sub_list,
             queue_size = 100,  # How long we wait
             slop = 0.1, # Max time difference, seems like we can make this rather small for SAM and still get a lot of data
             allow_headerless=True
