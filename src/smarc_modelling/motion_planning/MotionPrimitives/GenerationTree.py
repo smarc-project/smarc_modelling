@@ -91,15 +91,21 @@ def reconstruct_path(current, parents_dict, resolution_dict, map_instance, ax, p
             print("<starting optimization>")
 
             # Interpolate the waypoints
-            addedPoints = 15
+            addedPoints = 25 - (len(res_list) - len(res_list)//2)   # We can have a primitive up to 3 seconds --> //2 is 15 waypoints!
             for _ in range(addedPoints):
                 res_list.append(map_instance["final_state"])
-
             # Optimise them 
-            result_list, status = optimization_acados_singleTree(res_list[(len(res_list)-addedPoints)//2 :], map_instance)    # Only optimize half of the primitive
+            #result_list, status = optimization_acados_singleTree(res_list[(len(res_list)-addedPoints)//2 :], map_instance)   
+            result_list, status = optimization_acados_singleTree(res_list[(len(res_list)-addedPoints)//2 :], map_instance)   
             if status == 0:
                 success = 1
-                res_list = result_list
+                results = []
+                for i in range((len(res_list)-addedPoints)//2):
+                    results.append(res_list[i])
+                for ii in range(len(result_list)):
+                    results.append(result_list[ii])
+                res_list = results
+                #res_list = result_list
                 print(f"{bcolors.OKGREEN}[ OK ]{bcolors.ENDC}")
             else:
                 success = 0
