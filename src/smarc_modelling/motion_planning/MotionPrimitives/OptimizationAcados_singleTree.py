@@ -1,4 +1,5 @@
 import numpy as np
+import os
 from casadi import SX, vertcat, sqrt
 from acados_template import AcadosOcp, AcadosOcpSolver, AcadosModel
 from smarc_modelling.control.control import *
@@ -98,7 +99,7 @@ def create_ocp(model, x0, x_last, N, map_instance):
     ocp = AcadosOcp()
     ocp.model = model
     ts = glbv.RESOLUTION_DT
-    N_horizon = N
+    N_horizon = 25
     ocp.solver_options.N_horizon = N_horizon
     ocp.solver_options.tf = N_horizon*ts  
     ocp.solver_options.qp_solver = 'PARTIAL_CONDENSING_HPIPM'
@@ -114,7 +115,7 @@ def create_ocp(model, x0, x_last, N, map_instance):
     ocp.solver_options.regularize_method = 'NO_REGULARIZE'
     
     # Cost function: minimize final velocity + sum(k=0, N){u_k^T Q u_k}
-    #nu = model.u.rows()
+    nu = model.u.rows()
     nx = model.x.rows()
     ocp.cost.cost_type_e = 'NONLINEAR_LS'
     ocp.cost.cost_type = 'NONLINEAR_LS'
@@ -130,8 +131,9 @@ def create_ocp(model, x0, x_last, N, map_instance):
 
     # Constraints
     ocp.constraints.x0 = x0
-    
+
     # Terminal state constraints: Goal area bounds
+    
     TILESIZE = map_instance["TileSize"]
     arrivalx_min = map_instance["goal_pixel"][0] - 0.5 * TILESIZE
     arrivalx_max = map_instance["goal_pixel"][0] + 0.5 * TILESIZE
@@ -140,6 +142,7 @@ def create_ocp(model, x0, x_last, N, map_instance):
     arrivalz_min = map_instance["goal_pixel"][2] - 0.5 * TILESIZE
     arrivalz_max = map_instance["goal_pixel"][2] + 0.5 * TILESIZE
     
+
     # Define terminal state constraints as symbolic expressions
     goal_constraints_cg = vertcat(
         model.x[0],  # x position
@@ -161,6 +164,7 @@ def create_ocp(model, x0, x_last, N, map_instance):
         pointB[2]
     )
     
+    # Not used
     '''
     constraint_RPM2 = vertcat(
         model.x[17] - model.x[18]
@@ -176,6 +180,8 @@ def create_ocp(model, x0, x_last, N, map_instance):
     ])
     '''
     
+    # Used
+    
     # At the end
     ocp.model.con_h_expr_e = vertcat(goal_constraints_cg)
     ocp.constraints.lh_e = np.array([
@@ -186,19 +192,8 @@ def create_ocp(model, x0, x_last, N, map_instance):
     ])
     
 
-    
-    # Final constraint in goal
-    '''
-    ocp.model.con_h_expr_e = vertcat(goal_constraints_cg)
-    ocp.constraints.lh_e = np.array([
-        arrivalx_min, arrivaly_min, arrivalz_min
-    ])
-    ocp.constraints.uh_e = np.array([
-        arrivalz_max, arrivaly_max, arrivalz_max
-    ])
-    '''
-
     # Constraint: x in XFREE
+    
     bound = 0.1
     xMax = map_instance["x_max"] - bound
     yMax = map_instance["y_max"] - bound
@@ -207,6 +202,7 @@ def create_ocp(model, x0, x_last, N, map_instance):
     yMin = map_instance["y_min"] + bound
     zMin = map_instance["z_min"] + bound
 
+    # Used
     ocp.model.con_h_expr = vertcat(goal_constraints_pointA, constraints_point_B)
     ocp.constraints.lh = np.array([
         xMin, yMin, zMin, 
@@ -252,7 +248,14 @@ def optimization_acados_singleTree(waypoints, map_instance):
     ocp = create_ocp(model, waypoints[0], waypoints[-1], len(waypoints), map_instance)
 
     # Solver setup
-    ocp_solver = AcadosOcpSolver(ocp, json_file='acados_ocp.json')
+    # Set directory for code generation
+    this_file_dir = os.path.dirname(os.path.abspath(__file__))
+    package_root = os.path.abspath(os.path.join(this_file_dir, '..'))
+    codegen_dir = os.path.join(package_root, 'optimization_single_velocity')
+    os.makedirs(codegen_dir, exist_ok=True)
+    ocp.code_export_directory = codegen_dir
+    print(f"ext package acados dir: {codegen_dir}")        
+    ocp_solver = AcadosOcpSolver(ocp, json_file='acados_ocp.json', generate=True, build=True)
 
     # Set initial guess from waypoints
     '''
