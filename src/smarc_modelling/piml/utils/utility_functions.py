@@ -71,19 +71,19 @@ def load_rosbag(bag_path):
 
         # Appending data to vectors
         # Time
-        time.append(msg.imu.header.stamp.sec + msg.imu.header.stamp.nanosec * 1e-9) # Time from imu but all headers are synched
+        time.append(msg.lcg_cmd.header.stamp.sec + msg.lcg_cmd.header.stamp.nanosec * 1e-9) # Time from lcg_cmd but all headers are synched so really does not matter
         
         # Controls
         lcg_fb.append(msg.lcg_fb.value)
-        lcg_cmd = lcg_fb # No cmd in bag atm
-        # Thrust vector
-        # No cmd in bag atm
+        lcg_cmd.append(msg.lcg_cmd.value)
+        dR.append(msg.thrust_vector_cmd.thruster_vertical_radians)
+        dS.append(msg.thrust_vector_cmd.thruster_horizontal_radians)
         rpm1_fb.append(msg.thruster1_fb.rpm.rpm)
-        rpm1_cmd = rpm1_fb 
+        rpm1_cmd.append(msg.thruster1_cmd.rpm) 
         rpm2_fb.append(msg.thruster2_fb.rpm.rpm)
-        rpm2_cmd = rpm2_fb
+        rpm2_cmd.append(msg.thruster2_cmd.rpm)
         vbs_fb.append(msg.vbs_fb.value)
-        vbs_cmd = vbs_fb
+        vbs_cmd.append(msg.vbs_cmd.value)
 
         # Pose
         x.append(msg.odom_gt.pose.pose.position.x)
@@ -115,10 +115,8 @@ def load_rosbag(bag_path):
     eta = [x, y, z, q1, q2, q3, q4]
     nu = [u, v, w, p, q, r]
     acc = [u_dot, v_dot, w_dot, p_dot, q_dot, r_dot]
-    dS = np.zeros_like(lcg_cmd)
-    dR = dS
     u_control = [vbs_cmd, lcg_cmd, dS, dR, rpm1_cmd, rpm2_cmd]
-    u_control_ref = [vbs_fb, lcg_fb, dS, dR, rpm1_fb, rpm2_fb]
+    u_control_ref = [vbs_fb, lcg_fb, dS, dR, rpm1_cmd, rpm2_cmd]
     
     return time, eta, nu, acc, u_control, u_control_ref
 
@@ -301,6 +299,8 @@ def load_data_from_bag(data_file: str="", return_type: str=""):
         Cv[t] = sam.C @ nu[t]
         g_eta[t] = sam.g_vec
         tau[t] = sam.tau
+
+    time = time - time[0]
 
     print(f" Data has been loaded and processed!")
     if return_type == "torch": # Return all values as torch tensors

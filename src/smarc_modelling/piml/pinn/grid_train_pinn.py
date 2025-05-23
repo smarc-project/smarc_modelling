@@ -11,17 +11,34 @@ import numpy as np
 if __name__ == "__main__":
 
     # Loading training data
-    train_path = "src/smarc_modelling/piml/data/rosbags/rosbag_train"
+    train_path = "src/smarc_modelling/piml/data/rosbags/rosbag_tank_train"
     eta, nu, u, u_cmd, Dv_comp, Mv_dot, Cv, g_eta, tau, t = load_data_from_bag(train_path, "torch")
     x = torch.cat([eta, nu, u], dim=1) # State vector
 
+    # Fixing coordinates for training data
+    zeroing = eta[0, 0:3].clone()
+    eta[:, 0:3] = eta[:, 0:3] - zeroing # Move data origin to 0
+    eta[:, 0] = -eta[:, 0]
+    eta[:, 1] = -eta[:, 1]
+    eta[:, 2] = -eta[:, 2]
+    eta[:, 0:3] = eta[:, 0:3] + zeroing
+
     # Loading validation data
-    validate_path = "src/smarc_modelling/piml/data/rosbags/rosbag_validate"
+    validate_path = "src/smarc_modelling/piml/data/rosbags/rosbag_tank_validate"
     eta_val, nu_val, u_val, u_cmd_val, Dv_comp_val, Mv_dot_val, Cv_val, g_eta_val, tau_val, t_val = load_data_from_bag(validate_path, "torch")
     x_val = torch.cat([eta_val, nu_val, u_val], dim=1)
 
+    # Fixing coordinates for validation data
+    zeroing = eta_val[0, 0:3].clone()
+    eta_val[:, 0:3] = eta_val[:, 0:3] - zeroing # Move data origin to 0
+    eta_val[:, 0] = -eta_val[:, 0]
+    eta_val[:, 1] = -eta_val[:, 1]
+    eta_val[:, 2] = -eta_val[:, 2]
+    eta_val[:, 0:3] = eta_val[:, 0:3] + zeroing
+
     # For results
     loss_grid = np.zeros((5, 5, 5))
+    best_error = float("inf")
 
     # Grid params
     for i, layers in enumerate([3, 4, 6, 8, 10]): # Amount of layers
@@ -76,8 +93,8 @@ if __name__ == "__main__":
                     else:
                         counter += 1
 
-                    # if epoch % 500 == 0:
-                    #     print(f" Still training, epoch {epoch}, loss: {loss.item()}, lr: {optimizer.param_groups[0]['lr']},\n validation loss: {val_loss.item()}, shape: {shape}")
+                    if epoch % 500 == 0:
+                        print(f" Still training, epoch {epoch}, loss: {loss.item()}, lr: {optimizer.param_groups[0]['lr']},\n validation loss: {val_loss.item()}, shape: {shape}")
                 
                     if counter >= patience:
                         print(f" Stopping early due to no improvement after {patience} epochs from epoch: {epoch-counter}")
@@ -90,13 +107,23 @@ if __name__ == "__main__":
 
                 try: 
                     # Running the SAM simulator to get predicted validation path
-                    sam_pinn = VEHICLE_SIM("pinn", 0.01, x_val[0], t_val, u_cmd_val, "SAM")
-                    results = sam_pinn.run_sim()[:, 0:13].T
+                    dt = 0.01
+                    sam_pinn = VEHICLE_SIM("pinn", dt, x_val[0], t_val, u_cmd_val, "SAM")
+                    results = torch.Tensor(sam_pinn.run_sim()[:, 0:13]).T
+
+                    # Pulling out corresponding index of times in eval data
+                    max_index_val = np.shape(results)
+                    time_index = torch.clamp((t_val * (1/dt)).long(), min=0, max=max_index_val)
+                    selected_index_results = [results[i, :] for i in time_index]
 
                     # Error from results
-                    error = np.array(x_val[0:13, :]) - np.array(results) 
+                    error = np.array(x_val[0:13, :]) - np.array(selected_index_results) 
                     error = np.sum(error**2)
                     loss_grid[i,j,k] = error
+
+                    if error < best_error:
+                        best_error = error
+                        torch.save({"model_shape": shape, "state_dict": model.state_dict()}, "src/smarc_modelling/piml/models/pinn_best_grid.pt")
                     
                     print(" Succesful model made \n")
 

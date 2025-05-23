@@ -112,8 +112,8 @@ class VariableBuoyancySystem:
         # Motion bounds
         self.x_vbs_min = 0  # Minimum VBS position (m)
         self.x_vbs_max = l_vbs_l  # Maximum VBS position (m)
-        self.x_vbs_dot_min = -10  # Maximum retraction speed (m/s)
-        self.x_vbs_dot_max = 10 # FIXME: This is an estimate. Need to adjust, since the speed is given in mm/s, but we control on percentages right now. Maximum extension speed (m/s)
+        self.x_vbs_dot_min = -7  # Maximum retraction speed (m/s)
+        self.x_vbs_dot_max = 7 # FIXME: This is an estimate. Need to adjust, since the speed is given in mm/s, but we control on percentages right now. Maximum extension speed (m/s)
 
 
 class LongitudinalCenterOfGravityControl:
@@ -242,7 +242,9 @@ class SAM_PIML():
 
         # Weight and buoyancy
         self.W = self.m * self.g
-        self.B = self.W # NOTE: Init buoyancy as dry mass + half the VBS
+        self.B = self.W + (self.vbs.m_vbs * 0.45 * self.g) # Using mass change instead of volume change
+        # to avoid having to move around the center of buoyancy a bunch, 0.45 VBS is "neutral" buoyancy
+
 
         # Damping matrix based on Bhat 2021
         # Parameters from smarc_advanced_controllers mpc_inverted_pendulum...
@@ -339,21 +341,30 @@ class SAM_PIML():
         u = self.bound_actuators(u)
         u_ref = self.bound_actuators(u_ref)
 
-        self.calculate_system_state(nu, eta, u)
+        self.calculate_system_state(nu, eta, u_ref)
         self.calculate_cg()
         self.update_inertias()
         self.calculate_M()
         self.calculate_C()
-        self.calculate_D(eta, nu, u)
+        self.calculate_D(eta, nu, u_ref)
         self.calculate_g()
-        self.calculate_tau(u)
-
+        self.calculate_tau(u_ref)
+        
         nu_dot = self.Minv @ (self.tau - np.matmul(self.C,self.nu_r) - np.matmul(self.D,self.nu_r) - self.g_vec)
-        u_dot = self.actuator_dynamics(u, u_ref)
-        eta_dot = self.eta_dynamics(eta, nu)
-        x_dot = np.concatenate([eta_dot, nu_dot, u_dot])
+        # print("x_dot: ", nu_dot[0])
+        # print("Cv: ", np.matmul(self.C, self.nu_r)[0])
+        # print("Dv: ", np.matmul(self.D, self.nu_r)[0])
+        # print("tau: ", self.tau[0])
+        # print("g: ", self.g_vec[0])
+        # print("\n")
 
-        return x_dot
+        u_dot = self.actuator_dynamics(u, u_ref)
+        eta_dot = self.eta_dynamics(eta, self.nu_r)
+        x_dot = np.concatenate([eta_dot, nu_dot, u_dot])
+        Dv_comp = np.matmul(self.D, self.nu_r)
+
+        get_index = 0
+        return x_dot, Dv_comp, [nu_dot[get_index], -np.matmul(self.C, self.nu_r)[get_index], -np.matmul(self.D, self.nu_r)[get_index], self.tau[get_index], -self.g_vec[get_index]]
 
     def bound_actuators(self, u):
         """
@@ -491,6 +502,7 @@ class SAM_PIML():
         # Mass matrix including added mass
         self.M = self.MRB + self.MA
         self.Minv = np.linalg.inv(self.M)
+      
 
     def calculate_C(self):
         """
@@ -509,6 +521,7 @@ class SAM_PIML():
         CA[1, 5] = 0
 
         self.C = CRB + CA
+
 
     def calculate_D(self, eta, nu, u):
         """
@@ -532,6 +545,13 @@ class SAM_PIML():
             self.D[3,2] = self.y_cp * self.Zww * np.abs(self.nu_r[2])
             self.D[4,2] = -self.x_cp * self.Zww * np.abs(self.nu_r[2])
 
+            self.D[0,4] = self.z_cp * self.Xuu * np.abs(self.nu_r[0])
+            self.D[0,5] = -self.y_cp * self.Xuu * np.abs(self.nu_r[0])
+            self.D[1,3] = -self.z_cp * self.Yvv * np.abs(self.nu_r[1])
+            self.D[1,5] = self.x_cp * self.Yvv * np.abs(self.nu_r[1])
+            self.D[2,3] = self.y_cp * self.Zww * np.abs(self.nu_r[2])
+            self.D[2,4] = -self.x_cp * self.Zww * np.abs(self.nu_r[2])
+
         elif self.piml_type == "pinn":
             self.D = pinn_predict(self.piml_model, eta, nu, u)
         elif self.piml_type == "bpinn":
@@ -543,6 +563,27 @@ class SAM_PIML():
         """
         self.W = self.m * self.g
         self.g_vec = gvect(self.W, self.B, self.theta, self.phi, self.p_OG_O, self.p_OB_O)
+
+        # # Other version from the danish paper this makes SAM go crazy dont use (unless you know a fix)
+        # theta = self.theta
+        # phi = self.phi
+        # W = self.W
+        # B = self.B
+        # self.xb = self.p_OG_O[0]
+        # self.yb = self.p_OG_O[1]
+        # self.zb = self.p_OG_O[2]
+        
+        # g = np.zeros((6, 1))
+        # g[0] = (W-B) * np.sin(theta)
+        # g[1] = -(W-B) * np.cos(theta) * np.sin(phi)
+        # g[2] = -(W-B) * np.cos(theta) * np.cos(phi)
+        # g[3] = self.yb*B*np.cos(theta)*np.cos(phi)-(self.zb*B*np.cos(theta)*np.sin(phi))
+        # g[4] = -self.zb*B*np.sin(theta)-(self.xb*B*np.cos(theta)*np.cos(phi))
+        # g[5] = self.xb*B*np.cos(theta)*np.sin(phi)+(self.yb*B*np.sin(theta))
+
+        # self.g_vec = g.squeeze()
+        
+
 
     def calculate_tau(self, u):
         """
@@ -597,6 +638,9 @@ class SAM_PIML():
                         + np.array([(-1)**i * K_prop_i, 0, 0])  # the -1 is because we have counter rotating
                                     # propellers that are supposed to cancel out the propeller induced
                                     # momentum
+
+
+            # M_prop_i[1] = 0 # TODO: maybe add if statement to only do this when props have same rpm
             tau_prop_i = np.concatenate([F_prop_b, M_prop_i])
             tau_prop += tau_prop_i
 
@@ -648,6 +692,15 @@ class SAM_PIML():
         ## From Fossen 2021, eq. 2.78:
         om = nu[3:6]  # Angular velocity
         q0, q1, q2, q3 = q
+        T_q_n_b = 0.5 * np.array([
+                                 [-q1, -q2, -q3],
+                                 [q0, -q3, q2],
+                                 [q3, q0, -q1],
+                                 [-q2, q1, q0]
+                                 ])
+        q_dot = T_q_n_b @ om + self.gamma/2 * (1 - q.T.dot(q)) * q
+
+        return np.concatenate([pos_dot, q_dot])
 
 
     def actuator_dynamics(self, u_cur, u_ref):
@@ -668,3 +721,5 @@ class SAM_PIML():
             u_dot[1] = self.lcg.x_lcg_dot_max * np.sign(u_dot[1])
 
         return u_dot
+
+
