@@ -3,6 +3,7 @@ from acados_template import AcadosOcp, AcadosOcpSolver, AcadosSimSolver, AcadosM
 from smarc_modelling.motion_planning.MotionPrimitives.ObstacleChecker import compute_A_point_forward    ## CHANGE
 import numpy as np
 import casadi as ca
+import os
 from casadi import vertcat, horzcat, sqrt
 
 
@@ -417,12 +418,18 @@ class NMPC_trajectory:
         self.ocp.solver_options.regularize_method = 'NO_REGULARIZE'
 
         solver_json = 'acados_ocp_' + self.model.name + '.json'
-        #acados_ocp_solver = AcadosOcpSolver(self.ocp, json_file = solver_json, generate = False, build = False)
-        acados_ocp_solver = AcadosOcpSolver(self.ocp, json_file = solver_json)
 
+        # Set directory for code generation
+        this_file_dir = os.path.dirname(os.path.abspath(__file__))
+        package_root = os.path.abspath(os.path.join(this_file_dir, '..'))
+        codegen_dir = os.path.join(package_root, 'optimization_double_mpc')
+        os.makedirs(codegen_dir, exist_ok=True)
+        self.ocp.code_export_directory = codegen_dir
+        print(f"ext package acados dir: {codegen_dir}") 
+
+        acados_ocp_solver = AcadosOcpSolver(self.ocp, json_file = solver_json, generate=False, build=False)
 
         # create an integrator with the same settings as used in the OCP solver.
-        #acados_integrator = AcadosSimSolver(self.ocp, json_file = solver_json, generate = False, build = False)
         acados_integrator = AcadosSimSolver(self.ocp, json_file = solver_json)
 
 

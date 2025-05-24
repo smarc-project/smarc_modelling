@@ -617,7 +617,7 @@ def double_a_star_search(ax, plt, map_instance, realTimeDraw, typeF_function, de
 
                     # Create the list containing the two nodes to be connected
                     list_connection_full = []
-                    for _ in range(10):
+                    for _ in range(10): # If you change it, you have to recompile Acados!
                         list_connection_full.append(list_connection[0])
                     list_connection_full.append(second_path[-1])
                     
@@ -630,6 +630,9 @@ def double_a_star_search(ax, plt, map_instance, realTimeDraw, typeF_function, de
                         print(f"{bcolors.FAIL}OPTIMIZATION FAILED! trying new connection points!{bcolors.ENDC}")
                         continue
                     
+                    print("real x0: ",list_connection_full[0])
+                    print("---------------")
+                    print("optimized x0: ", connection_list_optimized[0])
                     print(f"{bcolors.OKGREEN}OPTIMIZATION SUCCEEDED!{bcolors.ENDC}")
 
                     # Define Q for reverting the second path
@@ -651,13 +654,16 @@ def double_a_star_search(ax, plt, map_instance, realTimeDraw, typeF_function, de
                     # Optimize the second path
                     
                     array_waypoints = np.asarray(waypoints[::-1])
-                    N_hor = array_waypoints.shape[0] // 2
+                    #N_hor = array_waypoints.shape[0] // 2
+                    N_hor = 25
                     T_s = 0.1
                     optimized_waypoints, status = main(array_waypoints, Q, N_hor, T_s, map_instance)
                     if status != 0:
                         print(f"{bcolors.FAIL}Optimization failed - change connection points{bcolors.ENDC}")
                         continue
-        
+                    print("real first second path: ", connection_list_optimized[-1])
+                    print("--------")
+                    print("After MPC first second path: ", optimized_waypoints[0])
 
                     # Create the entire path
                     full_path_waypoints = []

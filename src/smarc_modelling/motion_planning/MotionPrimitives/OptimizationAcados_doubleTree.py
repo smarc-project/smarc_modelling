@@ -1,4 +1,5 @@
 import numpy as np
+import os
 from casadi import SX, vertcat, sqrt
 from acados_template import AcadosOcp, AcadosOcpSolver, AcadosModel
 from smarc_modelling.control.control import *
@@ -156,46 +157,7 @@ def create_ocp(model, x0, x_last, N, map_instance):
         pointB[0],
         pointB[1],
         pointB[2]
-    )
-
-    '''
-    constraint_RPM2 = vertcat(
-        model.x[17] - model.x[18]
-    )
-    
-    # For each step
-    ocp.model.con_h_expr = vertcat(constraint_RPM2)
-    ocp.constraints.lh = np.array([
-        0
-    ])
-    ocp.constraints.uh = np.array([
-        0
-    ])
-    '''
-    
-    # At the end
-    '''
-    ocp.model.con_h_expr_e = vertcat(goal_constraints_pointA)
-    ocp.constraints.lh_e = np.array([
-        arrivalx_min, arrivaly_min, arrivalz_min  # cg bounds
-    ])
-    ocp.constraints.uh_e = np.array([
-        arrivalx_max, arrivaly_max, arrivalz_max  # cg bounds
-    ])
-    '''
-
-    '''
-    # Final constraint in goal and z
-    ocp.model.con_h_expr_e = vertcat(goal_constraints_cg, goal_constraint_z)
-    ocp.constraints.lh_e = np.array([
-        arrivalx_min, arrivaly_min, arrivalz_min,
-        -0.1
-    ])
-    ocp.constraints.uh_e = np.array([
-        arrivalz_max, arrivaly_max, arrivalz_max,
-        0.1
-    ])
-    '''
+    )  
 
     # Constraint: x in XFREE
     bound = 0.1
@@ -248,10 +210,29 @@ def optimization_acados_doubleTree(waypoints, map_instance):
     model = nmpc.export_dynamics_model(sam)
 
     # Create ocp
-    ocp = create_ocp(model, waypoints[0], waypoints[-1], len(waypoints), map_instance)
+    #ocp = create_ocp(model, waypoints[0], waypoints[-1], len(waypoints), map_instance)
+    ocp = create_ocp(model, waypoints[0], waypoints[-1], len(waypoints), map_instance)   # give waypoints[0] as the last for debugging!
 
     # Solver setup
-    ocp_solver = AcadosOcpSolver(ocp, json_file='acados_ocp.json')
+    # Set directory for code generation
+    this_file_dir = os.path.dirname(os.path.abspath(__file__))
+    package_root = os.path.abspath(os.path.join(this_file_dir, '..'))
+    codegen_dir = os.path.join(package_root, 'optimization_double_connection')
+    os.makedirs(codegen_dir, exist_ok=True)
+    ocp.code_export_directory = codegen_dir
+    print(f"ext package acados dir: {codegen_dir}")        
+
+    # Solve Acados
+    ocp_solver = AcadosOcpSolver(ocp, json_file='acados_ocp.json', generate=False, build=False)
+
+    # Change y_ref of last point
+    ocp_solver.set(N, "y_ref", waypoints[-1])
+
+    # Change x0 
+    ocp_solver.set(0, "lbx", waypoints[0])
+    ocp_solver.set(0, "ubx", waypoints[0]) 
+
+
 
     # Set initial guess from waypoints
     '''
@@ -267,7 +248,6 @@ def optimization_acados_doubleTree(waypoints, map_instance):
         print(f"Solver failed with status {status}")
     else:
         print("Optimization successful!")
-
     # Extract the optimized waypoints and save them
     optimized_waypoints = []
     for i in range(ocp.dims.N + 1):
