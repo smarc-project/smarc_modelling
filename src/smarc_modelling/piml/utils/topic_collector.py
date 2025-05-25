@@ -3,7 +3,6 @@
 
 import rclpy
 from rclpy.node import Node
-from rclpy.executors import MultiThreadedExecutor
 from message_filters import Subscriber, ApproximateTimeSynchronizer
 
 from smarc_msgs.msg import PercentStamped, ThrusterFeedback
