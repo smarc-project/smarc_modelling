@@ -222,7 +222,7 @@ def optimization_acados_doubleTree(waypoints, map_instance):
     ocp.code_export_directory = codegen_dir
     print(f"ext package acados dir: {codegen_dir}")        
 
-    # Solve Acados
+    # Solve Acados (For compiling, change both flags to true)
     ocp_solver = AcadosOcpSolver(ocp, json_file='acados_ocp.json', generate=False, build=False)
 
     # Change y_ref of last point
