@@ -155,9 +155,9 @@ void SAM_equation_system_acados_create_set_plan(ocp_nlp_plan_t* nlp_solver_plan,
     nlp_solver_plan->ocp_qp_solver_plan.qp_solver = PARTIAL_CONDENSING_HPIPM;
     nlp_solver_plan->relaxed_ocp_qp_solver_plan.qp_solver = PARTIAL_CONDENSING_HPIPM;
 
-    nlp_solver_plan->nlp_cost[0] = NONLINEAR_LS;
+    nlp_solver_plan->nlp_cost[0] = LINEAR_LS;
     for (int i = 1; i < N; i++)
-        nlp_solver_plan->nlp_cost[i] = NONLINEAR_LS;
+        nlp_solver_plan->nlp_cost[i] = LINEAR_LS;
 
     nlp_solver_plan->nlp_cost[N] = NONLINEAR_LS;
 
@@ -348,9 +348,6 @@ void SAM_equation_system_acados_create_setup_functions(SAM_equation_system_solve
         MAP_CASADI_FNC(nl_constr_h_fun[i], SAM_equation_system_constr_h_fun);
     }
 
-    // nonlinear least squares function
-    MAP_CASADI_FNC(cost_y_0_fun, SAM_equation_system_cost_y_0_fun);
-    MAP_CASADI_FNC(cost_y_0_fun_jac_ut_xt, SAM_equation_system_cost_y_0_fun_jac_ut_xt);
 
 
 
@@ -371,18 +368,6 @@ void SAM_equation_system_acados_create_setup_functions(SAM_equation_system_solve
         MAP_CASADI_FNC(impl_dae_jac_x_xdot_u_z[i], SAM_equation_system_impl_dae_jac_x_xdot_u_z);
     }
 
-    // nonlinear least squares cost
-    capsule->cost_y_fun = (external_function_external_param_casadi *) malloc(sizeof(external_function_external_param_casadi)*(N-1));
-    for (int i = 0; i < N-1; i++)
-    {
-        MAP_CASADI_FNC(cost_y_fun[i], SAM_equation_system_cost_y_fun);
-    }
-
-    capsule->cost_y_fun_jac_ut_xt = (external_function_external_param_casadi *) malloc(sizeof(external_function_external_param_casadi)*(N-1));
-    for (int i = 0; i < N-1; i++)
-    {
-        MAP_CASADI_FNC(cost_y_fun_jac_ut_xt[i], SAM_equation_system_cost_y_fun_jac_ut_xt);
-    }
     // nonlinear least square function
     MAP_CASADI_FNC(cost_y_e_fun, SAM_equation_system_cost_y_e_fun);
     MAP_CASADI_FNC(cost_y_e_fun_jac_ut_xt, SAM_equation_system_cost_y_e_fun_jac_ut_xt);
@@ -397,14 +382,7 @@ void SAM_equation_system_acados_create_setup_functions(SAM_equation_system_solve
 void SAM_equation_system_acados_create_set_default_parameters(SAM_equation_system_solver_capsule* capsule)
 {
 
-    const int N = capsule->nlp_solver_plan->N;
-    // initialize parameters to nominal value
-    double* p = calloc(NP, sizeof(double));
-
-    for (int i = 0; i <= N; i++) {
-        SAM_equation_system_acados_update_params(capsule, i, p, NP);
-    }
-    free(p);
+    // no parameters defined
 
 
     // no global parameters defined
@@ -458,21 +436,7 @@ void SAM_equation_system_acados_setup_nlp_in(SAM_equation_system_solver_capsule*
         cost_scaling[8] = 0.1;
         cost_scaling[9] = 0.1;
         cost_scaling[10] = 0.1;
-        cost_scaling[11] = 0.1;
-        cost_scaling[12] = 0.1;
-        cost_scaling[13] = 0.1;
-        cost_scaling[14] = 0.1;
-        cost_scaling[15] = 0.1;
-        cost_scaling[16] = 0.1;
-        cost_scaling[17] = 0.1;
-        cost_scaling[18] = 0.1;
-        cost_scaling[19] = 0.1;
-        cost_scaling[20] = 0.1;
-        cost_scaling[21] = 0.1;
-        cost_scaling[22] = 0.1;
-        cost_scaling[23] = 0.1;
-        cost_scaling[24] = 0.1;
-        cost_scaling[25] = 1;
+        cost_scaling[11] = 1;
         for (int i = 0; i <= N; i++)
         {
             ocp_nlp_cost_model_set(nlp_config, nlp_dims, nlp_in, i, "scaling", &cost_scaling[i]);
@@ -492,98 +456,40 @@ void SAM_equation_system_acados_setup_nlp_in(SAM_equation_system_solver_capsule*
     }
 
     /**** Cost ****/
-    double* yref_0 = calloc(NY0, sizeof(double));
-    // change only the non-zero elements:
-    ocp_nlp_cost_model_set(nlp_config, nlp_dims, nlp_in, 0, "yref", yref_0);
-    free(yref_0);
-
-   double* W_0 = calloc(NY0*NY0, sizeof(double));
-    // change only the non-zero elements:
-    W_0[0+(NY0) * 0] = 150;
-    W_0[1+(NY0) * 1] = 150;
-    W_0[2+(NY0) * 2] = 150;
-    W_0[3+(NY0) * 3] = 1500;
-    W_0[4+(NY0) * 4] = 1500;
-    W_0[5+(NY0) * 5] = 1500;
-    W_0[6+(NY0) * 6] = 1500;
-    W_0[7+(NY0) * 7] = 130;
-    W_0[8+(NY0) * 8] = 130;
-    W_0[9+(NY0) * 9] = 130;
-    W_0[10+(NY0) * 10] = 100;
-    W_0[11+(NY0) * 11] = 100;
-    W_0[12+(NY0) * 12] = 100;
-    W_0[19+(NY0) * 19] = 0.001;
-    W_0[20+(NY0) * 20] = 0.001;
-    W_0[21+(NY0) * 21] = 1;
-    W_0[22+(NY0) * 22] = 1;
-    W_0[23+(NY0) * 23] = 0.00001;
-    W_0[24+(NY0) * 24] = 0.00001;
-    ocp_nlp_cost_model_set(nlp_config, nlp_dims, nlp_in, 0, "W", W_0);
-    free(W_0);
-    double* yref = calloc(NY, sizeof(double));
-    // change only the non-zero elements:
-
-    for (int i = 1; i < N; i++)
-    {
-        ocp_nlp_cost_model_set(nlp_config, nlp_dims, nlp_in, i, "yref", yref);
-    }
-    free(yref);
-    double* W = calloc(NY*NY, sizeof(double));
-    // change only the non-zero elements:
-    W[0+(NY) * 0] = 150;
-    W[1+(NY) * 1] = 150;
-    W[2+(NY) * 2] = 150;
-    W[3+(NY) * 3] = 1500;
-    W[4+(NY) * 4] = 1500;
-    W[5+(NY) * 5] = 1500;
-    W[6+(NY) * 6] = 1500;
-    W[7+(NY) * 7] = 130;
-    W[8+(NY) * 8] = 130;
-    W[9+(NY) * 9] = 130;
-    W[10+(NY) * 10] = 100;
-    W[11+(NY) * 11] = 100;
-    W[12+(NY) * 12] = 100;
-    W[19+(NY) * 19] = 0.001;
-    W[20+(NY) * 20] = 0.001;
-    W[21+(NY) * 21] = 1;
-    W[22+(NY) * 22] = 1;
-    W[23+(NY) * 23] = 0.00001;
-    W[24+(NY) * 24] = 0.00001;
-
-    for (int i = 1; i < N; i++)
-    {
-        ocp_nlp_cost_model_set(nlp_config, nlp_dims, nlp_in, i, "W", W);
-    }
-    free(W);
     double* yref_e = calloc(NYN, sizeof(double));
     // change only the non-zero elements:
+    yref_e[0] = 7.75;
+    yref_e[1] = -0.15;
+    yref_e[2] = 2.75;
+    yref_e[3] = 1;
+    yref_e[13] = 50;
+    yref_e[14] = 50;
     ocp_nlp_cost_model_set(nlp_config, nlp_dims, nlp_in, N, "yref", yref_e);
     free(yref_e);
 
     double* W_e = calloc(NYN*NYN, sizeof(double));
     // change only the non-zero elements:
-    W_e[0+(NYN) * 0] = 150;
-    W_e[1+(NYN) * 1] = 150;
-    W_e[2+(NYN) * 2] = 150;
-    W_e[3+(NYN) * 3] = 1500;
-    W_e[4+(NYN) * 4] = 1500;
-    W_e[5+(NYN) * 5] = 1500;
-    W_e[6+(NYN) * 6] = 1500;
-    W_e[7+(NYN) * 7] = 130;
-    W_e[8+(NYN) * 8] = 130;
-    W_e[9+(NYN) * 9] = 130;
-    W_e[10+(NYN) * 10] = 100;
-    W_e[11+(NYN) * 11] = 100;
-    W_e[12+(NYN) * 12] = 100;
+    W_e[0+(NYN) * 0] = 120;
+    W_e[1+(NYN) * 1] = 120;
+    W_e[2+(NYN) * 2] = 120;
+    W_e[3+(NYN) * 3] = 120;
+    W_e[4+(NYN) * 4] = 120;
+    W_e[5+(NYN) * 5] = 120;
+    W_e[6+(NYN) * 6] = 120;
+    W_e[7+(NYN) * 7] = 10;
+    W_e[8+(NYN) * 8] = 10;
+    W_e[9+(NYN) * 9] = 10;
+    W_e[10+(NYN) * 10] = 10;
+    W_e[11+(NYN) * 11] = 10;
+    W_e[12+(NYN) * 12] = 10;
+    W_e[13+(NYN) * 13] = 0.0001;
+    W_e[14+(NYN) * 14] = 0.0001;
+    W_e[15+(NYN) * 15] = 0.005;
+    W_e[16+(NYN) * 16] = 0.005;
+    W_e[17+(NYN) * 17] = 0.000001;
+    W_e[18+(NYN) * 18] = 0.000001;
     ocp_nlp_cost_model_set(nlp_config, nlp_dims, nlp_in, N, "W", W_e);
     free(W_e);
-    ocp_nlp_cost_model_set_external_param_fun(nlp_config, nlp_dims, nlp_in, 0, "nls_y_fun", &capsule->cost_y_0_fun);
-    ocp_nlp_cost_model_set_external_param_fun(nlp_config, nlp_dims, nlp_in, 0, "nls_y_fun_jac", &capsule->cost_y_0_fun_jac_ut_xt);
-    for (int i = 1; i < N; i++)
-    {
-        ocp_nlp_cost_model_set_external_param_fun(nlp_config, nlp_dims, nlp_in, i, "nls_y_fun", &capsule->cost_y_fun[i-1]);
-        ocp_nlp_cost_model_set_external_param_fun(nlp_config, nlp_dims, nlp_in, i, "nls_y_fun_jac", &capsule->cost_y_fun_jac_ut_xt[i-1]);
-    }
     ocp_nlp_cost_model_set_external_param_fun(nlp_config, nlp_dims, nlp_in, N, "nls_y_fun", &capsule->cost_y_e_fun);
     ocp_nlp_cost_model_set_external_param_fun(nlp_config, nlp_dims, nlp_in, N, "nls_y_fun_jac", &capsule->cost_y_e_fun_jac_ut_xt);
 
@@ -621,44 +527,44 @@ void SAM_equation_system_acados_setup_nlp_in(SAM_equation_system_solver_capsule*
     double* lbx0 = lubx0;
     double* ubx0 = lubx0 + NBX0;
     // change only the non-zero elements:
-    lbx0[0] = 3.947382191056128;
-    ubx0[0] = 3.947382191056128;
-    lbx0[1] = 1.4700959582754711;
-    ubx0[1] = 1.4700959582754711;
-    lbx0[2] = 1.2782744528515448;
-    ubx0[2] = 1.2782744528515448;
-    lbx0[3] = 0.9697369054729348;
-    ubx0[3] = 0.9697369054729348;
-    lbx0[4] = -0.0024075125910284698;
-    ubx0[4] = -0.0024075125910284698;
-    lbx0[5] = 0.005911448868071184;
-    ubx0[5] = 0.005911448868071184;
-    lbx0[6] = 0.06062221061306733;
-    ubx0[6] = 0.06062221061306733;
-    lbx0[7] = 0.5340135670265422;
-    ubx0[7] = 0.5340135670265422;
-    lbx0[8] = 0.35107170051556463;
-    ubx0[8] = 0.35107170051556463;
-    lbx0[9] = 0.011209180476735569;
-    ubx0[9] = 0.011209180476735569;
-    lbx0[10] = -0.012376512969304442;
-    ubx0[10] = -0.012376512969304442;
-    lbx0[11] = 0.06672057237242282;
-    ubx0[11] = 0.06672057237242282;
-    lbx0[12] = 0.21398147500431325;
-    ubx0[12] = 0.21398147500431325;
-    lbx0[13] = 83.48241786144587;
-    ubx0[13] = 83.48241786144587;
-    lbx0[14] = 10.229882753083082;
-    ubx0[14] = 10.229882753083082;
-    lbx0[15] = -0.122173046995634;
-    ubx0[15] = -0.122173046995634;
-    lbx0[16] = -0.1221730475894728;
-    ubx0[16] = -0.1221730475894728;
-    lbx0[17] = 794.1899202110542;
-    ubx0[17] = 794.1899202110542;
-    lbx0[18] = 792.9833844760742;
-    ubx0[18] = 792.9833844760742;
+    lbx0[0] = 7.747101286480884;
+    ubx0[0] = 7.747101286480884;
+    lbx0[1] = -0.12940343698226403;
+    ubx0[1] = -0.12940343698226403;
+    lbx0[2] = 1.8018126367520304;
+    ubx0[2] = 1.8018126367520304;
+    lbx0[3] = 0.9858046203674696;
+    ubx0[3] = 0.9858046203674696;
+    lbx0[4] = -0.015668133856364307;
+    ubx0[4] = -0.015668133856364307;
+    lbx0[5] = -0.09691841631825698;
+    ubx0[5] = -0.09691841631825698;
+    lbx0[6] = -0.1495105920302512;
+    ubx0[6] = -0.1495105920302512;
+    lbx0[7] = 1.2605543133021642;
+    ubx0[7] = 1.2605543133021642;
+    lbx0[8] = 0.053855893911977176;
+    ubx0[8] = 0.053855893911977176;
+    lbx0[9] = 0.20950506035420288;
+    ubx0[9] = 0.20950506035420288;
+    lbx0[10] = 0.03809085708786763;
+    ubx0[10] = 0.03809085708786763;
+    lbx0[11] = 0.06752573722227322;
+    ubx0[11] = 0.06752573722227322;
+    lbx0[12] = 0.2092935353900873;
+    ubx0[12] = 0.2092935353900873;
+    lbx0[13] = 90;
+    ubx0[13] = 90;
+    lbx0[14] = 100;
+    ubx0[14] = 100;
+    lbx0[15] = 0.12217304763960309;
+    ubx0[15] = 0.12217304763960309;
+    lbx0[16] = -0.06981317007977318;
+    ubx0[16] = -0.06981317007977318;
+    lbx0[17] = 600;
+    ubx0[17] = 600;
+    lbx0[18] = 600;
+    ubx0[18] = 600;
 
     ocp_nlp_constraints_model_set(nlp_config, nlp_dims, nlp_in, 0, "idxbx", idxbx0);
     ocp_nlp_constraints_model_set(nlp_config, nlp_dims, nlp_in, 0, "lbx", lbx0);
@@ -697,38 +603,6 @@ void SAM_equation_system_acados_setup_nlp_in(SAM_equation_system_solver_capsule*
 
 
     /* constraints that are the same for initial and intermediate */
-    // u
-    int* idxbu = malloc(NBU * sizeof(int));
-    idxbu[0] = 0;
-    idxbu[1] = 1;
-    idxbu[2] = 2;
-    idxbu[3] = 3;
-    idxbu[4] = 4;
-    idxbu[5] = 5;
-    double* lubu = calloc(2*NBU, sizeof(double));
-    double* lbu = lubu;
-    double* ubu = lubu + NBU;
-    lbu[0] = -10;
-    ubu[0] = 10;
-    lbu[1] = -15;
-    ubu[1] = 15;
-    lbu[2] = -7;
-    ubu[2] = 7;
-    lbu[3] = -7;
-    ubu[3] = 7;
-    lbu[4] = -1000;
-    ubu[4] = 1000;
-    lbu[5] = -1000;
-    ubu[5] = 1000;
-
-    for (int i = 0; i < N; i++)
-    {
-        ocp_nlp_constraints_model_set(nlp_config, nlp_dims, nlp_in, i, "idxbu", idxbu);
-        ocp_nlp_constraints_model_set(nlp_config, nlp_dims, nlp_in, i, "lbu", lbu);
-        ocp_nlp_constraints_model_set(nlp_config, nlp_dims, nlp_in, i, "ubu", ubu);
-    }
-    free(idxbu);
-    free(lubu);
 
 
 
@@ -789,14 +663,14 @@ void SAM_equation_system_acados_setup_nlp_in(SAM_equation_system_solver_capsule*
     ubx[12] = 1000;
     ubx[13] = 100;
     ubx[14] = 100;
-    lbx[15] = -7;
-    ubx[15] = 7;
-    lbx[16] = -7;
-    ubx[16] = 7;
-    lbx[17] = -1000;
-    ubx[17] = 1000;
-    lbx[18] = -1000;
-    ubx[18] = 1000;
+    lbx[15] = -0.12217304763960309;
+    ubx[15] = 0.12217304763960309;
+    lbx[16] = -0.12217304763960309;
+    ubx[16] = 0.12217304763960309;
+    lbx[17] = -1300;
+    ubx[17] = 1300;
+    lbx[18] = -1300;
+    ubx[18] = 1300;
 
     for (int i = 1; i < N; i++)
     {
@@ -898,14 +772,14 @@ void SAM_equation_system_acados_setup_nlp_in(SAM_equation_system_solver_capsule*
     ubx_e[12] = 1000;
     ubx_e[13] = 100;
     ubx_e[14] = 100;
-    lbx_e[15] = -7;
-    ubx_e[15] = 7;
-    lbx_e[16] = -7;
-    ubx_e[16] = 7;
-    lbx_e[17] = -1000;
-    ubx_e[17] = 1000;
-    lbx_e[18] = -1000;
-    ubx_e[18] = 1000;
+    lbx_e[15] = -0.12217304763960309;
+    ubx_e[15] = 0.12217304763960309;
+    lbx_e[16] = -0.12217304763960309;
+    ubx_e[16] = 0.12217304763960309;
+    lbx_e[17] = -1300;
+    ubx_e[17] = 1300;
+    lbx_e[18] = -1300;
+    ubx_e[18] = 1300;
     ocp_nlp_constraints_model_set(nlp_config, nlp_dims, nlp_in, N, "idxbx", idxbx_e);
     ocp_nlp_constraints_model_set(nlp_config, nlp_dims, nlp_in, N, "lbx", lbx_e);
     ocp_nlp_constraints_model_set(nlp_config, nlp_dims, nlp_in, N, "ubx", ubx_e);
@@ -1003,7 +877,7 @@ static void SAM_equation_system_acados_create_set_opts(SAM_equation_system_solve
     ocp_nlp_solver_opts_set(nlp_config, nlp_opts, "levenberg_marquardt", &levenberg_marquardt);
 
     /* options QP solver */
-    int qp_solver_cond_N;const int qp_solver_cond_N_ori = 25;
+    int qp_solver_cond_N;const int qp_solver_cond_N_ori = 11;
     qp_solver_cond_N = N < qp_solver_cond_N_ori ? N : qp_solver_cond_N_ori; // use the minimum value here
     ocp_nlp_solver_opts_set(nlp_config, nlp_opts, "qp_cond_N", &qp_solver_cond_N);
 
@@ -1076,25 +950,25 @@ void SAM_equation_system_acados_set_nlp_out(SAM_equation_system_solver_capsule* 
     double* x0 = xu0;
 
     // initialize with x0
-    x0[0] = 3.947382191056128;
-    x0[1] = 1.4700959582754711;
-    x0[2] = 1.2782744528515448;
-    x0[3] = 0.9697369054729348;
-    x0[4] = -0.0024075125910284698;
-    x0[5] = 0.005911448868071184;
-    x0[6] = 0.06062221061306733;
-    x0[7] = 0.5340135670265422;
-    x0[8] = 0.35107170051556463;
-    x0[9] = 0.011209180476735569;
-    x0[10] = -0.012376512969304442;
-    x0[11] = 0.06672057237242282;
-    x0[12] = 0.21398147500431325;
-    x0[13] = 83.48241786144587;
-    x0[14] = 10.229882753083082;
-    x0[15] = -0.122173046995634;
-    x0[16] = -0.1221730475894728;
-    x0[17] = 794.1899202110542;
-    x0[18] = 792.9833844760742;
+    x0[0] = 7.747101286480884;
+    x0[1] = -0.12940343698226403;
+    x0[2] = 1.8018126367520304;
+    x0[3] = 0.9858046203674696;
+    x0[4] = -0.015668133856364307;
+    x0[5] = -0.09691841631825698;
+    x0[6] = -0.1495105920302512;
+    x0[7] = 1.2605543133021642;
+    x0[8] = 0.053855893911977176;
+    x0[9] = 0.20950506035420288;
+    x0[10] = 0.03809085708786763;
+    x0[11] = 0.06752573722227322;
+    x0[12] = 0.2092935353900873;
+    x0[13] = 90;
+    x0[14] = 100;
+    x0[15] = 0.12217304763960309;
+    x0[16] = -0.06981317007977318;
+    x0[17] = 600;
+    x0[18] = 600;
 
 
     double* u0 = xu0 + NX;
@@ -1249,7 +1123,7 @@ int SAM_equation_system_acados_update_params(SAM_equation_system_solver_capsule*
 {
     int solver_status = 0;
 
-    int casadi_np = 25;
+    int casadi_np = 0;
     if (casadi_np != np) {
         printf("acados_update_params: trying to set %i parameters for external functions."
             " External function has %i parameters. Exiting.\n", np, casadi_np);
@@ -1422,15 +1296,6 @@ int SAM_equation_system_acados_free(SAM_equation_system_solver_capsule* capsule)
     free(capsule->impl_dae_jac_x_xdot_u_z);
 
     // cost
-    external_function_external_param_casadi_free(&capsule->cost_y_0_fun);
-    external_function_external_param_casadi_free(&capsule->cost_y_0_fun_jac_ut_xt);
-    for (int i = 0; i < N - 1; i++)
-    {
-        external_function_external_param_casadi_free(&capsule->cost_y_fun[i]);
-        external_function_external_param_casadi_free(&capsule->cost_y_fun_jac_ut_xt[i]);
-    }
-    free(capsule->cost_y_fun);
-    free(capsule->cost_y_fun_jac_ut_xt);
     external_function_external_param_casadi_free(&capsule->cost_y_e_fun);
     external_function_external_param_casadi_free(&capsule->cost_y_e_fun_jac_ut_xt);
 
@@ -1457,7 +1322,7 @@ void SAM_equation_system_acados_print_stats(SAM_equation_system_solver_capsule* 
     ocp_nlp_get(capsule->nlp_solver, "stat_m", &stat_m);
 
 
-    double stat[960];
+    double stat[12000];
     ocp_nlp_get(capsule->nlp_solver, "statistics", stat);
 
     int nrow = nlp_iter+1 < stat_m ? nlp_iter+1 : stat_m;

@@ -421,16 +421,21 @@ class NMPC_trajectory:
 
         # Set directory for code generation
         this_file_dir = os.path.dirname(os.path.abspath(__file__))
-        package_root = os.path.abspath(os.path.join(this_file_dir, '..'))
+        #root_files_dir = '/home/parallels/Desktop/smarc_modelling-master/src/smarc_modelling/motion_planning/MotionPrimitives'
+        #package_root = os.path.abspath(os.path.join(this_file_dir, '..'))
+        package_root = os.path.abspath(this_file_dir)
         codegen_dir = os.path.join(package_root, 'optimization_double_mpc')
+        ocp_dir = os.path.join(codegen_dir, 'acados_ocp_')
         os.makedirs(codegen_dir, exist_ok=True)
         self.ocp.code_export_directory = codegen_dir
         print(f"ext package acados dir: {codegen_dir}") 
 
-        acados_ocp_solver = AcadosOcpSolver(self.ocp, json_file = solver_json, generate=False, build=False)
+        #acados_ocp_solver = AcadosOcpSolver(self.ocp, json_file = solver_json, generate=False, build=False)
+        acados_ocp_solver = AcadosOcpSolver(self.ocp, json_file = ocp_dir + self.model.name + '.json', generate=False, build=False)
 
         # create an integrator with the same settings as used in the OCP solver.
-        acados_integrator = AcadosSimSolver(self.ocp, json_file = solver_json)
+        #acados_integrator = AcadosSimSolver(self.ocp, json_file = solver_json)
+        acados_integrator = AcadosSimSolver(self.ocp, json_file = ocp_dir + self.model.name + '.json')
 
 
         return acados_ocp_solver, acados_integrator

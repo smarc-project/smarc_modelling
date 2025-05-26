@@ -46,12 +46,6 @@ OCP_SRC=
 
 OCP_SRC+= SAM_equation_system_constraints/SAM_equation_system_constr_h_fun_jac_uxt_zt.c
 OCP_SRC+= SAM_equation_system_constraints/SAM_equation_system_constr_h_fun.c
-OCP_SRC+= SAM_equation_system_cost/SAM_equation_system_cost_y_0_fun.c
-OCP_SRC+= SAM_equation_system_cost/SAM_equation_system_cost_y_0_fun_jac_ut_xt.c
-OCP_SRC+= SAM_equation_system_cost/SAM_equation_system_cost_y_0_hess.c
-OCP_SRC+= SAM_equation_system_cost/SAM_equation_system_cost_y_fun.c
-OCP_SRC+= SAM_equation_system_cost/SAM_equation_system_cost_y_fun_jac_ut_xt.c
-OCP_SRC+= SAM_equation_system_cost/SAM_equation_system_cost_y_hess.c
 OCP_SRC+= SAM_equation_system_cost/SAM_equation_system_cost_y_e_fun.c
 OCP_SRC+= SAM_equation_system_cost/SAM_equation_system_cost_y_e_fun_jac_ut_xt.c
 OCP_SRC+= SAM_equation_system_cost/SAM_equation_system_cost_y_e_hess.c
@@ -143,7 +137,7 @@ ocp_cython_c: ocp_shared_lib
 	-o acados_ocp_solver_pyx.c \
 	-I $(INCLUDE_PATH)/../interfaces/acados_template/acados_template \
 	$(INCLUDE_PATH)/../interfaces/acados_template/acados_template/acados_ocp_solver_pyx.pyx \
-	-I /home/parallels/Desktop/smarc_modelling-master/src/smarc_modelling/motion_planning/MotionPrimitives/optimization_double_mpc \
+	-I /home/parallels/Desktop/smarc_modelling-master/src/smarc_modelling/motion_planning/MotionPrimitives/optimization_double_connection \
 
 ocp_cython_o: ocp_cython_c
 	$(CC) $(ACADOS_FLAGS) -c -O2 \
@@ -171,7 +165,7 @@ sim_cython_c: sim_shared_lib
 	-o acados_sim_solver_pyx.c \
 	-I $(INCLUDE_PATH)/../interfaces/acados_template/acados_template \
 	$(INCLUDE_PATH)/../interfaces/acados_template/acados_template/acados_sim_solver_pyx.pyx \
-	-I /home/parallels/Desktop/smarc_modelling-master/src/smarc_modelling/motion_planning/MotionPrimitives/optimization_double_mpc \
+	-I /home/parallels/Desktop/smarc_modelling-master/src/smarc_modelling/motion_planning/MotionPrimitives/optimization_double_connection \
 
 sim_cython_o: sim_cython_c
 	$(CC) $(ACADOS_FLAGS) -c -O2 \

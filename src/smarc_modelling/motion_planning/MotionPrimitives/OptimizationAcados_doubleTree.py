@@ -216,14 +216,17 @@ def optimization_acados_doubleTree(waypoints, map_instance):
     # Solver setup
     # Set directory for code generation
     this_file_dir = os.path.dirname(os.path.abspath(__file__))
-    package_root = os.path.abspath(os.path.join(this_file_dir, '..'))
+    #root_files_dir = '/home/parallels/Desktop/smarc_modelling-master/src/smarc_modelling/motion_planning/MotionPrimitives'
+    #package_root = os.path.abspath(os.path.join(this_file_dir, '..'))
+    package_root = os.path.abspath(this_file_dir)
     codegen_dir = os.path.join(package_root, 'optimization_double_connection')
+    ocp_dir = os.path.join(codegen_dir, 'acados_ocp.json')
     os.makedirs(codegen_dir, exist_ok=True)
     ocp.code_export_directory = codegen_dir
     print(f"ext package acados dir: {codegen_dir}")        
 
     # Solve Acados (For compiling, change both flags to true)
-    ocp_solver = AcadosOcpSolver(ocp, json_file='acados_ocp.json', generate=False, build=False)
+    ocp_solver = AcadosOcpSolver(ocp, json_file=ocp_dir, generate=False, build=False)
 
     # Change y_ref of last point
     ocp_solver.set(N, "y_ref", waypoints[-1])
