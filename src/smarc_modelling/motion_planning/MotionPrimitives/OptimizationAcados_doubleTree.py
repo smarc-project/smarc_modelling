@@ -118,6 +118,7 @@ def create_ocp(model, x0, x_last, N, map_instance):
     # Cost function: minimize final velocity + sum(k=0, N){u_k^T Q u_k}
     #nu = model.u.rows()
     nx = model.x.rows()
+    nu = model.u.rows()
     ocp.cost.cost_type_e = 'NONLINEAR_LS'
     #ocp.cost.cost_type = 'NONLINEAR_LS'
     # Define the Q matrix
@@ -178,6 +179,15 @@ def create_ocp(model, x0, x_last, N, map_instance):
         xMax, yMax, zMax
     ])
     
+    # Set constraints on the rate of change of inputs
+    vbs_dot = 10    # Maximum rate of change for the VBS
+    lcg_dot = 15    # Maximum rate of change for the LCG
+    ds_dot  = 7     # Maximum rate of change for stern angle
+    dr_dot  = 7     # Maximum rate of change for rudder angle
+    rpm_dot = 1000  # Maximum rate of change for rpm
+    ocp.constraints.lbu = np.array([-vbs_dot,-lcg_dot, -ds_dot, -dr_dot, -rpm_dot, -rpm_dot])
+    ocp.constraints.ubu = np.array([ vbs_dot, lcg_dot,  ds_dot,  dr_dot,  rpm_dot,  rpm_dot])
+    ocp.constraints.idxbu = np.arange(nu)
 
     # Set constraints on the states
     x_ubx = np.ones(nx)
