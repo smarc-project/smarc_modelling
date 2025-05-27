@@ -13,6 +13,7 @@ import pandas as pd
 from smarc_modelling.lib.gnc import *
 
 def load_rosbag(bag_path):
+
     # Initialize reader
     storage_options = rosbag2_py.StorageOptions(uri=bag_path, storage_id="sqlite3")
     converter_options = rosbag2_py.ConverterOptions("cdr", "cdr")
@@ -102,12 +103,10 @@ def load_rosbag(bag_path):
         q.append(msg.odom_gt.twist.twist.angular.y)
         r.append(msg.odom_gt.twist.twist.angular.z)
 
-        # Accelerations
-        u_dot.append(msg.imu.linear_acceleration.x)
-        v_dot.append(msg.imu.linear_acceleration.y)
-        w_dot.append(msg.imu.linear_acceleration.z)
-    
-    # Calculating angular acceleration numerically (No ROS source)
+    # Calculating acceleration numerically (No ROS source)
+    u_dot = np.gradient(u, time)
+    v_dot = np.gradient(v, time)
+    w_dot = np.gradient(w, time)
     p_dot = np.gradient(p, time)
     q_dot = np.gradient(q, time)
     r_dot = np.gradient(r, time)
@@ -458,8 +457,6 @@ def load_multiple_data_from_bag_brov(data_vector, return_type):
             tau,
             time
         )
-
-
 
 def load_data(data_file: str = "", return_type: str=""):
     from smarc_modelling.vehicles.SAM import SAM

@@ -275,6 +275,7 @@ class SAM_PIML():
         self.Ja_max = 0.6632
 
         self.gamma = 100 # Scaling factor for numerical stability of quaternion differentiation
+        self.once = True
 
         # Initializing PIML model for predicting D
         self.piml_type = piml_type
@@ -343,14 +344,22 @@ class SAM_PIML():
 
         self.calculate_system_state(nu, eta, u_ref)
         self.calculate_cg()
-        self.update_inertias()
+        if self.once:
+            self.update_inertias()
+            self.once = False
         self.calculate_M()
         self.calculate_C()
         self.calculate_D(eta, nu, u_ref)
         self.calculate_g()
         self.calculate_tau(u_ref)
+
+        self.D = np.eye(6)
+        self.C = np.eye(6)
+
+        self.C_D = np.eye(6)
         
-        nu_dot = self.Minv @ (self.tau - np.matmul(self.C,self.nu_r) - np.matmul(self.D,self.nu_r) - self.g_vec)
+        nu_dot = self.Minv @ (self.tau - np.matmul(self.C, self.nu_r) - np.matmul(self.D, self.nu_r) - self.g_vec)
+        nu_dot = self.Minv @ (self.tau - np.matmul(self.C_D, self.nu_r) - self.g_vec)
         # print("x_dot: ", nu_dot[0])
         # print("Cv: ", np.matmul(self.C, self.nu_r)[0])
         # print("Dv: ", np.matmul(self.D, self.nu_r)[0])
@@ -364,7 +373,7 @@ class SAM_PIML():
         Dv_comp = np.matmul(self.D, self.nu_r)
 
         get_index = 0
-        return x_dot, Dv_comp, [nu_dot[get_index], -np.matmul(self.C, self.nu_r)[get_index], -np.matmul(self.D, self.nu_r)[get_index], self.tau[get_index], -self.g_vec[get_index]]
+        return x_dot, Dv_comp, [nu_dot, -np.matmul(self.C, self.nu_r), -np.matmul(self.D, self.nu_r), self.tau, -self.g_vec]
 
     def bound_actuators(self, u):
         """
@@ -723,3 +732,6 @@ class SAM_PIML():
         return u_dot
 
 
+    def update_dt(self, dt):
+        # Needed for the variable time-step simulator
+        self.dt = dt

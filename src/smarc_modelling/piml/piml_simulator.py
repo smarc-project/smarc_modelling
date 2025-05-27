@@ -23,9 +23,9 @@ class VEHICLE_SIM:
 
         # Create vehicle instance
         if vehicle == "SAM":
-            self.vehicle = SAM_PIML(dt=0.02, piml_type=model_type)
+            self.vehicle = SAM_PIML(dt=0.01, piml_type=model_type)
         elif vehicle == "BROV":
-            self.vehicle = BlueROV_PIML(h=0.02, piml_type=model_type)
+            self.vehicle = BlueROV_PIML(h=0.01, piml_type=model_type)
         else: 
             print("Selected vehicle for VEHICLE_SIM does not exist")
             return
@@ -48,15 +48,42 @@ class VEHICLE_SIM:
 
         # Integration loop
         for i in range(self.n_sim-1):
+
+            # Get the timestep
             dt = self.var_dt[i]
+            self.vehicle.update_dt(dt)
+
+            # Try to do a normal sim step
+            # try:
             data[:,i+1], Dv, x_acc = self.rk4(data[:,i], self.controls[i], dt, self.vehicle.dynamics)
             Dv_vec.append(Dv)
             x_acc_vec.append(x_acc)
-       
+
+            # Otherwise normalize the quat and try again
+            # except:
+            #     # TODO: By the points we get here the speeds are already way to big, maybe if we fix the other sim problems this will not be an issue(?)
+            #     # NOTE: This issue happens more due to the fact that we have an overflow in the speeds turning them into NaNs --> making the quats weird --> crashing the sim
+            #     # NOTE: So if we actually want to fix this just check for NaNs in the update and replace with 0 or whatever you want
+               
+            #     # Normalize quaternion to help with stability when sim is misbehaving
+            #     quat = data[:, i][2:6]
+            #     quat = quat / np.linalg.norm(quat)
+            #     data[:, i][3] = quat[0]
+            #     data[:, i][4] = quat[1]
+            #     data[:, i][5] = quat[2]
+            #     data[:, i][6] = quat[3]
+                
+            #     data[:,i+1], Dv, x_acc = self.rk4(data[:,i], self.controls[i], dt, self.vehicle.dynamics)
+            #     Dv_vec.append(Dv)
+            #     x_acc_vec.append(x_acc)
+
+            #     # If this doesn't work we just let the sim crash atm (useful for PIML validation of D)
+
         return data, Dv_vec, x_acc_vec
     
     def rk4(self, x, u, dt, fun):
         # https://github.com/smarc-project/smarc_modelling/blob/master/src/smarc_modelling/sam_sim.py#L38C1-L46C15 
+        # Runge Kutta 4
         k1, Dv, x_acc = fun(x, u) # (19, )
         k2, _, _ = fun(x+dt/2*k1, u)
         k3, _, _ = fun(x+dt/2*k2, u)
@@ -75,6 +102,7 @@ if __name__ == "__main__":
     print(f" Initializing simulator...")
     
     # Ground truth data (SAM)
+    # eta_gt, nu_gt, u_fb_gt, u_cmd_gt, Dv_comp_gt, Mv_dot_gt, Cv_gt, g_eta_gt, tau_gt, t_gt = load_data_from_bag("src/smarc_modelling/piml/data/rosbags/rosbag_tank_validate", "torch")
     eta_gt, nu_gt, u_fb_gt, u_cmd_gt, Dv_comp_gt, Mv_dot_gt, Cv_gt, g_eta_gt, tau_gt, t_gt = load_data_from_bag("src/smarc_modelling/piml/data/rosbags/rosbag_tank_forward_blind", "torch")
     init_pose = torch.Tensor.tolist(torch.cat([eta_gt[0], nu_gt[0], u_fb_gt[0]]))
     
@@ -93,7 +121,7 @@ if __name__ == "__main__":
     # u_cmd_gt[:, 0] = vbs_neutral # VBS
     # u_cmd_gt[:, 1] = lcg_neutral # LCG
     # u_cmd_gt[:, 2] = 0 # np.deg2rad(7)    # Vertical (stern)
-    # u_cmd_gt[:, 3] = -np.deg2rad(7)   # Horizontal (rudder)
+    # u_cmd_gt[:, 3] = 0 #-np.deg2rad(7)   # Horizontal (rudder)
     # u_cmd_gt[:, 4] = 100 # 1000     # RPM 1
     # u_cmd_gt[:, 5] = 100 # 1000     # RPM 2
     # init_pose = np.zeros(19).squeeze()
@@ -109,11 +137,9 @@ if __name__ == "__main__":
     # u_cmd_gt[:, 4] = 1000     # RPM 1
     # u_cmd_gt[:, 5] = 1000     # RPM 2
 
-    # Simulator parameters
+    # Simulator parameters (Not used now but its a nice print out)
     dt = np.mean(np.diff(t_gt)) # Time step 
     print(f" Dataset average dt as: {dt}")
-    dt_model = 0.01
-    # TODO: dt_model = dt 
 
     # Models for simulation
     print(f" Initalizing models...")
@@ -124,7 +150,7 @@ if __name__ == "__main__":
     print(f" Running all the simulators...")
 
     # White-box
-    results_wb, Dv_wb, x_acc_wb = sam_wb.run_sim()
+    results_wb, Dv_wb, acc_wb = sam_wb.run_sim()
     results_wb = torch.tensor(results_wb).T
     Dv_wb = np.array(Dv_wb)
     eta_wb = results_wb[:, 0:7]
@@ -138,13 +164,6 @@ if __name__ == "__main__":
 
     print(f" All sims done! Making plots.")
     
-    # Picking out index corresponding to existing time data
-    max_index_eta = np.shape(eta_wb)[0] - 1
-    eta_times = torch.clamp((t_gt * (1/dt_model)).long(), min=0, max=max_index_eta)
-    
-    # Forces have one less value in them due to begin computed from a difference of velocities
-    eta_times = torch.clamp(eta_times, min=0, max=max_index_eta-1)
-
     # Plotting trajectories in 3d
     fig = plt.figure()
     ax = fig.add_subplot(111, projection="3d")
@@ -256,6 +275,11 @@ if __name__ == "__main__":
         ax[5,0].set_ylabel('u_dr')
         ax[5,1].set_ylabel('rpm1')
         ax[5,2].set_ylabel('rpm2')
+        # Limit for removing the spike
+        ax[4,2].set_ylim(-10, 10)
+        ax[5,0].set_ylim(-10, 10)
+        ax[5,1].set_ylim(-1000, 1000)
+        ax[5,2].set_ylim(-1000, 1000)
 
     # Plotting forces
     if True:
@@ -294,33 +318,69 @@ if __name__ == "__main__":
     # Plotting sim forces in n-axis
     if True:
         
-        _, ax = plt.subplots(5, 1, figsize=(12, 10))
-
-        x_acc_wb = np.array(x_acc_wb)
+        _, ax = plt.subplots(5, 6, figsize=(12, 10))
+   
+        acc_wb = np.array(acc_wb)
+        x_acc_wb = np.array(acc_wb[:, :, 0])
+        y_acc_wb = np.array(acc_wb[:, :, 1])
+        z_acc_wb = np.array(acc_wb[:, :, 2])
+        p_acc_wb = np.array(acc_wb[:, :, 3])
+        q_acc_wb = np.array(acc_wb[:, :, 4])
+        r_acc_wb = np.array(acc_wb[:, :, 5])
 
         t_gt_forces = t_gt[:-1]
         
-        ax[0].plot(t_gt_forces, x_acc_wb[:, 0], label="nu_dot - wb")
-        ax[0].legend()
-        ax[1].plot(t_gt_forces, x_acc_wb[:, 1], label="C(v)v - wb")
-        ax[1].legend()
-        ax[2].plot(t_gt_forces, x_acc_wb[:, 2], label="D(v)v - wb")
-        ax[2].legend()
-        ax[3].plot(t_gt_forces, x_acc_wb[:, 3], label="Tau - wb")
-        ax[3].legend()
-        ax[4].plot(t_gt_forces, x_acc_wb[:, 4], label="g_vec - wb")
-        ax[4].legend()
-        ax[0].set_ylabel('nu_dot')
-        ax[1].set_ylabel('C(v)v')
-        ax[2].set_ylabel('D(v)v')
-        ax[3].set_ylabel('Tau')
-        ax[4].set_ylabel('g_vec')
+        ax[0, 0].plot(t_gt_forces, x_acc_wb[:, 0], label="nu_dot - wb - x")
+        ax[0, 1].plot(t_gt_forces, y_acc_wb[:, 0], label="nu_dot - wb - y")
+        ax[0, 2].plot(t_gt_forces, z_acc_wb[:, 0], label="nu_dot - wb - z")
+        ax[0, 3].plot(t_gt_forces, p_acc_wb[:, 0], label="nu_dot - wb - p")
+        ax[0, 4].plot(t_gt_forces, q_acc_wb[:, 0], label="nu_dot - wb - q")
+        ax[0, 5].plot(t_gt_forces, r_acc_wb[:, 0], label="nu_dot - wb - r")
+        # ax[0].legend()
+        ax[1, 0].plot(t_gt_forces, x_acc_wb[:, 1], label="C(v)v - wb - x")
+        ax[1, 1].plot(t_gt_forces, y_acc_wb[:, 1], label="C(v)v - wb - y")
+        ax[1, 2].plot(t_gt_forces, z_acc_wb[:, 1], label="C(v)v - wb - z")
+        ax[1, 3].plot(t_gt_forces, p_acc_wb[:, 1], label="C(v)v - wb - p")
+        ax[1, 4].plot(t_gt_forces, q_acc_wb[:, 1], label="C(v)v - wb - q")
+        ax[1, 5].plot(t_gt_forces, r_acc_wb[:, 1], label="C(v)v - wb - r")
+        # ax[1].legend()
+        ax[2, 0].plot(t_gt_forces, x_acc_wb[:, 2], label="D(v)v - wb - x")
+        ax[2, 1].plot(t_gt_forces, y_acc_wb[:, 2], label="D(v)v - wb - y")
+        ax[2, 2].plot(t_gt_forces, z_acc_wb[:, 2], label="D(v)v - wb - z")
+        ax[2, 3].plot(t_gt_forces, p_acc_wb[:, 2], label="D(v)v - wb - p")
+        ax[2, 4].plot(t_gt_forces, q_acc_wb[:, 2], label="D(v)v - wb - q")
+        ax[2, 5].plot(t_gt_forces, r_acc_wb[:, 2], label="D(v)v - wb - r")
+        # ax[2].legend()
+        ax[3, 0].plot(t_gt_forces, x_acc_wb[:, 3], label="Tau - wb - x")
+        ax[3, 1].plot(t_gt_forces, y_acc_wb[:, 3], label="Tau - wb - y")
+        ax[3, 2].plot(t_gt_forces, z_acc_wb[:, 3], label="Tau - wb - z")
+        ax[3, 3].plot(t_gt_forces, p_acc_wb[:, 3], label="Tau - wb - p")
+        ax[3, 4].plot(t_gt_forces, q_acc_wb[:, 3], label="Tau - wb - q")
+        ax[3, 5].plot(t_gt_forces, r_acc_wb[:, 3], label="Tau - wb - r")
+        # ax[3].legend()
+        ax[4, 0].plot(t_gt_forces, x_acc_wb[:, 4], label="g_vec - wb - x")
+        ax[4, 1].plot(t_gt_forces, y_acc_wb[:, 4], label="g_vec - wb - y")
+        ax[4, 2].plot(t_gt_forces, z_acc_wb[:, 4], label="g_vec - wb - z")
+        ax[4, 3].plot(t_gt_forces, p_acc_wb[:, 4], label="g_vec - wb - p")
+        ax[4, 4].plot(t_gt_forces, q_acc_wb[:, 4], label="g_vec - wb - q")
+        ax[4, 5].plot(t_gt_forces, r_acc_wb[:, 4], label="g_vec - wb - r")
+        # ax[4].legend()
+        ax[0, 0].set_ylabel('nu_dot')
+        ax[1, 0].set_ylabel('D(v)v')
+        ax[2, 0].set_ylabel('C(v)v')
+        ax[3, 0].set_ylabel('Tau')
+        ax[4, 0].set_ylabel('g_vec')
+
+        ax[0, 0].set_xlabel('x')
+        ax[0, 1].set_xlabel('y')
+        ax[0, 2].set_xlabel('z')
+        ax[0, 3].set_xlabel('p')
+        ax[0, 4].set_xlabel('q')
+        ax[0, 5].set_xlabel('r')
    
     # Plotting unsynched sim results
     if True:
-        sim_length = np.shape(eta_wb)[0]
-        sim_end = sim_length * dt_model
-        t_sim = np.linspace(0, sim_end, sim_length)
+
         eta_wb = np.array(eta_wb)
 
         _, ax = plt.subplots(6, 3, figsize=(12, 10))
