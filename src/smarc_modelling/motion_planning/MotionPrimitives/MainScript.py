@@ -7,7 +7,7 @@ from smarc_modelling.motion_planning.MotionPrimitives.GenerationTree import a_st
 from smarc_modelling.motion_planning.MotionPrimitives.PlotResults import *
 from smarc_modelling.motion_planning.MotionPrimitives.trm_colors import *
 from smarc_modelling.motion_planning.MotionPrimitives.StatisticalAnalysis import runStatisticalAnalysis
-from smarc_modelling.sam_sim import plot_results, Sol
+#from smarc_modelling.sam_sim import plot_results, Sol
 import time
 import matplotlib.animation as animation
 #import pandas as pd
@@ -54,12 +54,12 @@ def MotionPlanningAlgorithm(realTimeDraw, map_instance):
     end_time = time.time()
 
     # Get the inputs plot
-    sol = np.asarray(trajectory).T  # It should be the states on the columns
-    print(sol)
-    t_eval = np.linspace(0, 0.1*len(trajectory), len(trajectory))
-    sol = Sol(t_eval,sol)
-    plot_results(sol)
-    print("printed the inputs!")
+    #sol = np.asarray(trajectory).T  # It should be the states on the columns
+    #print(sol)
+    #t_eval = np.linspace(0, 0.1*len(trajectory), len(trajectory))
+    #sol = Sol(t_eval,sol)
+    #plot_results(sol)
+    #print("printed the inputs!")
 
     # Computational time (seconds)
     print(f"{bcolors.HEADER}>> A star analysis{bcolors.ENDC}")
@@ -225,9 +225,9 @@ if __name__ == "__main__":
 
     # SAM initial state 
     eta0 = np.zeros(7)
-    eta0[0] = 1.75
-    eta0[1] = 0
-    eta0[2] = 0.25
+    eta0[0] = 1.55
+    eta0[1] = 0.25
+    eta0[2] = 0.75
     initial_yaw = np.deg2rad(0)   # in deg
     initial_pitch = np.deg2rad(0) # in deg
     initial_roll = np.deg2rad(0)  # in deg 
@@ -243,7 +243,7 @@ if __name__ == "__main__":
     
     # SAM final state
     finalState = x0.copy()
-    finalState[0:3] = (8.75, -0.25, 1.25)
+    finalState[0:3] = (7.75, -0.25, 2.75)
     final_yaw = np.deg2rad(0)   # in deg
     final_pitch = np.deg2rad(0) # in deg
     final_roll = np.deg2rad(0)  # in deg 

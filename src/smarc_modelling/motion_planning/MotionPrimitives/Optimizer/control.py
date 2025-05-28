@@ -431,7 +431,7 @@ class NMPC_trajectory:
         print(f"ext package acados dir: {codegen_dir}") 
 
         #acados_ocp_solver = AcadosOcpSolver(self.ocp, json_file = solver_json, generate=False, build=False)
-        acados_ocp_solver = AcadosOcpSolver(self.ocp, json_file = ocp_dir + self.model.name + '.json', generate=False, build=False)
+        acados_ocp_solver = AcadosOcpSolver(self.ocp, json_file = ocp_dir + self.model.name + '.json', generate=True, build=True)
 
         # create an integrator with the same settings as used in the OCP solver.
         #acados_integrator = AcadosSimSolver(self.ocp, json_file = solver_json)
