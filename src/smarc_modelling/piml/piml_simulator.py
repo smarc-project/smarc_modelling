@@ -29,7 +29,7 @@ class VEHICLE_SIM:
         else: 
             print("Selected vehicle for VEHICLE_SIM does not exist")
             return
-        
+
         # Calculating how many sim steps we need to cover full time
         self.controls = control_vec
         self.n_sim = np.shape(time_vec)[0]
@@ -102,8 +102,8 @@ if __name__ == "__main__":
     print(f" Initializing simulator...")
     
     # Ground truth data (SAM)
-    # eta_gt, nu_gt, u_fb_gt, u_cmd_gt, Dv_comp_gt, Mv_dot_gt, Cv_gt, g_eta_gt, tau_gt, t_gt = load_data_from_bag("src/smarc_modelling/piml/data/rosbags/rosbag_tank_validate", "torch")
-    eta_gt, nu_gt, u_fb_gt, u_cmd_gt, Dv_comp_gt, Mv_dot_gt, Cv_gt, g_eta_gt, tau_gt, t_gt = load_data_from_bag("src/smarc_modelling/piml/data/rosbags/rosbag_tank_forward_blind", "torch")
+    # eta_gt, nu_gt, u_fb_gt, u_cmd_gt, Dv_comp_gt, Mv_dot_gt, Cv_gt, g_eta_gt, tau_gt, t_gt = load_data_from_bag("src/smarc_modelling/piml/data/rosbags/rosbag_tank_forward_blind", "torch")
+    eta_gt, nu_gt, u_fb_gt, u_cmd_gt, Dv_comp_gt, Mv_dot_gt, Cv_gt, g_eta_gt, tau_gt, t_gt = load_data_from_bag("src/smarc_modelling/piml/data/rosbags/rosbag_tank_good", "torch")
     init_pose = torch.Tensor.tolist(torch.cat([eta_gt[0], nu_gt[0], u_fb_gt[0]]))
     
     # Fixing coordinates for gt data NOTE: Dont do this they should have the same frame as the sim!! Just flip everything upside down when doing visualization
@@ -129,13 +129,13 @@ if __name__ == "__main__":
     # init_pose[13] = vbs_neutral
     # init_pose[14] = lcg_neutral
 
-    # # "Spin"
-    # u_cmd_gt[:, 0] = 50 # VBS
-    # u_cmd_gt[:, 1] = 50 # LCG
-    # u_cmd_gt[:, 2] = np.deg2rad(7)    # Vertical (stern)
-    # u_cmd_gt[:, 3] = -np.deg2rad(7)   # Horizontal (rudder)
-    # u_cmd_gt[:, 4] = 1000     # RPM 1
-    # u_cmd_gt[:, 5] = 1000     # RPM 2
+    # "Spin"
+    u_cmd_gt[:, 0] = 50 # VBS
+    u_cmd_gt[:, 1] = 50 # LCG
+    u_cmd_gt[:, 2] = np.deg2rad(7)    # Vertical (stern)
+    u_cmd_gt[:, 3] = -np.deg2rad(7)   # Horizontal (rudder)
+    u_cmd_gt[:, 4] = 1000     # RPM 1
+    u_cmd_gt[:, 5] = 1000     # RPM 2
 
     # Simulator parameters (Not used now but its a nice print out)
     dt = np.mean(np.diff(t_gt)) # Time step 

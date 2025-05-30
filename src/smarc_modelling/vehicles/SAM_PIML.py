@@ -342,7 +342,7 @@ class SAM_PIML():
         u = self.bound_actuators(u)
         u_ref = self.bound_actuators(u_ref)
 
-        self.calculate_system_state(nu, eta, u_ref)
+        self.calculate_system_state(nu, eta, u)
         self.calculate_cg()
         if self.once:
             self.update_inertias()
@@ -371,6 +371,8 @@ class SAM_PIML():
         eta_dot = self.eta_dynamics(eta, self.nu_r)
         x_dot = np.concatenate([eta_dot, nu_dot, u_dot])
         Dv_comp = np.matmul(self.D, self.nu_r)
+
+        self.get_logger().info("test")
 
         get_index = 0
         return x_dot, Dv_comp, [nu_dot, -np.matmul(self.C, self.nu_r), -np.matmul(self.D, self.nu_r), self.tau, -self.g_vec]
