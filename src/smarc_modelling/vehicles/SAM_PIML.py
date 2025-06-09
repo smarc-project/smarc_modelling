@@ -59,10 +59,7 @@ import numpy as np
 import math
 from scipy.linalg import block_diag
 from smarc_modelling.lib.gnc import *
-
-# For PIML model prediction
 from smarc_modelling.piml.pinn.pinn import init_pinn_model, pinn_predict
-from smarc_modelling.piml.bpinn.bpinn import init_bpinn_model, bpinn_predict
 
 
 class SolidStructure:
@@ -187,6 +184,13 @@ class SAM_PIML():
             piml_type=None
     ):
         self.dt = dt # Sim time step, necessary for evaluation of the actuator dynamics
+        
+        # Some factors to make sim agree with real life data, these are eyeballed from sim vs gt data
+        self.vbs_factor = 0.5 # How sensitive the vbs is
+        self.inertia_factor = 10 # Adjust how quickly we can change direction
+        self.damping_factor = 60 # Adjust how much the damping affect acceleration high number = move less
+        self.damping_rot = 5 # Adjust how much the damping affects the rotation high number = less rotation should be tuned on bag where we turn without any control inputs
+        self.thruster_rot_strength = 2  # Just making the thruster a bit stronger for rotation
 
         # Constants
         self.p_OC_O = np.array([-0.75, 0, 0.06], float)  # Measurement frame C in CO (O)
@@ -242,9 +246,7 @@ class SAM_PIML():
 
         # Weight and buoyancy
         self.W = self.m * self.g
-        self.B = self.W + (self.vbs.m_vbs * 0.45 * self.g) # Using mass change instead of volume change
-        # to avoid having to move around the center of buoyancy a bunch, 0.45 VBS is "neutral" buoyancy
-
+        self.B = self.W + self.vbs.m_vbs*0.5
 
         # Damping matrix based on Bhat 2021
         # Parameters from smarc_advanced_controllers mpc_inverted_pendulum...
@@ -275,17 +277,18 @@ class SAM_PIML():
         self.Ja_max = 0.6632
 
         self.gamma = 100 # Scaling factor for numerical stability of quaternion differentiation
-        self.once = True
 
-        # Initializing PIML model for predicting D
-        self.piml_type = piml_type
+        # PIML related stuff
+        self.piml_type= piml_type
+
         if self.piml_type == "pinn":
-            print(f" Physics Informed Neural Network model initialized!")
+            print(f" Physics Informed Neural Network model initialized")
             self.piml_model = init_pinn_model("pinn.pt")
 
-        if self.piml_type == "bpinn":
-            print(f" Bayesian - Physics Informed Neural Network model intialized!")
-            self.piml_model = init_bpinn_model("bpinn.pt")
+        # For white-box
+        if piml_type == None:
+            self.piml_type = "None"
+
 
     def init_vehicle(self):
         """
@@ -344,38 +347,19 @@ class SAM_PIML():
 
         self.calculate_system_state(nu, eta, u)
         self.calculate_cg()
-        if self.once:
-            self.update_inertias()
-            self.once = False
+        self.update_inertias()
         self.calculate_M()
         self.calculate_C()
-        self.calculate_D(eta, nu, u_ref)
+        self.calculate_D(eta, nu, u)
         self.calculate_g()
         self.calculate_tau(u_ref)
 
-        self.D = np.eye(6)
-        self.C = np.eye(6)
-
-        self.C_D = np.eye(6)
-        
-        nu_dot = self.Minv @ (self.tau - np.matmul(self.C, self.nu_r) - np.matmul(self.D, self.nu_r) - self.g_vec)
-        nu_dot = self.Minv @ (self.tau - np.matmul(self.C_D, self.nu_r) - self.g_vec)
-        # print("x_dot: ", nu_dot[0])
-        # print("Cv: ", np.matmul(self.C, self.nu_r)[0])
-        # print("Dv: ", np.matmul(self.D, self.nu_r)[0])
-        # print("tau: ", self.tau[0])
-        # print("g: ", self.g_vec[0])
-        # print("\n")
-
+        nu_dot = self.Minv @ (self.tau - np.matmul(self.C,self.nu_r) - np.matmul(self.D,self.nu_r) - self.g_vec)
         u_dot = self.actuator_dynamics(u, u_ref)
-        eta_dot = self.eta_dynamics(eta, self.nu_r)
+        eta_dot = self.eta_dynamics(eta, nu)
         x_dot = np.concatenate([eta_dot, nu_dot, u_dot])
-        Dv_comp = np.matmul(self.D, self.nu_r)
 
-        self.get_logger().info("test")
-
-        get_index = 0
-        return x_dot, Dv_comp, [nu_dot, -np.matmul(self.C, self.nu_r), -np.matmul(self.D, self.nu_r), self.tau, -self.g_vec]
+        return x_dot
 
     def bound_actuators(self, u):
         """
@@ -486,6 +470,7 @@ class SAM_PIML():
         J_lcg_co = J_lcg_cg - self.lcg.m_lcg * S2_r_lcg_cg
 
         self.J_total = J_ss_co + J_vbs_co + J_lcg_co
+        self.J_total[0, 0] *= self.inertia_factor
 
     def calculate_M(self):
         """
@@ -513,7 +498,6 @@ class SAM_PIML():
         # Mass matrix including added mass
         self.M = self.MRB + self.MA
         self.Minv = np.linalg.inv(self.M)
-      
 
     def calculate_C(self):
         """
@@ -522,24 +506,14 @@ class SAM_PIML():
         CRB = m2c(self.MRB, self.nu_r)
         CA = m2c(self.MA, self.nu_r)
 
-        CA[4, 0] = 0
-        CA[0, 4] = 0
-        CA[4, 2] = 0
-        CA[2, 4] = 0
-        CA[5, 0] = 0
-        CA[0, 5] = 0
-        CA[5, 1] = 0
-        CA[1, 5] = 0
-
         self.C = CRB + CA
-
 
     def calculate_D(self, eta, nu, u):
         """
         Calculate damping
         """
 
-        if self.piml_type == None:
+        if self.piml_type == "None":
             # Nonlinear damping
             self.D[0,0] = self.Xuu * np.abs(self.nu_r[0])
             self.D[1,1] = self.Yvv * np.abs(self.nu_r[1])
@@ -556,17 +530,14 @@ class SAM_PIML():
             self.D[3,2] = self.y_cp * self.Zww * np.abs(self.nu_r[2])
             self.D[4,2] = -self.x_cp * self.Zww * np.abs(self.nu_r[2])
 
-            self.D[0,4] = self.z_cp * self.Xuu * np.abs(self.nu_r[0])
-            self.D[0,5] = -self.y_cp * self.Xuu * np.abs(self.nu_r[0])
-            self.D[1,3] = -self.z_cp * self.Yvv * np.abs(self.nu_r[1])
-            self.D[1,5] = self.x_cp * self.Yvv * np.abs(self.nu_r[1])
-            self.D[2,3] = self.y_cp * self.Zww * np.abs(self.nu_r[2])
-            self.D[2,4] = -self.x_cp * self.Zww * np.abs(self.nu_r[2])
+            # Overwrite D to get better results from sim
+            self.D = np.eye(6) * self.damping_factor
+            self.D[3,3] = self.damping_rot
+            self.D[4,4] = self.damping_rot
+            self.D[5,5] = self.damping_rot
 
-        elif self.piml_type == "pinn":
+        if self.piml_type == "pinn":
             self.D = pinn_predict(self.piml_model, eta, nu, u)
-        elif self.piml_type == "bpinn":
-            self.D = bpinn_predict(self.piml_model, eta, nu, u)
 
     def calculate_g(self):
         """
@@ -574,27 +545,6 @@ class SAM_PIML():
         """
         self.W = self.m * self.g
         self.g_vec = gvect(self.W, self.B, self.theta, self.phi, self.p_OG_O, self.p_OB_O)
-
-        # # Other version from the danish paper this makes SAM go crazy dont use (unless you know a fix)
-        # theta = self.theta
-        # phi = self.phi
-        # W = self.W
-        # B = self.B
-        # self.xb = self.p_OG_O[0]
-        # self.yb = self.p_OG_O[1]
-        # self.zb = self.p_OG_O[2]
-        
-        # g = np.zeros((6, 1))
-        # g[0] = (W-B) * np.sin(theta)
-        # g[1] = -(W-B) * np.cos(theta) * np.sin(phi)
-        # g[2] = -(W-B) * np.cos(theta) * np.cos(phi)
-        # g[3] = self.yb*B*np.cos(theta)*np.cos(phi)-(self.zb*B*np.cos(theta)*np.sin(phi))
-        # g[4] = -self.zb*B*np.sin(theta)-(self.xb*B*np.cos(theta)*np.cos(phi))
-        # g[5] = self.xb*B*np.cos(theta)*np.sin(phi)+(self.yb*B*np.sin(theta))
-
-        # self.g_vec = g.squeeze()
-        
-
 
     def calculate_tau(self, u):
         """
@@ -617,8 +567,8 @@ class SAM_PIML():
         u: control inputs as [x_vbs, x_lcg, delta_s, delta_r, rpm1, rpm2]
         Azimuth Thrusters: Fossen 2021, ch.9.4.2
         """
-        delta_s = u[2]
-        delta_r = u[3]
+        delta_s = -u[2]
+        delta_r = -u[3]
         n_rpm = u[4:]
 
         # Compute propeller forces
@@ -637,11 +587,13 @@ class SAM_PIML():
                 K_prop_i = self.rho * (self.D_prop**5) * (
                         self.KQ_0 * abs(n_rps[i]) * n_rps[i] +
                         (self.KQ_max-self.KQ_0)/self.Ja_max * (Va/self.D_prop) * abs(n_rps[i]))
+                dir_flip = 1
             else:
                 X_prop_i = self.rho * (self.D_prop ** 4) * (
                         self.KT_0*abs(n_rps[i])*n_rps[i]
                         )/10
                 K_prop_i = self.rho * (self.D_prop ** 5) * self.KQ_0 * abs(n_rps[i]) * n_rps[i] / 10
+                dir_flip = -1
 
             F_prop_b = C_T2C @ np.array([X_prop_i, 0, 0])
             r_prop_i = C_T2C @ self.propellers.r_t_p_sh[i] - self.p_OC_O
@@ -650,8 +602,17 @@ class SAM_PIML():
                                     # propellers that are supposed to cancel out the propeller induced
                                     # momentum
 
+            # Rescale the rotation from props
+            M_prop_i[0] *= self.thruster_rot_strength # Yaw
+            M_prop_i[1] *= self.thruster_rot_strength * dir_flip # Pitch
+            M_prop_i[2] *= self.thruster_rot_strength # Roll
 
-            # M_prop_i[1] = 0 # TODO: maybe add if statement to only do this when props have same rpm
+            # Above equation return yaw, roll, pitch in other order than what the model uses
+            yaw = M_prop_i[0]
+            roll = M_prop_i[2]
+            M_prop_i[2] = yaw
+            M_prop_i[0] = -roll
+
             tau_prop_i = np.concatenate([F_prop_b, M_prop_i])
             tau_prop += tau_prop_i
 
@@ -713,7 +674,6 @@ class SAM_PIML():
 
         return np.concatenate([pos_dot, q_dot])
 
-
     def actuator_dynamics(self, u_cur, u_ref):
         """
         Compute the actuator dynamics.
@@ -733,7 +693,8 @@ class SAM_PIML():
 
         return u_dot
 
-
     def update_dt(self, dt):
-        # Needed for the variable time-step simulator
+        """
+        Updates dt for when doing simulations
+        """
         self.dt = dt

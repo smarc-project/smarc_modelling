@@ -105,22 +105,21 @@ if __name__ == "__main__":
     # Loading training data
     print(f" Loading training data...")
 
-    train_path = "src/smarc_modelling/piml/data/rosbags/rosbag_train"
+    train_path = "src/smarc_modelling/piml/data/rosbags/rosbag_tank_1970"
     eta, nu, u, u_cmd, Dv_comp, Mv_dot, Cv, g_eta, tau, t = load_data_from_bag(train_path, "torch")
     x = torch.cat([eta, nu, u], dim=1) # State vector
 
     # Loading validation data
     print(f" Loading validation data...")
 
-    validate_path = "src/smarc_modelling/piml/data/rosbags/rosbag_validate"
+    validate_path = "src/smarc_modelling/piml/data/rosbags/rosbag_tank_2025"
     eta_val, nu_val, u_val, u_val_cmd, Dv_comp_val, Mv_dot_val, Cv_val, g_eta_val, tau_val, t_val = load_data_from_bag(validate_path, "torch")
     x_val = torch.cat([eta_val, nu_val, u_val], dim=1)
 
     # Initialize model and optimizer
     shape = [19, 32, 64, 128, 128, 64, 36]
-    shape = [19, 256, 256, 256, 36]
     model = PINN(shape)
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.1)
 
     # Adaptive learning rate
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer=optimizer, mode="min", factor=0.95, patience=5000, threshold=1, min_lr=1e-5)
@@ -134,13 +133,13 @@ if __name__ == "__main__":
     # Early stopping using validation loss
     best_val_loss = float("inf")
     # How long we wait before stopping training
-    patience = 5000
+    patience = 50000
     counter = 0
     # Saving the best model before overfitting takes place
     best_model_state = None
 
     # Training loop
-    epochs = 500000
+    epochs = 5000000
     print(f" Starting training...")
     for epoch in range(epochs):
         
@@ -189,6 +188,7 @@ if __name__ == "__main__":
     print(f" Training done!")
     
     if "save" in sys.argv:
+        # Saving the best model state from training (as per based on validation loss)
         torch.save({"model_shape": shape, "state_dict": model.state_dict()}, "src/smarc_modelling/piml/models/pinn.pt")
         print(f" Model weights saved to models/pinn.pt")
 
