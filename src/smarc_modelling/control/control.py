@@ -3,7 +3,7 @@ from acados_template import AcadosOcp, AcadosOcpSolver, AcadosSimSolver, AcadosM
 import numpy as np
 import casadi as ca
 
-#NOTE: Before changing model, it is a MUST to genereate the controller
+#NOTE: Before changing model or NMPC type, it is a MUST to generate the controller
 class NMPC:
     def __init__(self, casadi_model, Ts, N_horizon):
         '''
@@ -109,7 +109,7 @@ class NMPC:
 
         # Set constraints on the control
         x_ubx[13:15] = 100 
-        x_ubx[15:17] = 7
+        x_ubx[15:17] = np.deg2rad(7)
         x_ubx[17:  ] = 1500
 
         x_lbx = -x_ubx
@@ -188,7 +188,7 @@ class NMPC:
         return x_error
 
 class NMPC_trajectory:
-    def __init__(self, casadi_model, Ts, N_horizon):
+    def __init__(self, casadi_model, Ts, N_horizon, update_solver_settings):
         '''
         Input:
         casadi_model == Casadi model
@@ -203,6 +203,7 @@ class NMPC_trajectory:
         self.Ts    = Ts
         self.Tf    = Ts*N_horizon
         self.N_horizon = N_horizon
+        self.update_solver = update_solver_settings
         
     # Function to create a Acados model from the casadi model
     def export_dynamics_model(self, casadi_model):
@@ -237,16 +238,16 @@ class NMPC_trajectory:
         # --------------------------- Cost setup ---------------------------------
         # State weight matrix
         Q_diag = np.ones(nx)
-        Q_diag[ 0:3 ] = 5       # Position
+        Q_diag[ 0:3 ] = 1       # Position
         Q_diag[ 3:7 ] = 5         # Quaternion
         Q_diag[ 7:10] = 1       # linear velocity
-        Q_diag[10:13] = 10        # Angular velocity
+        Q_diag[10:13] = 5        # Angular velocity
 
         # Control weight matrix - Costs set according to Bryson's rule (MPC course)
         Q_diag[13:15] = 1e-4        # VBS, LCG
         Q_diag[15:17] = 1/50        # stern_angle, rudder_angle
         Q_diag[17:  ] = 1e-6        # RPM1 And RPM2
-        Q_diag[13:  ] = Q_diag[13:  ]*5
+        Q_diag[13:  ] = Q_diag[13:  ]*3
         Q = np.diag(Q_diag)
 
         # Control rate of change weight matrix - control inputs as [x_vbs, x_lcg, delta_s, delta_r, rpm1, rpm2]
@@ -289,25 +290,27 @@ class NMPC_trajectory:
         self.ocp.constraints.x0 = x0
 
         # Set constraints on the control rate of change
-        self.ocp.constraints.lbu = np.array([-vbs_dot,-lcg_dot, -ds_dot, -dr_dot, -rpm_dot, -rpm_dot])
-        self.ocp.constraints.ubu = np.array([ vbs_dot, lcg_dot,  ds_dot,  dr_dot,  rpm_dot,  rpm_dot])
-        self.ocp.constraints.idxbu = np.arange(nu)
+        # self.ocp.constraints.lbu = np.array([-vbs_dot,-lcg_dot, -ds_dot, -dr_dot, -rpm_dot, -rpm_dot])
+        # self.ocp.constraints.ubu = np.array([ vbs_dot, lcg_dot,  ds_dot,  dr_dot,  rpm_dot,  rpm_dot])
+        # self.ocp.constraints.idxbu = np.arange(nu)
+        self.ocp.constraints.lbu = np.array([-vbs_dot,-lcg_dot])
+        self.ocp.constraints.ubu = np.array([ vbs_dot, lcg_dot])
+        self.ocp.constraints.idxbu = np.arange(2)
 
-        # Set constraints on the states
-        x_ubx = np.ones(nx)
-        x_ubx[  :13] = 1000
+        # Set constraints on the states and input magnitudes
+        x_ubx = np.ones(nu) # If state constraints are desired change nu to nx and declare for each state what is desired
 
         # Set constraints on the control
-        x_ubx[13:15] = 100 
-        x_ubx[15:17] = 7
-        x_ubx[17:  ] = 1500
+        x_ubx[0:2] = 100 
+        x_ubx[2:4] = 7
+        x_ubx[4: ] = 1500
 
         x_lbx = -x_ubx
         x_lbx[13:15] = 0
 
         self.ocp.constraints.lbx = x_lbx
         self.ocp.constraints.ubx = x_ubx
-        self.ocp.constraints.idxbx = np.arange(nx)
+        self.ocp.constraints.idxbx = np.arange(13, nx)
 
         # ----------------------- Solver Setup --------------------------
         # set prediction horizon
@@ -318,7 +321,7 @@ class NMPC_trajectory:
         self.ocp.solver_options.hpipm_mode = 'ROBUST'
         self.ocp.solver_options.hessian_approx = 'GAUSS_NEWTON'
         self.ocp.solver_options.integrator_type = 'IRK'
-        self.ocp.solver_options.sim_method_newton_iter = 3 #3 default
+        self.ocp.solver_options.sim_method_newton_iter = 2 #3 default
 
         self.ocp.solver_options.nlp_solver_type = 'SQP_RTI'
         self.ocp.solver_options.nlp_solver_max_iter = 80
@@ -329,8 +332,7 @@ class NMPC_trajectory:
         self.ocp.solver_options.regularize_method = 'NO_REGULARIZE'
 
         solver_json = 'acados_ocp_' + self.model.name + '.json'
-        update_solver = True
-        if update_solver == False:
+        if self.update_solver == False:
             acados_ocp_solver = AcadosOcpSolver(self.ocp, json_file = solver_json, generate=False, build=False)
 
             # create an integrator with the same settings as used in the OCP solver. generate=False, build=False

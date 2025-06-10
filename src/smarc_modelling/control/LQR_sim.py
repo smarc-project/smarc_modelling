@@ -76,10 +76,13 @@ def save_csv(trajectory, t, i, case):
     trajectory (np.array): The NumPy array to save.
     file_path (str): The path to the CSV file.
     """
-    np.savetxt("/home/admin/smarc_modelling/src/Trajectories/report_update/"+ case + "/LQR/" + case + str(i) +".csv"
+    #np.savetxt("/home/admin/smarc_modelling/src/Trajectories/report_update/"+ case + "/LQR/" + case + str(i) +".csv"
+    #           , trajectory, delimiter=',', header="X,Y,Z,phi,theta,psi,vx,vy,vz,p,q,r,control", comments='')
+    #np.savetxt("/home/admin/smarc_modelling/src/Trajectories/report_update/"+ case + "/LQR/time_" + case + str(i) +".csv"
+    #           , t, delimiter=',', header="time (ms)", comments='')
+    np.savetxt("/home/admin/smarc_modelling/src/Trajectories/report_update/noise/" + str(case) +"_" + str(i) +".csv"
                , trajectory, delimiter=',', header="X,Y,Z,phi,theta,psi,vx,vy,vz,p,q,r,control", comments='')
-    np.savetxt("/home/admin/smarc_modelling/src/Trajectories/report_update/"+ case + "/LQR/time_" + case + str(i) +".csv"
-               , t, delimiter=',', header="time (ms)", comments='')
+
     print("CSV file saved successfully.")
 
 def main():
@@ -131,26 +134,26 @@ def main():
         for i in range(Nsim):
             #print("-------------------------------------------------------------")
             #print(f"Nsim: {i}")
-            try:
-                time_start = time.time()
-                u = lqr.solve(x, u, x_lin, u_lin)
-                time_end = time.time()
-                t[i] = time_end - time_start
-                x_next = runge_kutta_4(casadi_dynamics, x, u, Ts)
-                x_next[3:7] = x_next[3:7]/scipy.linalg.norm(x_next[3:7])  # Normalize quaternion
+            noise_vector = np.zeros(13)
+            std = 0.0
+            bias_set = str(int(std*1000))+"mm"
+            noise_vector[10:13] = np.random.normal(0, std, 3)
             
-            except:
-                print("LQR solver failed at: ", i)
-                simNonlinear = simNonlinear[:i,:]
-                simU = simU[:i,:]
-                Nsim = simNonlinear.shape[0]-1
-                break
+            time_start = time.time()
+            u = lqr.solve(x, u, x_lin, u_lin)
+            time_end = time.time()
+            t[i] = time_end - time_start
+            x_next = runge_kutta_4(casadi_dynamics, x, u, Ts)
+            x_next[3:7] = x_next[3:7]/scipy.linalg.norm(x_next[3:7])  # Normalize quaternion
+        
+        
+
 
             if i < x_ref.shape[0]-1:
                 x_lin = x_ref[i+1,:]
                 u_lin = u_ref[i+1,:]
 
-            x=x_next
+            x=x_next + noise_vector
             simNonlinear[i+1,:] = x_next
             simU[i+1,:] = u
             #print(x)
@@ -158,15 +161,15 @@ def main():
 
         # evaluate timings
         t *= 1000  # scale to milliseconds
-        print(f'Computation time in ms:\nmin: {np.min(t):.3f}\nmax: {np.max(t):.3f}\navg: {np.average(t):.3f}\nstdev: {np.std(t)}\nmedian: {np.median(t):.3f}')
+        #print(f'Computation time in ms:\nmin: {np.min(t):.3f}\nmax: {np.max(t):.3f}\navg: {np.average(t):.3f}\nstdev: {np.std(t)}\nmedian: {np.median(t):.3f}')
 
         # plot results
         sim = np.hstack([simNonlinear, simU])
         u_dot = np.zeros(simU.shape)
         #plot(x_axis, references, u_ref, simNonlinear[:-1], simU[:-1])
         #plot_function(x_axis, trajectory, sim[:-1], u_dot[:-1])
-        save_csv(sim, t, j, case)
-        #part_plot_function(trajectory, sim[:-1], u_dot[:-1])
+        #save_csv(sim, t, j, bias_set)
+        part_plot_function(trajectory, sim[:-1], u_dot[:-1])
 
 if __name__ == '__main__':
     main()

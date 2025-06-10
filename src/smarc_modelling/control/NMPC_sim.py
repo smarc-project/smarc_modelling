@@ -76,10 +76,13 @@ def save_csv(trajectory, t, i, case):
     #            , trajectory, delimiter=',', header="X,Y,Z,phi,theta,psi,vx,vy,vz,p,q,r,control", comments='')
     # np.savetxt("/home/admin/smarc_modelling/src/Trajectories/report_update/"+ case + "/MPC/time_" + case + str(i) +".csv"
     #            , t, delimiter=',', header="time (ms)", comments='')
-    np.savetxt("/home/admin/smarc_modelling/src/Trajectories/report_update/q2/predhorizon/" + case + str(i) +".csv"
+    # np.savetxt("/home/admin/smarc_modelling/src/Trajectories/report_update/q2/predhorizon/" + case + str(i) +".csv"
+    #            , trajectory, delimiter=',', header="X,Y,Z,phi,theta,psi,vx,vy,vz,p,q,r,control", comments='')
+    # np.savetxt("/home/admin/smarc_modelling/src/Trajectories/report_update/q2/predhorizon/time_" + case + str(i) +".csv"
+    #            , t, delimiter=',', header="time (ms)", comments='')
+    np.savetxt("/home/admin/smarc_modelling/src/Trajectories/report_update/noise/" + str(case) +"_" + str(i) +".csv"
                , trajectory, delimiter=',', header="X,Y,Z,phi,theta,psi,vx,vy,vz,p,q,r,control", comments='')
-    np.savetxt("/home/admin/smarc_modelling/src/Trajectories/report_update/q2/predhorizon/time_" + case + str(i) +".csv"
-               , t, delimiter=',', header="time (ms)", comments='')
+
     print("CSV file saved successfully.")
 
 
@@ -111,13 +114,13 @@ def rmse(true, pred):
 
 def main():
     # Extract the CasADi model
-    sam = SAM_casadi()
+    sam = SAM_casadi(dt=0.1)
 
 
     # create ocp object to formulate the OCP
     Ts = 0.1           # Sampling time
-    N_horizon = 1      # Prediction horizon
-    nmpc = NMPC_trajectory(sam, Ts, N_horizon)
+    N_horizon = 16      # Prediction horizon
+    nmpc = NMPC_trajectory(sam, Ts, N_horizon, update_solver_settings=False)
     nx = nmpc.nx        # State vector length + control vector
     nu = nmpc.nu        # Control derivative vector length
     nc = 1
@@ -128,10 +131,9 @@ def main():
     x0= np.zeros(19,)
     ocp_solver, integrator = nmpc.setup(x0)
 
-
-    case = "hard"
-    setting ="np1_"
-    for j in range(50):
+    case = "medium"
+    setting ="np28_"
+    for j in range(1):
         file_path = "/home/admin/smarc_modelling/src/Trajectories/report_update/"+ case + "/trajectories/case_" + case + str(j) +".csv"
         trajectory = read_csv_to_array(file_path)
         print(file_path)
@@ -139,10 +141,10 @@ def main():
         trajectory = read_csv_to_array(file_path)
         # Declare duration of sim. and the x_axis in the plots
         Nsim = (trajectory.shape[0])            # The sim length should be equal to the number of waypoints
+        x_axis = np.linspace(0, Ts*Nsim, Nsim)
 
         simU = np.zeros((Nsim, nu))     # Matrix to store the optimal control derivative
         simX = np.zeros((Nsim+1, nx))   # Matrix to store the simulated states
-
 
         # Declare the initial state
         x0 = trajectory[0] 
@@ -192,8 +194,8 @@ def main():
                 status = ocp_solver.solve()
                 #ocp_solver.print_statistics()
                 if status != 0:
-                    break
                     print(f" Note: acados_ocp_solver returned status: {status}")
+                    break
 
                 # simulate system
                 t[i] = ocp_solver.get_stats('time_tot')
@@ -201,7 +203,10 @@ def main():
                     simU[i+k, :] = ocp_solver.get(k, "u")
             
             noise_vector = np.zeros(19)
-            #noise_vector[0:3] = np.array([(np.random.random()-0.5)/10,(np.random.random()-0.5)/10, (np.random.random()-0.5)/10])
+            std = 0.09
+            bias_set = str(int(std*1000))+"mm"
+            #noise_vector[10:13] = np.random.normal(0, std, 3)
+            #print(f"noise_vector: {noise_vector}")
             simX[i+1, :] = integrator.simulate(x=simX[i, :]+noise_vector, u=simU[i, :])
         
 
@@ -218,9 +223,9 @@ def main():
 
         # Extract the optimal control sequence
         #optimal_u = simX[:, 13:]
-        save_csv(simX,t, j, setting)
+        #save_csv(simX,t, j, bias_set)
         rmse(simX[:-1], trajectory)
-        #plot.plot_function(x_axis, trajectory, simX[:-1], simU)
+        plot.plot_function(x_axis, trajectory, simX[:-1], simU)
         #ocp_solver = None
 
 

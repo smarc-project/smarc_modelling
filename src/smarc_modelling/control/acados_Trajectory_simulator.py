@@ -112,8 +112,8 @@ def main():
 
     # create ocp object to formulate the OCP
     Ts = 0.1           # Sampling time
-    N_horizon = 1      # Prediction horizon
-    nmpc = NMPC_trajectory(sam, Ts, N_horizon)
+    N_horizon = 16      # Prediction horizon
+    nmpc = NMPC_trajectory(sam, Ts, N_horizon, update_solver_settings=False)
     nx = nmpc.nx        # State vector length + control vector
     nu = nmpc.nu        # Control derivative vector length
     nc = 1
@@ -122,7 +122,9 @@ def main():
     #file_path = "/home/admin/smarc_modelling/src/Trajectories/trajectoryComplexity3.csv"
     #file_path = "/home/admin/smarc_modelling/src/Trajectories/Complexity2Trajectory_0.csv"
     #file_path = "/home/admin/smarc_modelling/src/Trajectories/case_medium_original.csv"
-    file_path = "/home/admin/smarc_modelling/src/Trajectories/REPORT/hard/case_hard.csv"
+    file_path = "/home/admin/smarc_modelling/src/Trajectories/REPORT/medium/case_medium.csv"
+    #file_path = "/home/admin/smarc_modelling/src/Trajectories/report_update/easy/trajectories/case_easy0.csv"
+
 
     #file_path = "/home/admin/smarc_modelling/src/Trajectories/resolution01.csv"  
     trajectory = read_csv_to_array(file_path)
@@ -209,9 +211,9 @@ def main():
 
     # Extract the optimal control sequence
     optimal_u = simX[:, 13:]
-    save_csv(simX,t)
+    #save_csv(simX,t)
     rmse(simX[:-1], trajectory)
-    #plot.plot_function(x_axis, trajectory, simX[:-1], simU)
+    plot.plot_function(x_axis, trajectory, simX[:-1], simU)
     ocp_solver = None
 
 
