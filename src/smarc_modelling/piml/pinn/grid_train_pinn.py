@@ -39,8 +39,8 @@ if __name__ == "__main__":
     best_error = float("inf")
 
     # Grid params
-    for i, layers in enumerate([20, 50, 100]): # Amount of layers
-        for j, size in enumerate([32, 64, 128]): # Amount of neurons in each layer 
+    for i, layers in enumerate([6, 12, 20]): # Amount of layers
+        for j, size in enumerate([16, 32, 128]): # Amount of neurons in each layer 
 
                 # NN shape
                 shape = [size] * layers # Hidden layers
