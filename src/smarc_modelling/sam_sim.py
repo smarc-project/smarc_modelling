@@ -10,11 +10,12 @@ matplotlib.use('TkAgg')  # or 'Qt5Agg', depending on what you have installed
 
 # Initial conditions
 eta0 = np.zeros(7)
+eta0[2] = -1
 eta0[3] = 1.0  # Initial quaternion (no rotation) 
 nu0 = np.zeros(6)  # Zero initial velocities
 u0 = np.zeros(6)
 u0[0] = 50
-u0[1] = 45
+u0[1] = 50 #45
 x0 = np.concatenate([eta0, nu0, u0])
 
 # Simulation timespan
@@ -53,9 +54,9 @@ def run_simulation(t_span, x0, dt, sam):
     u = np.zeros(6)
     u[0] = 50#*np.sin((i/(20/0.02))*(3*np.pi/4))        # VBS
     u[1] = 50 # LCG
-    #u[2] = np.deg2rad(7)    # Vertical (stern)
-    #u[3] = -np.deg2rad(7)   # Horizontal (rudder)
-    u[4] = 1000     # RPM 1
+    u[2] = 0 #np.deg2rad(7)    # Vertical (stern)
+    u[3] = 0 #-np.deg2rad(7)   # Horizontal (rudder)
+    u[4] = 0 #1000     # RPM 1
     u[5] = u[4]     # RPM 2
 
     # Run integration
