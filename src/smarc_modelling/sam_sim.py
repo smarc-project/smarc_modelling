@@ -50,6 +50,20 @@ def run_simulation(t_span, x0, dt, sam):
     """
     Run SAM simulation using solve_ivp.
     """
+
+    def dynamics_wrapper(t, x):
+        """
+        u: control inputs as [x_vbs, x_lcg, delta_s, delta_r, rpm1, rpm2]
+        """
+        u = np.zeros(6)
+        u[0] = 50#*np.sin((i/(20/0.02))*(3*np.pi/4))        # VBS
+        u[1] = 50 # LCG
+        u[2] = np.deg2rad(7)    # Vertical (stern)
+        u[3] = -np.deg2rad(7)   # Horizontal (rudder) - = goes to the left + = goes to the right (looking from behind)
+        u[4] = 1000     # RPM 1
+        u[5] = u[4]     # RPM 2
+        return sam.dynamics(x, u)
+
     u = np.zeros(6)
     u[0] = 50#*np.sin((i/(20/0.02))*(3*np.pi/4))        # VBS
     u[1] = 50 # LCG
@@ -212,6 +226,8 @@ def plot_trajectory(sol, numDataPoints, generate_gif=False, filename="3d.gif", F
 
 # Run simulation and plot results
 sol = run_simulation(t_span, x0, dt, sam)
+
 plot_results(sol)
-#plot_trajectory(sol, 50, False, "3d.gif", 10)
+plot_trajectory(sol, 50, False, "3d.gif", 10)
 plt.show()
+
