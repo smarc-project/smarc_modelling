@@ -18,7 +18,7 @@ def IsWithinObstacle(x,y,z, map_instance):
 
     return cellOfPixel in obstaclesDictionary
 
-def arrived(current, map_instance):
+def arrived(current, map_instance, numberTree):
     """
     This function returns True if (x,y,z) is within the goal, False otherwise
     """
@@ -27,27 +27,23 @@ def arrived(current, map_instance):
     x = current[0]
     y = current[1]
     z = current[2]
-    
-    # Constraint on final velocity
-    '''
-    finalVelocityConstraint = False
-    if finalVelocityConstraint:
-        q0, q1, q2, q3, vx, vy, vz = current[3:10]
-        currentVelocityVector = body_to_global_velocity((q0,q1,q2,q3), [vx, vy, vz])
-        currentVelocityNorm = np.linalg.norm(currentVelocityVector)
-        maxFinalVelocity = 1
-        if currentVelocityNorm > maxFinalVelocity:
-            return False
-    '''
 
     # Compute goal area
     TILESIZE = map_instance["TileSize"]
-    arrivalx_min = TILESIZE * map_instance["goal_area"][1]
-    arrivalx_max = arrivalx_min + TILESIZE
-    arrivaly_min = TILESIZE * map_instance["goal_area"][0]
-    arrivaly_max = arrivaly_min + TILESIZE
-    arrivalz_min = TILESIZE * map_instance["goal_area"][2]
-    arrivalz_max = arrivalz_min + TILESIZE
+    if numberTree == 1:
+        arrivalx_min = map_instance["goal_pixel"][0] - 0.5 * TILESIZE
+        arrivalx_max = map_instance["goal_pixel"][0] + 0.5 * TILESIZE
+        arrivaly_min = map_instance["goal_pixel"][1] - 0.5 * TILESIZE
+        arrivaly_max = map_instance["goal_pixel"][1] + 0.5 * TILESIZE
+        arrivalz_min = map_instance["goal_pixel"][2] - 0.5 * TILESIZE
+        arrivalz_max = map_instance["goal_pixel"][2] + 0.5 * TILESIZE
+    else:
+        arrivalx_min = map_instance["start_pos"][0] - 0.5 * TILESIZE
+        arrivalx_max = map_instance["start_pos"][0] + 0.5 * TILESIZE
+        arrivaly_min = map_instance["start_pos"][1] - 0.5 * TILESIZE
+        arrivaly_max = map_instance["start_pos"][1] + 0.5 * TILESIZE
+        arrivalz_min = map_instance["start_pos"][2] - 0.5 * TILESIZE
+        arrivalz_max = map_instance["start_pos"][2] + 0.5 * TILESIZE
 
     if (x<arrivalx_min or x>arrivalx_max) or (y<arrivaly_min or y>arrivaly_max)  or (z<arrivalz_min or z>arrivalz_max):
         return False
@@ -64,9 +60,9 @@ def IsOutsideTheMap(x,y,z, map_instance):
     """
 
     # Boundaries of the map
-    xMin = 0 
-    yMin = 0 
-    zMin = 0 
+    xMin = map_instance["x_min"]
+    yMin = map_instance["y_min"]
+    zMin = map_instance["z_min"]
     xMax = map_instance["x_max"] 
     yMax = map_instance["y_max"] 
     zMax = map_instance["z_max"] 
@@ -145,7 +141,7 @@ def body_to_global_velocity(quaternion, body_velocity):
     
     return global_velocity
 
-def calculate_angle_goalVector(state, vector, map_instance):
+def calculate_angle_goalVector(state, vector, map_instance, numberTree, type = "normal"):
     """
     Compute the angle (in rad) between a vector and the goal vector from the current state
     """
@@ -154,9 +150,25 @@ def calculate_angle_goalVector(state, vector, map_instance):
     x = state[0]
     y = state[1]
     z = state[2]
-    x_goal = map_instance["goal_pixel"][0]
-    y_goal = map_instance["goal_pixel"][1]
-    z_goal = map_instance["goal_pixel"][2]
+    '''
+    match type:
+        case "pointA":
+                x_goal = map_instance["goal_pixel_pointA"][0]
+                y_goal = map_instance["goal_pixel_pointA"][1]
+                z_goal = map_instance["goal_pixel_pointA"][2]
+        case _:
+                x_goal = map_instance["goal_pixel"][0]
+                y_goal = map_instance["goal_pixel"][1]
+                z_goal = map_instance["goal_pixel"][2]
+    '''
+    if numberTree == 1:
+                x_goal = map_instance["goal_pixel"][0]
+                y_goal = map_instance["goal_pixel"][1]
+                z_goal = map_instance["goal_pixel"][2]
+    else:
+                x_goal = map_instance["start_pos"][0]
+                y_goal = map_instance["start_pos"][1]
+                z_goal = map_instance["start_pos"][2]   
 
     # Define the distance between position and goal
     dx = x_goal - x
@@ -171,7 +183,8 @@ def calculate_angle_goalVector(state, vector, map_instance):
     # Define the goal vector
     goal_vector = np.array([dx, dy, dz])
     goal_vector_norm = np.linalg.norm(goal_vector)
-    goal_vector /= goal_vector_norm
+    if goal_vector_norm != 0:
+        goal_vector /= goal_vector_norm
 
     # Boundary case
     if vector_norm == 0 or goal_vector_norm == 0:
