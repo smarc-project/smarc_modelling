@@ -124,7 +124,6 @@ def main():
     nx = nmpc.nx        # State vector length + control vector
     nu = nmpc.nu        # Control derivative vector length
     nc = 1
-    
 
 
     # Run the MPC setup
