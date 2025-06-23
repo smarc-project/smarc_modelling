@@ -29,6 +29,11 @@ bag_files_combine = [
     "src/smarc_modelling/piml/data/rosbags/rosbag_tank_2025"
 ]
 
+bag_files_append = [
+    "src/smarc_modelling/piml/data/rosbags/rosbag_tank_1970",
+    "src/smarc_modelling/piml/data/rosbags/rosbag_tank_newdata"
+]
+
 # "src/smarc_modelling/piml/data/prebags/rosbag2_2025_05_22-15_22_01", We are saving this one for testing in the end
 
 def play_bag(bag_path):
@@ -56,7 +61,7 @@ def play_bag(bag_path):
 def main():
 
     # Quick swap between the two different sets, 1970 uses mocap and 2025 uses mocap2
-    selected_bags = bag_files_2025
+    selected_bags = bag_files_append
 
     for bag in selected_bags:
         play_bag(bag)

@@ -357,6 +357,11 @@ class SAM_PIML():
         nu_dot = self.Minv @ (self.tau - np.matmul(self.C,self.nu_r) - np.matmul(self.D,self.nu_r) - self.g_vec)
         u_dot = self.actuator_dynamics(u, u_ref)
         eta_dot = self.eta_dynamics(eta, nu)
+
+        # Bounding the acceleration and speed in y direction NOTE: This might be more of a bad idea than a good one?
+        #nu_dot[2] = np.min([nu_dot[2], 0.01])
+        # eta_dot[1] = np.min([eta_dot[1], 0.01])
+
         x_dot = np.concatenate([eta_dot, nu_dot, u_dot])
 
         return x_dot

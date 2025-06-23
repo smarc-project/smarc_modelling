@@ -117,12 +117,17 @@ if __name__ == "__main__":
     x_val = torch.cat([eta_val, nu_val, u_val], dim=1)
 
     # Initialize model and optimizer
-    shape = [19, 32, 64, 128, 128, 64, 36]
+    size = 32
+    layers = 20
+    shape = [size] * layers # Hidden layers
+    shape.insert(0, 19) # Input layer
+    shape.append(36) # Output layer
+
     model = PINN(shape)
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.1)
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
 
     # Adaptive learning rate
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer=optimizer, mode="min", factor=0.95, patience=5000, threshold=1, min_lr=1e-5)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer=optimizer, mode="min", factor=0.98, patience=1000, threshold=100, min_lr=1e-5)
 
     # For plotting loss and lr
     if "plot" in sys.argv:
@@ -139,7 +144,7 @@ if __name__ == "__main__":
     best_model_state = None
 
     # Training loop
-    epochs = 5000000
+    epochs = patience * 10
     print(f" Starting training...")
     for epoch in range(epochs):
         
@@ -169,7 +174,7 @@ if __name__ == "__main__":
             lr_history.append(optimizer.param_groups[0]['lr'])
 
         # Early stopping based on validation loss
-        if val_loss.item() < best_val_loss:
+        if val_loss.item() < best_val_loss and epoch >=2500:
             best_val_loss = val_loss.item()
             counter = 0 # Reset counter
             best_model_state = model.state_dict() # Saving the best model
@@ -177,7 +182,7 @@ if __name__ == "__main__":
             counter += 1
 
         if epoch % 500 == 0:
-            print(f" Still training, epoch {epoch}, loss: {loss.item()}, lr: {optimizer.param_groups[0]['lr']}")
+            print(f" Still training, epoch {epoch}, loss: {loss.item()}, lr: {optimizer.param_groups[0]['lr']}, \n validation loss: {val_loss.item()}")
         
         if counter >= patience:
             print(f" Stopping early due to no improvement after {patience} epochs from epoch: {epoch-counter}")
@@ -189,7 +194,7 @@ if __name__ == "__main__":
     
     if "save" in sys.argv:
         # Saving the best model state from training (as per based on validation loss)
-        torch.save({"model_shape": shape, "state_dict": model.state_dict()}, "src/smarc_modelling/piml/models/pinn.pt")
+        torch.save({"model_shape": shape, "state_dict": model.state_dict()}, "src/smarc_modelling/piml/models/pinn_trained.pt")
         print(f" Model weights saved to models/pinn.pt")
 
     if "plot" in sys.argv:

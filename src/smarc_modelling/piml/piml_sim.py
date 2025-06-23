@@ -6,7 +6,7 @@ from smarc_modelling.vehicles.SAM_PIML import SAM_PIML
 from smarc_modelling.piml.utils.utility_functions import load_data_from_bag, eta_quat_to_deg
 import matplotlib.pyplot as plt
 import torch
-import scienceplots
+import scienceplots # For fancy plotting
 
 
 class SIM:
@@ -32,6 +32,10 @@ class SIM:
         data = np.empty((len(self.x0), self.n_sim))
         data[:, 0] = self.x0
 
+        # For getting last value before quat errors
+        end_val = 10e10
+        once = True
+        
         for i in range(self.n_sim-1):
 
             # Get the current time step
@@ -39,9 +43,17 @@ class SIM:
             self.vehicle.update_dt(dt)
 
             # Do sim step using rk4 or ef
-            data[:, i+1] = self.rk4(data[:, i], self.controls[i], dt, self.vehicle.dynamics)
+            try:
+                data[:, i+1] = self.rk4(data[:, i], self.controls[i], dt, self.vehicle.dynamics)
+            except:
+                data[:, i+1] = data[:, i-10]
+                if once:
+                    once = False
+                    end_val = i-10
 
-        return data
+            data[10, i+1] = 0
+
+        return data, end_val
     
     def rk4(self, x, u, dt, fun):
         # https://github.com/smarc-project/smarc_modelling/blob/master/src/smarc_modelling/sam_sim.py#L38C1-L46C15 
@@ -62,7 +74,7 @@ if __name__ == "__main__":
     print(f" Starting simulator...")
 
     # Loading ground truth data
-    eta, nu, u_fb, u_cmd, Dv_comp, Mv_dot, Cv, g_eta, tau, t = load_data_from_bag("src/smarc_modelling/piml/data/rosbags/rosbag_tank_test", "torch")
+    eta, nu, u_fb, u_cmd, Dv_comp, Mv_dot, Cv, g_eta, tau, t = load_data_from_bag("src/smarc_modelling/piml/data/rosbags/rosbag_tank_normal", "torch")
     init_pose = torch.Tensor.tolist(torch.cat([eta[0], nu[0], u_fb[0]]))
 
     # Initial positions used for flipping coordinate frames later
@@ -76,7 +88,7 @@ if __name__ == "__main__":
     
     # Running the simulators
     print(f" Running white-box simulation...")
-    results_wb = sam_wb.run_sim()
+    results_wb, end_val_wb = sam_wb.run_sim()
     results_wb = torch.tensor(results_wb).T
     eta_wb = results_wb[:, 0:7]
     eta_wb[:, 0] = 2 * x0 - eta_wb[:, 0] # Flipping to NED frame
@@ -85,7 +97,7 @@ if __name__ == "__main__":
     print(f" Done with the white-box sim!")
 
     print(f" Running PINN simulation...")
-    results_pinn = sam_pinn.run_sim()
+    results_pinn, end_val_pinn = sam_pinn.run_sim()
     results_pinn = torch.tensor(results_pinn).T
     eta_pinn = results_pinn[:, 0:7]
     eta_pinn[:, 0] = 2 * x0 - eta_pinn[:, 0] # Flipping to NED frame
@@ -99,6 +111,9 @@ if __name__ == "__main__":
     eta[:, 1] = 2 * y0 - eta[:, 1]
     eta[:, 2] = 2 * z0 - eta[:, 2] 
 
+    end_val = int(np.min([end_val_wb, end_val_pinn]))
+    print(end_val)
+
     # 3D trajectory plot
     if True:
         # Plotting trajectory in 3d
@@ -109,7 +124,7 @@ if __name__ == "__main__":
         for vector, label in zip([eta, eta_wb, eta_pinn], ["Ground Truth", "White-Box", "PINN"]):
             # Plotting trajectory
             vector = np.array(vector)
-            points = vector[:, :3].T
+            points = vector[:end_val, :3].T
             ax.plot(points[0], points[1], points[2], label=label)
 
         # Equal axis scaling
@@ -167,21 +182,21 @@ if __name__ == "__main__":
 
         # Plotting error in eta
         for i in range(6):
-            axes[i].plot(eta_wb_error[:, i], label="White-box")
-            axes[i].plot(eta_pinn_error[:, i], label="PINN")
+            axes[i].plot(eta_wb_error[:end_val, i], label="White-box")
+            axes[i].plot(eta_pinn_error[:end_val, i], label="PINN")
             axes[i].set_title(f"{labels_eta[i]}")
             axes[i].set_xlabel("Timestep")
             axes[i].set_ylabel("Cumulative Error")
             axes[i].legend()
 
         # Plot nu errors (next 6 plots)
-        for i in range(6):
-            axes[i+6].plot(nu_wb_error[:, i], label="White-box")
-            axes[i+6].plot(nu_pinn_error[:, i], label="PINN")
-            axes[i+6].set_title(f"{labels_nu[i]}")
-            axes[i+6].set_xlabel("Timestep")
-            axes[i+6].set_ylabel("Cumulative Error")
-            axes[i+6].legend()
+        for i, j in enumerate([0, 2, 1, 3, 4, 5]):
+            axes[j+6].plot(nu_wb_error[:end_val, i], label="White-box")
+            axes[j+6].plot(nu_pinn_error[:end_val, i], label="PINN")
+            axes[j+6].set_title(f"{labels_nu[i]}")
+            axes[j+6].set_xlabel("Timestep")
+            axes[j+6].set_ylabel("Cumulative Error")
+            axes[j+6].legend()
 
         plt.tight_layout()
 
@@ -200,19 +215,19 @@ if __name__ == "__main__":
 
         # Plotting error in eta
         for i in range(6):
-            axes[i].plot(eta_deg[:, i], label="Ground Truth")
-            axes[i].plot(eta_wb_deg[:, i], label="White-box")
-            axes[i].plot(eta_pinn_deg[:, i], label="PINN")
+            axes[i].plot(eta_deg[:end_val, i], label="Ground Truth")
+            axes[i].plot(eta_wb_deg[:end_val, i], label="White-box")
+            axes[i].plot(eta_pinn_deg[:end_val, i], label="PINN")
             axes[i].set_title(f"{labels_eta[i]}")
             axes[i].set_xlabel("Timestep")
             axes[i].set_ylabel("State")
             axes[i].legend()
 
         # Plot nu errors (next 6 plots)
-        for i in range(6):
-            axes[i+6].plot(nu[:, i], label="Ground Truth")
-            axes[i+6].plot(nu_wb[:, i], label="White-box")
-            axes[i+6].plot(nu_pinn[:, i], label="PINN")
+        for i, j in enumerate([0, 2, 1, 3, 4, 5]):
+            axes[i+6].plot(nu[:end_val, j], label="Ground Truth")
+            axes[i+6].plot(nu_wb[:end_val, j], label="White-box")
+            axes[i+6].plot(nu_pinn[:end_val, j], label="PINN")
             axes[i+6].set_title(f"{labels_nu[i]}")
             axes[i+6].set_xlabel("Timestep")
             axes[i+6].set_ylabel("State")
