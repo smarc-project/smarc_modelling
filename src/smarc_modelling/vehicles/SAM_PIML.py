@@ -59,7 +59,8 @@ import numpy as np
 import math
 from scipy.linalg import block_diag
 from smarc_modelling.lib.gnc import *
-from smarc_modelling.piml.pinn.pinn import init_pinn_model, pinn_predict
+from smarc_modelling.piml.pinn.pinn import init_pinn_model, pinn_predict, init_pinn_model_hybrid, pinn_predict_hybrid
+from smarc_modelling.piml.bpinn.bpinn import init_bpinn_model, bpinn_predict
 
 
 class SolidStructure:
@@ -285,6 +286,14 @@ class SAM_PIML():
             print(f" Physics Informed Neural Network model initialized")
             self.piml_model = init_pinn_model("pinn.pt")
 
+        if self.piml_type == "pinn_hybrid":
+            print(f" Hybrid Physics Informed Neural Network model initialized")
+            self.piml_model = init_pinn_model_hybrid()
+
+        if self.piml_type == "bpinn":
+            print("Bayesian - Physics Informed Neural Network model initialized")
+            self.piml_model = init_bpinn_model("bpinn.pt")
+
         # For white-box
         if piml_type == None:
             self.piml_type = "None"
@@ -357,6 +366,11 @@ class SAM_PIML():
         nu_dot = self.Minv @ (self.tau - np.matmul(self.C,self.nu_r) - np.matmul(self.D,self.nu_r) - self.g_vec)
         u_dot = self.actuator_dynamics(u, u_ref)
         eta_dot = self.eta_dynamics(eta, nu)
+
+        # Bounding the acceleration and speed in y direction NOTE: This might be more of a bad idea than a good one?
+        #nu_dot[2] = np.min([nu_dot[2], 0.01])
+        # eta_dot[1] = np.min([eta_dot[1], 0.01])
+
         x_dot = np.concatenate([eta_dot, nu_dot, u_dot])
 
         return x_dot
@@ -538,6 +552,25 @@ class SAM_PIML():
 
         if self.piml_type == "pinn":
             self.D = pinn_predict(self.piml_model, eta, nu, u)
+
+            # # For debugging to validate that d is psd
+            # D = np.array(self.D)
+            # psd = np.all(np.linalg.eigvals(D)) > 0
+            # if not psd:
+            #     print("Not PSD prediction!!")
+
+        if self.piml_type == "pinn_hybrid":
+            self.D = pinn_predict_hybrid(self.piml_model, eta, nu, u)
+
+        if self.piml_type == "bpinn":
+            self.D = bpinn_predict(self.piml_model, eta, nu, u)
+
+            # For debugging to validate that d is psd
+            D = np.array(self.D)
+            psd = np.all(np.linalg.eigvals(D)) > 0
+            if not psd:
+                print("Not PSD prediction!!")
+
 
     def calculate_g(self):
         """

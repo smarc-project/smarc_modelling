@@ -128,7 +128,6 @@ def load_data_from_bag(data_file: str="", return_type: str=""):
     from smarc_modelling.vehicles.SAM import SAM
 
     # Loading bag
-    print(f" Getting data from ROS bag...")
     time, eta, nu, acc, u_cmd, u_fb = load_rosbag(data_file)
 
     # Transposing data
@@ -145,8 +144,6 @@ def load_data_from_bag(data_file: str="", return_type: str=""):
     Cv = np.zeros_like(nu)
     g_eta = np.zeros_like(nu)
     tau = np.zeros_like(nu)
-
-    print(f" Calculating D(v)v...")
 
     for t in range(len(state_vector)):
 
@@ -173,7 +170,6 @@ def load_data_from_bag(data_file: str="", return_type: str=""):
 
     time = time - time[0] # Setting time to start at 0
 
-    print(f" Data has been loaded and processed!")
     if return_type == "torch": # Return all values as torch tensors
         return(
             torch.tensor(eta, dtype=torch.float32),

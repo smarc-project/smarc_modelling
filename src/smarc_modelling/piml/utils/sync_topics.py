@@ -19,14 +19,15 @@ class SyncSubscriber(Node):
         super().__init__("sync_topics")
 
         # Thruster doesn't actively publish so we just save their latest state
+        # Init it as 0 then save last known state in callback
         self.thrust_vector_msg = ThrusterAngles()
         self.thrust_vector_msg.header.stamp = self.get_clock().now().to_msg()
         self.thrust_vector_msg.thruster_horizontal_radians = 0.0
         self.thrust_vector_msg.thruster_vertical_radians = 0.0
-
-        # Tracking if we have gotten any thruster data
-        self.thruster1_state = False
-        self.thruster2_state = False
+        self.thruster1_cmd_msg = ThrusterRPMStamped()
+        self.thruster1_cmd_msg.rpm = 0
+        self.thruster2_cmd_msg = ThrusterRPMStamped()
+        self.thruster2_cmd_msg.rpm = 0
 
         # Thrusters
         self.thruster1_cmd_sub = self.create_subscription(ThrusterRPMStamped, "/piml/thruster1_cmd", self.thruster1_cmd_cb, 1) 
@@ -65,43 +66,34 @@ class SyncSubscriber(Node):
 
         # Making message
         sync_msg = SynchedData()
+        
+        # Putting the correct velocity data into the odom
+        twist = velo.twist
+        twist_data = TwistWithCovariance()
+        twist_data.twist = twist
+        odom.twist = twist_data
 
-        # Check if we have been given any thruster commands
-        if self.thruster1_state and self.thruster2_state:
+        # Filling with collected data
+        sync_msg.lcg_fb = lcg_fb
+        sync_msg.lcg_cmd = lcg_cmd
+        sync_msg.odom_gt = odom
+        sync_msg.thruster1_fb = thruster1_fb
+        sync_msg.thruster2_fb = thruster2_fb
+        sync_msg.thruster1_cmd = self.thruster1_cmd_msg
+        sync_msg.thruster2_cmd = self.thruster2_cmd_msg
+        sync_msg.thrust_vector_cmd = self.thrust_vector_msg
+        sync_msg.vbs_fb = vbs_fb
+        sync_msg.vbs_cmd = vbs_cmd
 
-            # Putting the correct velocity data into the odom
-            twist = velo.twist
-            twist_data = TwistWithCovariance()
-            twist_data.twist = twist
-            odom.twist = twist_data
-
-            # Filling with collected data
-            sync_msg.lcg_fb = lcg_fb
-            sync_msg.lcg_cmd = lcg_cmd
-            sync_msg.odom_gt = odom
-            sync_msg.thruster1_fb = thruster1_fb
-            sync_msg.thruster2_fb = thruster2_fb
-            sync_msg.thruster1_cmd = self.thruster1_cmd_msg
-            sync_msg.thruster2_cmd = self.thruster2_cmd_msg
-            sync_msg.thrust_vector_cmd = self.thrust_vector_msg
-            sync_msg.vbs_fb = vbs_fb
-            sync_msg.vbs_cmd = vbs_cmd
-
-            # Publish message
-            self.synched_pub.publish(sync_msg)
-            self.get_logger().info("Published synched data!")
+        # Publish message
+        self.synched_pub.publish(sync_msg)
+        self.get_logger().info("Published synched data!")
 
     def thruster1_cmd_cb(self, msg):
         self.thruster1_cmd_msg = msg
-        if not self.thruster1_state:
-            self.get_logger().info("Got first set of thruster 1 controls!")
-            self.thruster1_state = True
 
     def thruster2_cmd_cb(self, msg):
         self.thruster2_cmd_msg = msg
-        if not self.thruster2_state:
-            self.get_logger().info("Got first set of thruster 2 controls!")
-            self.thruster2_state = True
 
     def thrust_vector_cb(self, msg):
         self.thrust_vector_msg = msg
