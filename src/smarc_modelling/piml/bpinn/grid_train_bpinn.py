@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-from smarc_modelling.piml.pinn.pinn import PINN, loss_function
+from smarc_modelling.piml.bpinn.bpinn import BPINN, loss_function
 from smarc_modelling.piml.utils.utility_functions import load_data_from_bag, eta_quat_to_deg
 from smarc_modelling.piml.piml_sim import SIM
 import torch
@@ -95,13 +95,13 @@ if __name__ == "__main__":
         y_trajectories_test.append(y_traj)
 
     # For results
-    error_grid = np.zeros((6, 4, 2))
+    error_grid = np.zeros((5, 4, 5))
     best_error = float("inf")
 
     # Grid params
-    for i, layers in enumerate([5, 6, 8, 10, 15, 20]): # Amount of layers
+    for i, layers in enumerate([5, 8, 12, 15, 20]): # Amount of layers
         for j, size in enumerate([16, 32, 64, 128]): # Amount of neurons in each layer 
-            for k, factor in enumerate([0.9, 0.85]):
+            for k, dropout_rate in enumerate([0.1, 0.2, 0.3, 0.4, 0.5]): # Starting learning rate <-- Changed by the scheduler during training later
 
                 # NN shape
                 shape = [size] * layers # Hidden layers
@@ -109,15 +109,15 @@ if __name__ == "__main__":
                 shape.append(36) # Output layer
                 
                 # Initalize model
-                model = PINN(shape)
+                model = BPINN(shape, dropout_rate)
                 optimizer = torch.optim.Adam(model.parameters(), lr=0.1)
 
                 # Adaptive learning rate
-                scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer=optimizer, mode="min", factor=factor, patience=1000, threshold=100, min_lr=1e-5)
+                scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer=optimizer, mode="min", factor=0.9, patience=500, threshold=0.01, min_lr=1e-5)
 
                 # Early stopping with validation loss
                 best_val_loss = float("inf")
-                patience = 6000
+                patience = 7500
                 counter = 0
                 best_model_state = None
 
@@ -151,7 +151,7 @@ if __name__ == "__main__":
                             # Get PI validation loss
                             val_loss = loss_function(model, x_traj_val, y_traj_val["Dv_comp"], y_traj_val["Mv_dot"], y_traj_val["Cv"], y_traj_val["g_eta"], y_traj_val["tau"], y_traj_val["nu"])
                             val_loss_total += val_loss
-                            
+                        
                     # Handling for early stopping
                     if val_loss_total.item() < best_val_loss:
                         best_val_loss = val_loss_total.item()
@@ -160,18 +160,16 @@ if __name__ == "__main__":
                     else:
                         counter += 1
 
-                    # Print statement to make sure everything is still running
                     if epoch % 500 == 0:
-                        print(f" Still training, epoch {epoch}, loss: {loss_total.item()}, lr: {optimizer.param_groups[0]['lr']},\n validation loss: {val_loss_total.item()}, shape: {layers}, {size}, {factor}")
+                        print(f" Still training, epoch {epoch}, loss: {loss_total.item()}, lr: {optimizer.param_groups[0]['lr']},\n validation loss: {val_loss_total.item()}, shape: {layers}, {size}, {dropout_rate}")
 
-                    # Break condition for early stopping
                     if counter >= patience:
                         print(f" Stopping early due to no improvement after {patience} epochs from epoch: {epoch-counter}")
                         break
                 
                 # Calculating the model error
                 model.load_state_dict(best_model_state) # Loading the best model state
-                torch.save({"model_shape": shape, "state_dict": model.state_dict()}, "src/smarc_modelling/piml/models/pinn.pt") 
+                torch.save({"model_shape": shape, "state_dict": model.state_dict(), "dropout": dropout_rate}, "src/smarc_modelling/piml/models/bpinn.pt") 
                 model.eval() # Just to doubly ensure that it is in eval mode
 
                 total_error = 0.0
@@ -188,7 +186,7 @@ if __name__ == "__main__":
 
                     try: 
                         # Running the SAM simulator to get predicted validation path
-                        sam_pinn = SIM("pinn", x_traj_test[0], y_traj_test["t"], y_traj_test["u_cmd"])
+                        sam_pinn = SIM("bpinn", x_traj_test[0], y_traj_test["t"], y_traj_test["u_cmd"])
                         results, _ = sam_pinn.run_sim()
                         results = torch.tensor(results).T
                         eta_pinn = results[:, 0:7]
@@ -219,21 +217,12 @@ if __name__ == "__main__":
                 # Save the best model for later
                 if total_error < best_error:
                             best_error = total_error
-                            torch.save({"model_shape": shape, "state_dict": model.state_dict()}, "src/smarc_modelling/piml/models/pinn_best_grid.pt")
-                            best_setup = [layers, size, factor]
+                            torch.save({"model_shape": shape, "state_dict": model.state_dict(), "dropout": dropout_rate}, "src/smarc_modelling/piml/models/bpinn_best_grid.pt")
+                            best_setup = [layers, size, dropout_rate]
     
-
+                
     # After going trough the grid getting the smallest loss
     print(f" Best found configuration as: {best_setup}")
     print(f" Training set was: {datasets[:train_val_split]}")
     print(f" Validation set was: {datasets[train_val_split:]}")
 
-
-    # Grid trainer log
-    # 6 - 128 best Jun 6 23:12
-    # 12 - 32 best Jun 8 13:23
-    # 20 - 32 best Jun 8 21:23
-    # New additional data added to training set
-    # 15 - 16 - 0.9 best Jun 13 20:33
-    # Changed to trajectory based training with multiple test cases Jun 23
-    # 4 - 6 - 0.9 best Jun 24 10:46 <-- Model isn't that good but it was able to predict the full bag

@@ -51,8 +51,6 @@ class SIM:
                     once = False
                     end_val = i-10
 
-            data[10, i+1] = 0
-
         return data, end_val
     
     def rk4(self, x, u, dt, fun):
@@ -74,7 +72,7 @@ if __name__ == "__main__":
     print(f" Starting simulator...")
 
     # Loading ground truth data
-    eta, nu, u_fb, u_cmd, Dv_comp, Mv_dot, Cv, g_eta, tau, t = load_data_from_bag("src/smarc_modelling/piml/data/rosbags/rosbag_tank_normal", "torch")
+    eta, nu, u_fb, u_cmd, Dv_comp, Mv_dot, Cv, g_eta, tau, t = load_data_from_bag("src/smarc_modelling/piml/data/rosbags/rosbag_normal", "torch")
     init_pose = torch.Tensor.tolist(torch.cat([eta[0], nu[0], u_fb[0]]))
 
     # Initial positions used for flipping coordinate frames later
@@ -84,7 +82,7 @@ if __name__ == "__main__":
 
     # Setting up model for simulations
     sam_wb = SIM(None, init_pose, t, u_cmd) # White-box sim
-    sam_pinn = SIM("pinn", init_pose, t, u_cmd) # Physics Informed Neural Network sim
+    sam_pinn = SIM("pinn_hybrid", init_pose, t, u_cmd) # Physics Informed Neural Network sim
     
     # Running the simulators
     print(f" Running white-box simulation...")
@@ -108,7 +106,8 @@ if __name__ == "__main__":
     print(f" Done with all sims making plots!")
 
     # Flipping gt into NED frame for plots instead of ENU
-    eta[:, 1] = 2 * y0 - eta[:, 1]
+    eta[:, 0] = 2 * x0 - eta[:, 0]
+    #eta[:, 1] = 2 * y0 - eta[:, 1]
     eta[:, 2] = 2 * z0 - eta[:, 2] 
 
     end_val = int(np.min([end_val_wb, end_val_pinn]))
@@ -156,9 +155,9 @@ if __name__ == "__main__":
     # Cumulative error plots
     if True:
         # Quat to deg
-        eta_deg = np.array([eta_quat_to_deg(eta_vec) for eta_vec in eta])
-        eta_wb_deg = np.array([eta_quat_to_deg(eta_vec) for eta_vec in eta_wb])
-        eta_pinn_deg = np.array([eta_quat_to_deg(eta_vec) for eta_vec in eta_pinn])
+        eta_deg = np.array([eta_quat_to_deg(eta_vec) for eta_vec in eta[:end_val]])
+        eta_wb_deg = np.array([eta_quat_to_deg(eta_vec) for eta_vec in eta_wb[:end_val]])
+        eta_pinn_deg = np.array([eta_quat_to_deg(eta_vec) for eta_vec in eta_pinn[:end_val]])
 
         # Errors WB
         eta_wb_mse = (eta_wb_deg - eta_deg)**2
@@ -203,9 +202,9 @@ if __name__ == "__main__":
     # Plots of each state
     if True:
         # Quat to deg
-        eta_deg = np.array([eta_quat_to_deg(eta_vec) for eta_vec in eta])
-        eta_wb_deg = np.array([eta_quat_to_deg(eta_vec) for eta_vec in eta_wb])
-        eta_pinn_deg = np.array([eta_quat_to_deg(eta_vec) for eta_vec in eta_pinn])
+        eta_deg = np.array([eta_quat_to_deg(eta_vec) for eta_vec in eta[:end_val]])
+        eta_wb_deg = np.array([eta_quat_to_deg(eta_vec) for eta_vec in eta_wb[:end_val]])
+        eta_pinn_deg = np.array([eta_quat_to_deg(eta_vec) for eta_vec in eta_pinn[:end_val]])
 
         fig, axes = plt.subplots(4, 3, figsize=(12, 10))
         axes = axes.flatten()

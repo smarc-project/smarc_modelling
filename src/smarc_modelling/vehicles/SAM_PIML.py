@@ -59,7 +59,8 @@ import numpy as np
 import math
 from scipy.linalg import block_diag
 from smarc_modelling.lib.gnc import *
-from smarc_modelling.piml.pinn.pinn import init_pinn_model, pinn_predict
+from smarc_modelling.piml.pinn.pinn import init_pinn_model, pinn_predict, init_pinn_model_hybrid, pinn_predict_hybrid
+from smarc_modelling.piml.bpinn.bpinn import init_bpinn_model, bpinn_predict
 
 
 class SolidStructure:
@@ -284,6 +285,14 @@ class SAM_PIML():
         if self.piml_type == "pinn":
             print(f" Physics Informed Neural Network model initialized")
             self.piml_model = init_pinn_model("pinn.pt")
+
+        if self.piml_type == "pinn_hybrid":
+            print(f" Hybrid Physics Informed Neural Network model initialized")
+            self.piml_model = init_pinn_model_hybrid()
+
+        if self.piml_type == "bpinn":
+            print("Bayesian - Physics Informed Neural Network model initialized")
+            self.piml_model = init_bpinn_model("bpinn.pt")
 
         # For white-box
         if piml_type == None:
@@ -543,6 +552,25 @@ class SAM_PIML():
 
         if self.piml_type == "pinn":
             self.D = pinn_predict(self.piml_model, eta, nu, u)
+
+            # # For debugging to validate that d is psd
+            # D = np.array(self.D)
+            # psd = np.all(np.linalg.eigvals(D)) > 0
+            # if not psd:
+            #     print("Not PSD prediction!!")
+
+        if self.piml_type == "pinn_hybrid":
+            self.D = pinn_predict_hybrid(self.piml_model, eta, nu, u)
+
+        if self.piml_type == "bpinn":
+            self.D = bpinn_predict(self.piml_model, eta, nu, u)
+
+            # For debugging to validate that d is psd
+            D = np.array(self.D)
+            psd = np.all(np.linalg.eigvals(D)) > 0
+            if not psd:
+                print("Not PSD prediction!!")
+
 
     def calculate_g(self):
         """
