@@ -46,7 +46,7 @@ class NMPC:
 
         return model
     
-    def setup(self, x0):    
+    def setup(self):    
         print("\033[92mNMPC_trajectory setup is running\033[0m")    
         nx = self.model.x.rows()
         nu = self.model.u.rows()
@@ -54,16 +54,16 @@ class NMPC:
         # --------------------------- Cost setup ---------------------------------
         # State weight matrix
         Q_diag = np.ones(nx)
-        Q_diag[ 0:3 ] = 10      # Position
-        Q_diag[ 3:7 ] = 10         # Quaternion
-        Q_diag[ 7:10] = 1       # linear velocity
-        Q_diag[10:13] = 1        # Angular velocity
+        Q_diag[ 0:3 ] = 10      # Position: standard 10
+        Q_diag[ 3:7 ] = 5       # Quaternion: standard 10
+        Q_diag[ 7:10] = 10      # linear velocity: standard 1
+        Q_diag[10:13] = 1       # Angular velocity: standard 1
 
-        # Control weight matrix - Costs set according to Bryson's rule (MPC course)
-        Q_diag[13:15] = 1e-4        # VBS, LCG
-        Q_diag[15:17] = 1/50        # stern_angle, rudder_angle
-        Q_diag[17:  ] = 1e-6        # RPM1 And RPM2
-        Q_diag[13:  ] = Q_diag[13:  ]
+        # Control weight matrix - Costs set according to Bryson's rule
+        Q_diag[13:15] = 1e-4            # VBS, LCG
+        Q_diag[15:17] = 1/50            # stern_angle, rudder_angle
+        Q_diag[17:  ] = 1e-6            # RPM1 And RPM2
+        Q_diag[13:  ] = Q_diag[13:  ]   # Adjustment to control weights
         Q = np.diag(Q_diag)
 
         # Control rate of change weight matrix - control inputs as [x_vbs, x_lcg, delta_s, delta_r, rpm1, rpm2]
@@ -103,7 +103,7 @@ class NMPC:
         rpm_dot = 1000  # Maximum rate of change for rpm
 
         # Declare initial state
-        self.ocp.constraints.x0 = x0
+        self.ocp.constraints.x0 = np.zeros((nx,)) # Initial state is zero. This is set in the sim. for-loop
 
         # Set constraints on the control rate of change
         # self.ocp.constraints.lbu = np.array([-vbs_dot,-lcg_dot, -ds_dot, -dr_dot, -rpm_dot, -rpm_dot])
@@ -118,7 +118,7 @@ class NMPC:
 
         # Set constraints on the control
         x_ubx[0:2] = 100 
-        x_ubx[2:4] = 7
+        x_ubx[2:4] = np.deg2rad(7)
         x_ubx[4: ] = 1500
 
         x_lbx = -x_ubx
@@ -182,6 +182,7 @@ class NMPC:
         q_z = q1[0] * q2[3] + q1[1] * q2[2] - q1[2] * q2[1] + q1[3] * q2[0]
 
         q_error = ca.vertcat(q_w, q_x, q_y, q_z)
+        q_error = ca.if_else(q_w < 0, -q_error, q_error)  # Ensure the quaternion error is positive
 
         pos_error = x[:3] - ref[:3] #+ np.array([(np.random.random()-0.5)/5,(np.random.random()-0.5)/5, (np.random.random()-0.5)/5])
         vel_error = x[7:13] - ref[7:13]
