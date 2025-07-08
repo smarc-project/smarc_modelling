@@ -113,7 +113,7 @@ def main():
     # create ocp object to formulate the OCP
     Ts = 0.1           # Sampling time
     N_horizon = 12      # Prediction horizon
-    nmpc = NMPC(sam, Ts, N_horizon, update_solver_settings=False)
+    nmpc = NMPC(sam, Ts, N_horizon, update_solver_settings=True)
     nx = nmpc.nx        # State vector length + control vector
     nu = nmpc.nu        # Control derivative vector length
     nc = 1
@@ -122,8 +122,8 @@ def main():
     #file_path = "/home/admin/smarc_modelling/src/Trajectories/trajectoryComplexity3.csv"
     #file_path = "/home/admin/smarc_modelling/src/Trajectories/Complexity2Trajectory_0.csv"
     #file_path = "/home/admin/smarc_modelling/src/Trajectories/case_medium_original.csv"
-    file_path = "/home/admin/smarc_modelling/src/Trajectories/REPORT/medium/case_medium.csv"
-    #file_path = "/home/admin/smarc_modelling/src/Trajectories/report_update/easy/trajectories/case_easy0.csv"
+    #file_path = "/home/admin/smarc_modelling/src/Trajectories/REPORT/medium/case_medium.csv"
+    file_path = "/home/admin/smarc_modelling/src/Trajectories/report_update/easy/trajectories/case_easy0.csv"
 
 
     #file_path = "/home/admin/smarc_modelling/src/Trajectories/resolution01.csv"  
@@ -145,7 +145,7 @@ def main():
     trajectory = np.concatenate((trajectory, Uref), axis=1) 
 
     # Run the MPC setup
-    ocp_solver, integrator = nmpc.setup(x0)
+    ocp_solver, integrator = nmpc.setup()
 
     # Initialize the state and control vector as David does
     for stage in range(N_horizon + 1):
