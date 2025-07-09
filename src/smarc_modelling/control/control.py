@@ -8,9 +8,9 @@ class NMPC:
     def __init__(self, casadi_model, Ts, N_horizon, update_solver_settings):
         '''
         Input:
-        casadi_model == Casadi model
-        Ts == Sampling Time
-        N_horizon == control horizon
+            casadi_model: Casadi model
+            Ts: Sampling Interval
+            N_horizon: Prediction horizon
         '''
         self.ocp   = AcadosOcp()
         self.model = self.export_dynamics_model(casadi_model)
@@ -56,13 +56,15 @@ class NMPC:
         # State weight matrix
         Q_diag = np.ones(nx)
         Q_diag[ 0:3 ] = 10      # Position: standard 10
+        Q_diag[  2  ] = 100      # Position: standard 10
         Q_diag[ 3:7 ] = 0       # Quaternion: standard 10
         Q_diag[ 7:10] = 1       # linear velocity: standard 1
         Q_diag[10:13] = 1       # Angular velocity: standard 1
 
         # Control weight matrix - Costs set according to Bryson's rule
         Q_diag[13:15] = 1e-4            # VBS, LCG
-        Q_diag[15:17] = 10              # stern_angle, rudder_angle
+        Q_diag[ 15  ] = 5e3             # stern_angle
+        Q_diag[ 16  ] = 5e3             # rudder_angle
         Q_diag[17:  ] = 1e-6            # RPM1 And RPM2
         Q_diag[13:  ] = Q_diag[13:  ]   # Adjustment to control weights
         Q = np.diag(Q_diag)
@@ -70,9 +72,10 @@ class NMPC:
         # Control rate of change weight matrix - control inputs as [x_vbs, x_lcg, delta_s, delta_r, rpm1, rpm2]
         R_diag = np.ones(nu)
         R_diag[ :2] = 1e-3
-        R_diag[2:4] = 1e0
+        R_diag[2] = 1
+        R_diag[3] = 1e6
         R_diag[4: ] = 1e-5
-        R = np.diag(R_diag)*1e-4
+        R = np.diag(R_diag)*1e-3
 
         # Stage costs
         self.model.p = ca.MX.sym('ref_param', nx+nu,1)
@@ -123,7 +126,7 @@ class NMPC:
         x_ubx[4: ] = 1000
 
         x_lbx = -x_ubx
-        x_lbx[13:15] = 0
+        x_lbx[0:2] = 0
 
         self.ocp.constraints.lbx = x_lbx
         self.ocp.constraints.ubx = x_ubx
@@ -258,7 +261,7 @@ class NMPC:
 
 #         # Control weight matrix - Costs set according to Bryson's rule
 #         Q_diag[13:15] = 1e-4            # VBS, LCG
-#         Q_diag[15:17] = 1/50            # stern_angle, rudder_angle
+#         Q_diag[15:17] = 100            # stern_angle, rudder_angle
 #         Q_diag[17:  ] = 1e-6            # RPM1 And RPM2
 #         Q_diag[13:  ] = Q_diag[13:  ]   # Adjustment to control weights
 #         Q = np.diag(Q_diag)
@@ -316,13 +319,14 @@ class NMPC:
 #         # Set constraints on the control
 #         x_ubx[0:2] = 100 
 #         x_ubx[2:4] = np.deg2rad(7)
-#         x_ubx[4: ] = 1500
+#         x_ubx[4: ] = 1000
 
 #         x_lbx = -x_ubx
-#         x_lbx[13:15] = 0
+#         x_lbx[0:2] = 0
 
 #         # Soft constraints - implemented as https://github.com/acados/acados/blob/main/examples/acados_python/tests/soft_constraint_test.py
-#         rr= 0
+#         # https://github.com/acados/acados/blob/main/docs/problem_formulation/problem_formulation_ocp_mex.pdf
+#         rr= 1
 #         if rr == 1:
 #             self.ocp.constraints.lbx = x_lbx
 #             self.ocp.constraints.ubx = x_ubx
@@ -334,10 +338,10 @@ class NMPC:
 #             self.ocp.constraints.uh = x_ubx
 #             # indices of slacked constraints within h
 #             self.ocp.constraints.idxsh = np.arange(nu)
-#         self.ocp.cost.zl = 20*np.ones((nu,))
-#         self.ocp.cost.Zl = 20*np.ones((nu,))
-#         self.ocp.cost.zu = 20*np.ones((nu,))
-#         self.ocp.cost.Zu = 20*np.ones((nu,))
+#         self.ocp.cost.Zl = 50*np.ones((nu,))
+#         self.ocp.cost.Zu = 50*np.ones((nu,))
+#         self.ocp.cost.zl = 5*np.ones((nu,))
+#         self.ocp.cost.zu = 5*np.ones((nu,))
 
 
 #         # ----------------------- Solver Setup --------------------------
