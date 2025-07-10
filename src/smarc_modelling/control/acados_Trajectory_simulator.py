@@ -113,7 +113,7 @@ def main():
     # create ocp object to formulate the OCP
     Ts = 0.1           # Sampling time
     N_horizon = 12      # Prediction horizon
-    nmpc = NMPC(sam, Ts, N_horizon, update_solver_settings=True)
+    nmpc = NMPC(sam, Ts, N_horizon, update_solver_settings=False)
     nx = nmpc.nx        # State vector length + control vector
     nu = nmpc.nu        # Control derivative vector length
     nc = 1
