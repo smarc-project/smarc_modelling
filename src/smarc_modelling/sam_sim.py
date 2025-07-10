@@ -18,8 +18,8 @@ u0[1] = 45
 x0 = np.concatenate([eta0, nu0, u0])
 
 # Simulation timespan
-dt = 0.01 
-t_span = (0, 30)  # 20 seconds simulation
+dt = 0.01 #0.01 
+t_span = (0, 10)  # 20 seconds simulation
 n_sim = int(t_span[1]/dt)
 t_eval = np.linspace(t_span[0], t_span[1], n_sim)
 
@@ -34,12 +34,23 @@ class Sol():
         self.t = t
         self.y = data
 
+        
+def rk4(x, u, dt, fun):
+    k1 = fun(x, u)
+    k2 = fun(x+dt/2*k1, u)
+    k3 = fun(x+dt/2*k2, u)
+    k4 = fun(x+dt*k3, u)
+
+    x_t = x + dt/6 * (k1 + 2*k2 + 2*k3 + k4)
+
+    return x_t
 
 # FIXME: consider removing the dynamics wrapper and just call the dynamics straight away.
 def run_simulation(t_span, x0, dt, sam):
     """
     Run SAM simulation using solve_ivp.
     """
+
     def dynamics_wrapper(t, x):
         """
         u: control inputs as [x_vbs, x_lcg, delta_s, delta_r, rpm1, rpm2]
@@ -47,11 +58,19 @@ def run_simulation(t_span, x0, dt, sam):
         u = np.zeros(6)
         u[0] = 50#*np.sin((i/(20/0.02))*(3*np.pi/4))        # VBS
         u[1] = 50 # LCG
-        #u[2] = np.deg2rad(7)    # Vertical (stern)
-        u[3] = -np.deg2rad(7)   # Horizontal (rudder)
+        u[2] = np.deg2rad(7)    # Vertical (stern)
+        u[3] = -np.deg2rad(7)   # Horizontal (rudder) - = goes to the left + = goes to the right (looking from behind)
         u[4] = 1000     # RPM 1
         u[5] = u[4]     # RPM 2
         return sam.dynamics(x, u)
+
+    u = np.zeros(6)
+    u[0] = 50#*np.sin((i/(20/0.02))*(3*np.pi/4))        # VBS
+    u[1] = 50 # LCG
+    #u[2] = np.deg2rad(7)    # Vertical (stern)
+    #u[3] = -np.deg2rad(7)   # Horizontal (rudder)
+    u[4] = 1000     # RPM 1
+    u[5] = u[4]     # RPM 2
 
     # Run integration
     print(f" Start simulation")
@@ -65,10 +84,9 @@ def run_simulation(t_span, x0, dt, sam):
     #   and use these to compute eta_dot. This needs to be determined based on the 
     #   performance we see.
     for i in range(n_sim-1):
-        data[:,i+1] = data[:,i] + dynamics_wrapper(i, data[:,i]) * dt #(t_span[1]/n_sim)
+        data[:,i+1] = rk4(data[:,i], u, dt, sam.dynamics)
     sol = Sol(t_eval,data)
     print(f" Simulation complete!")
-    #print(f"data: {data}")
 
     return sol
 
@@ -208,7 +226,8 @@ def plot_trajectory(sol, numDataPoints, generate_gif=False, filename="3d.gif", F
 
 # Run simulation and plot results
 sol = run_simulation(t_span, x0, dt, sam)
-print(f"data: {sol.y[:,-1]}")
-#plot_results(sol)
+
+plot_results(sol)
 plot_trajectory(sol, 50, False, "3d.gif", 10)
 plt.show()
+

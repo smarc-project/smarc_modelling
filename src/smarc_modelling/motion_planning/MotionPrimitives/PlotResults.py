@@ -4,7 +4,7 @@
 
 # angles: get_neigh, curvePrimitives
 import numpy as np
-from smarc_modelling.motion_planning.MotionPrimitives.ObstacleChecker import compute_A_point_forward, compute_B_point_backward
+from smarc_modelling.motion_planning.MotionPrimitives.ObstacleChecker import compute_A_point_forward, compute_B_point_backward, body_to_global_velocity
 from smarc_modelling.vehicles.SAM import SAM 
 import matplotlib
 import matplotlib.pyplot as plt
@@ -21,60 +21,32 @@ def plot_map(map_data, typePlot):
     map_x_max = map_data["x_max"]   #number of column-wise
     map_y_max = map_data["y_max"]   #number of row-wise
     map_z_max = map_data["z_max"]
+    map_x_min = map_data["x_min"]
+    map_y_min = map_data["y_min"]
+    map_z_min = map_data["z_min"]
     obstacles = map_data["obstacleDict"]    #in the grid (row, column and z)
     start_pos = map_data["start_pos"]   #(x,y,z)
     goal_pixel = map_data["goal_pixel"] #(x,y,z)
+    start_area = map_data["start_area"]
     goal_area = map_data["goal_area"]
-    goal_area_front = map_data["goal_area_front"]
     TILESIZE = map_data["TileSize"]
-    (restr_x_min, restr_y_min, restr_z_min), (restr_x_max, restr_y_max, restr_z_max) = map_data["restricted_area"]
 
     # 3D plot setup
     fig = plt.figure(figsize=(12, 12))
     ax = fig.add_subplot(111, projection='3d')
 
     # Plot map as 3D surface 
-    x_grid = np.arange(0, map_x_max, TILESIZE)
-    y_grid = np.arange(0, map_y_max, TILESIZE)
-    z_grid = np.arange(0, map_z_max, TILESIZE)
+    x_grid = np.arange(map_x_min, map_x_max, TILESIZE)
+    y_grid = np.arange(map_y_min, map_y_max, TILESIZE)
+    z_grid = np.arange(map_z_min, map_z_max, TILESIZE)
     xx, yy , zz = np.meshgrid(x_grid, y_grid, z_grid)   # Shape: (numberVertical, numberHorizontal, number3D) == (y,x,z)
 
     # Create color grid for map visualization
     color_grid = np.full_like(xx, "white", dtype=object)    #(rows, columns, z)
     for obs in obstacles:
         color_grid[obs[0], obs[1], obs[2]] = "black"
-    color_grid[int(start_pos[1] // TILESIZE), int(start_pos[0] // TILESIZE), int(start_pos[2] // TILESIZE)] = "green"
-    color_grid[int(goal_pixel[1] // TILESIZE), int(goal_pixel[0] // TILESIZE), int(goal_pixel[2] // TILESIZE)] = "red"
-    #color_grid[int(goal_area_front[0]), int(goal_area_front[1]), int(goal_area_front[2])] = "red"
-    '''
-    if map_data["where"] == "top":
-        color_grid[int(goal_area[0]-1), int(goal_area[1]), int(goal_area[2])] = "red"
-        color_grid[int(goal_area[0]-2), int(goal_area[1]), int(goal_area[2])] = "red"
-        color_grid[int(goal_area[0]+2), int(goal_area[1]), int(goal_area[2])] = "red"
-        color_grid[int(goal_area[0]+1), int(goal_area[1]), int(goal_area[2])] = "red"
-
-    else:
-        color_grid[int(goal_area[0]), int(goal_area[1]-1), int(goal_area[2])] = "red"
-        color_grid[int(goal_area[0]), int(goal_area[1]-2), int(goal_area[2])] = "red"
-        color_grid[int(goal_area[0]), int(goal_area[1]+1), int(goal_area[2])] = "red"
-        color_grid[int(goal_area[0]), int(goal_area[1]+2), int(goal_area[2])] = "red"
-    '''
-    
-    plotRestrictedArea = False
-    if plotRestrictedArea:
-        # Transform restricted area from boundaries to cells
-        restr_c_min_idx = int(restr_x_min // TILESIZE)
-        restr_c_max_idx = int(restr_x_max // TILESIZE)
-        restr_r_min_idx = int(restr_y_min // TILESIZE)
-        restr_r_max_idx = int(restr_y_max // TILESIZE)
-        restr_z_min_idx = int(restr_z_min // TILESIZE)
-        restr_z_max_idx = int(restr_z_max // TILESIZE)
-
-        # Define restricted area in color_grid
-        for k in np.arange(restr_z_min_idx, restr_z_max_idx):  # z-axis
-            for i in np.arange(restr_r_min_idx, restr_r_max_idx):  # row-axis (y)
-                for j in np.arange(restr_c_min_idx, restr_c_max_idx):  # column-axis (x)
-                    color_grid[i, j, k] = "cyan"  # Mark as restricted
+    color_grid[int(start_area[0]), int(start_area[1]), int(start_area[2])] = "green"
+    color_grid[int(goal_area[0]), int(goal_area[1]), int(goal_area[2])] = "red"
 
     # Plot colored tiles from color_grid
     for k in range(color_grid.shape[2]):  # z-axis
@@ -130,13 +102,10 @@ def plot_map(map_data, typePlot):
             ax.view_init(elev=75, azim=90)  # top view
 
     # Set the limits for the axis
-    ax.set_xlim(0, map_x_max)
-    ax.set_ylim(0, map_y_max)
-    ax.set_zlim(0, map_z_max)
-    ax.set_xlim(0, map_x_max)
-    ax.set_ylim(0, map_y_max)
-    ax.set_zlim(0, map_z_max)
-    ax.set_box_aspect([map_x_max, map_y_max, map_z_max])
+    ax.set_xlim(map_x_min, map_x_max)
+    ax.set_ylim(map_y_min, map_y_max)
+    ax.set_zlim(map_z_min, map_z_max)
+    ax.set_box_aspect([np.abs(map_x_min) + np.abs(map_x_max), np.abs(map_y_min) + np.abs(map_y_max), np.abs(map_z_min) + np.abs(map_z_max)])
 
     # return the plot setup
     return (ax, plt, fig)
@@ -145,39 +114,10 @@ def update(frame, ax, plt, trajectory):
 
     # Get the current state
     vertex = trajectory[frame]
-    colorr = frame / len(trajectory)  # Normalize color based on frame
+    colorr = frame / (len(trajectory))  # Normalize color based on frame
 
     # Draw torpedo
     draw_torpedo(ax, vertex, colorr)
-
-def load_trajectory_from_csv(filename):
-    """
-    Reads trajectory data from a CSV file and returns it as a list of states.
-
-    Args:
-        filename (str): The path to the CSV file.
-
-    Returns:
-        list: A list of states, where each state is a list or tuple of the values
-              from a row in the CSV.
-    """
-    trajectory = []
-    with open(filename, 'r') as csvfile:
-        reader = csv.reader(csvfile)
-        # Skip the header row if it exists (optional)
-        header = next(reader, None)
-        if header:
-            print(f"Header row: {header}")
-        for row in reader:
-            # Convert the string values to appropriate data types (e.g., float, int)
-            # Assuming your states are numerical, you'll likely need to convert.
-            try:
-                state = [float(value) for value in row]
-            except ValueError:
-                print(f"Warning: Could not convert row to numbers: {row}. Skipping.")
-                continue
-            trajectory.append(state)
-    return trajectory
 
 def draw_torpedo(ax, vertex, colorr, length=1.5, radius=0.095, resolution=20):
     """
@@ -246,3 +186,72 @@ def draw_torpedo(ax, vertex, colorr, length=1.5, radius=0.095, resolution=20):
     # Plot surfaces (cylinder and cap)
     ax.plot_surface(x_cyl, y_cyl, z_cyl, color='y', alpha=colorr)
     ax.plot_surface(x_cap_rear, y_cap_rear, z_cap_rear, color='k', alpha=colorr)
+
+    # Draw the velocity vector
+    
+    pointA = compute_A_point_forward(vertex)
+    globalV = body_to_global_velocity((q0, q1, q2, q3), vertex[7:10])
+    vx, vy, vz = globalV
+    velocity_vector = np.array([vx, vy, vz])
+    velocity_vector_norm = np.linalg.norm(velocity_vector)
+    v_CG_inertial = np.array([globalV[0], globalV[1], globalV[2]])        # Linear velocity of CG in inertial frame
+    rr, ww, vv = vertex[10:13]
+    omega_body = np.array([rr, ww, vv])              # Angular velocity in body frame
+    r_fwd_body = np.array([0.655, 0, 0])           # Position of forward point relative to CG in body frame
+    # Ensure quaternion is in (x, y, z, w) format for scipy
+    rotation = R.from_quat([q1, q2, q3, q0])
+    R_b2i = rotation.as_matrix()  # Body to inertial rotation matrix
+    # Compute cross product in body frame
+    v_relative_body = np.cross(omega_body, r_fwd_body)
+    # Rotate to inertial frame
+    v_relative_inertial = R_b2i @ v_relative_body
+    # Add to CG velocity
+    v_fwd_inertial = v_CG_inertial + v_relative_inertial
+    ax.quiver(vertex[0], vertex[1], vertex[2], vx, vy, vz, color='b', length=velocity_vector_norm, normalize=True)
+
+def draw_map_and_toredo(map_instance, trajectory):
+    ax, plt, fig = plot_map(map_instance, "top") # this is the one were the primitives are plotted
+    ind = 0
+    for vertex in trajectory:
+
+        # Print the velocity for each vertex in the trajectory
+        q0, q1, q2, q3 = vertex[3:7]
+        globalV = body_to_global_velocity((q0, q1, q2, q3), vertex[7:10])
+        print(f"Velocity {ind:.0f} = {np.linalg.norm(globalV): .2f} m/s")
+
+        # Draw torpedo in the two created plots
+        norm_index = (ind / len(trajectory)) 
+        draw_torpedo(ax, vertex, norm_index)
+
+        ind += 1
+    
+    # Show the results
+    plt.show()
+
+def plot_waypoints(res_list, col, mark):
+    # Convert the list to a numpy array for easier indexing
+    res_array = np.array(res_list)
+    fig = plt.figure(figsize=(8, 8))
+    ax = fig.add_subplot(111, projection='3d')
+    # Extract x, y, and z coordinates
+    #print("array_size=", res_array.shape)
+    x_coords = res_array[:, 0]
+    y_coords = res_array[:, 1]
+    z_coords = res_array[:, 2]
+
+    # Create a new figure for the waypoints
+    #fig = plt.figure(figsize=(8, 8))
+    #ax = fig.add_subplot(111, projection='3d')
+
+    # Plot the waypoints as connected points
+    ax.plot(x_coords, y_coords, z_coords, marker=mark, linestyle='-', color=col, label="Waypoints")
+    #ax.scatter(x_coords, y_coords, z_coords, color='r', marker='o', label="Waypoint Positions")
+
+    # Add labels and title
+    ax.set_title("Interpolated Waypoints")
+    ax.set_xlabel("X")
+    ax.set_ylabel("Y")
+    ax.set_zlabel("Z")
+    ax.legend()
+
+    plt.show()

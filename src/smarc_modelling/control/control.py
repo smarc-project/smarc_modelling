@@ -1,7 +1,12 @@
 # Script for the acados NMPC model
-from acados_template import AcadosOcp, AcadosOcpSolver, AcadosSimSolver, AcadosModel
+
+import os
+
+from acados_template import AcadosOcp, AcadosOcpSolver, AcadosSimSolver, AcadosModel, AcadosSim
 import numpy as np
 import casadi as ca
+
+
 
 #The original NMPC class. Uses hard constraints.
 class NMPC:
@@ -21,6 +26,15 @@ class NMPC:
         self.Tf    = Ts*N_horizon
         self.N_horizon = N_horizon
         self.update_solver = update_solver_settings
+        # ----------- Unknown stuff coming from merge --------------
+        self.build = build          
+        self.acados_dir = acados_dir
+
+        # TODO: Add a acadso sim object for the integration
+        # Then you can hopefully specify the build path!
+        self.sim = AcadosSim()
+        self.sim.model = self.model
+        # --------------- end of unknown stuff -------------------
         
     # Function to create a Acados model from the casadi model
     def export_dynamics_model(self, casadi_model):
@@ -144,12 +158,18 @@ class NMPC:
         self.ocp.solver_options.sim_method_newton_iter = 2 #3 default
 
         self.ocp.solver_options.nlp_solver_type = 'SQP_RTI'
-        self.ocp.solver_options.nlp_solver_max_iter = 80
+        self.ocp.solver_options.nlp_solver_max_iter = 1 #80
         self.ocp.solver_options.tol    = 1e-6       # NLP tolerance. 1e-6 is default for tolerances
         self.ocp.solver_options.qp_tol = 1e-6       # QP tolerance
 
         self.ocp.solver_options.globalization = 'MERIT_BACKTRACKING'
         self.ocp.solver_options.regularize_method = 'NO_REGULARIZE'
+
+        #solver_json = 'acados_ocp_' + self.model.name + '.json'
+        #acados_ocp_solver = AcadosOcpSolver(self.ocp, json_file = solver_json)
+
+        ## create an integrator with the same settings as used in the OCP solver.
+        #acados_integrator = AcadosSimSolver(self.ocp, json_file = solver_json)
 
         solver_json = 'acados_ocp_' + self.model.name + '.json'
         if self.update_solver == False:
