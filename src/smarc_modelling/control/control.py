@@ -27,13 +27,13 @@ class NMPC:
         self.N_horizon = N_horizon
         self.update_solver = update_solver_settings
         # ----------- Unknown stuff coming from merge --------------
-        self.build = build          
-        self.acados_dir = acados_dir
+        # self.build = build          
+        # self.acados_dir = acados_dir
 
-        # TODO: Add a acadso sim object for the integration
-        # Then you can hopefully specify the build path!
-        self.sim = AcadosSim()
-        self.sim.model = self.model
+        # # TODO: Add a acadso sim object for the integration
+        # # Then you can hopefully specify the build path!
+        # self.sim = AcadosSim()
+        # self.sim.model = self.model
         # --------------- end of unknown stuff -------------------
         
     # Function to create a Acados model from the casadi model

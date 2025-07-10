@@ -116,7 +116,6 @@ def main():
     nmpc = NMPC(sam, Ts, N_horizon, update_solver_settings=False)
     nx = nmpc.nx        # State vector length + control vector
     nu = nmpc.nu        # Control derivative vector length
-    nc = 1
     
     # load trajectory - Replace with your actual file path
     #file_path = "/home/admin/smarc_modelling/src/Trajectories/trajectoryComplexity3.csv"
