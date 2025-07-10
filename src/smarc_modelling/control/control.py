@@ -55,17 +55,17 @@ class NMPC:
         # --------------------------- Cost setup ---------------------------------
         # State weight matrix
         Q_diag = np.ones(nx)
-        Q_diag[ 0:3 ] = 10      # Position: standard 10
-        Q_diag[  2  ] = 100      # Position: standard 10
-        Q_diag[ 3:7 ] = 0       # Quaternion: standard 10
-        Q_diag[ 7:10] = 1       # linear velocity: standard 1
+        Q_diag[ 0:3 ] = 10      # Position:         standard 10
+        Q_diag[  2  ] = 100     # Position:         standard 10
+        Q_diag[ 3:7 ] = 0       # Quaternion:       standard 10
+        Q_diag[ 7:10] = 1       # linear velocity:  standard 1
         Q_diag[10:13] = 1       # Angular velocity: standard 1
 
         # Control weight matrix - Costs set according to Bryson's rule
-        Q_diag[13:15] = 1e-4            # VBS, LCG
-        Q_diag[ 15  ] = 5e3             # stern_angle
-        Q_diag[ 16  ] = 5e3             # rudder_angle
-        Q_diag[17:  ] = 1e-6            # RPM1 And RPM2
+        Q_diag[13:15] = 1e-4            # VBS, LCG:      Standard: 1e-4
+        Q_diag[ 15  ] = 5e3             # stern_angle:   Standard: 100
+        Q_diag[ 16  ] = 5e3             # rudder_angle:  Standard: 100
+        Q_diag[17:  ] = 1e-6            # RPM1 And RPM2: Standard: 1e-6
         Q_diag[13:  ] = Q_diag[13:  ]   # Adjustment to control weights
         Q = np.diag(Q_diag)
 
@@ -200,8 +200,6 @@ class NMPC:
             x_error = ca.vertcat(pos_error, q_error, vel_error, u_error, u) #delta_u(u))
         return x_error
     
-
-
 # # NMPC class that uses soft constraints
 # class NMPC:
 #     def __init__(self, casadi_model, Ts, N_horizon, update_solver_settings):
