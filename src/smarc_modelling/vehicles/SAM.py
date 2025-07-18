@@ -357,6 +357,8 @@ class SAM():
 
         np.set_printoptions(precision=3)
 
+        np.set_printoptions(precision=3)
+
         nu_dot = self.Minv @ (self.tau - np.matmul(self.C,self.nu_r) - np.matmul(self.D,self.nu_r) - self.g_vec)
         u_dot = self.actuator_dynamics(u, u_ref)
         eta_dot = self.eta_dynamics(eta, nu)
