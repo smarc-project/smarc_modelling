@@ -108,8 +108,8 @@ class VariableBuoyancySystem:
         # Motion bounds
         self.x_vbs_min = 0  # Minimum VBS position (m)
         self.x_vbs_max = l_vbs_l  # Maximum VBS position (m)
-        self.x_vbs_dot_min = -10  # Maximum retraction speed (m/s)
-        self.x_vbs_dot_max = 10 # FIXME: This is an estimate. Need to adjust, since the speed is given in mm/s, but we control on percentages right now. Maximum extension speed (m/s)
+        self.x_vbs_dot_min = -7  # Maximum retraction speed (m/s)
+        self.x_vbs_dot_max = 7 # FIXME: This is an estimate. Need to adjust, since the speed is given in mm/s, but we control on percentages right now. Maximum extension speed (m/s)
 
 
 class LongitudinalCenterOfGravityControl:
@@ -182,6 +182,13 @@ class SAM():
             beta_current=0,
     ):
         self.dt = dt # Sim time step, necessary for evaluation of the actuator dynamics
+        
+        # Some factors to make sim agree with real life data, these are eyeballed from sim vs gt data
+        self.vbs_factor = 0.5 # How sensitive the vbs is
+        self.inertia_factor = 10 # Adjust how quickly we can change direction
+        self.damping_factor = 60 # Adjust how much the damping affect acceleration high number = move less
+        self.damping_rot = 5 # Adjust how much the damping affects the rotation high number = less rotation should be tuned on bag where we turn without any control inputs
+        self.thruster_rot_strength = 2  # Just making the thruster a bit stronger for rotation
 
         # Constants
         self.p_OC_O = np.array([-0.75, 0, 0.06], float)  # Measurement frame C in CO (O)
@@ -243,7 +250,8 @@ class SAM():
         self.k_prime = pow(e, 4) * (beta_0 - alpha_0) / (
                 (2 - e ** 2) * (2 * e ** 2 - (2 - e ** 2) * (beta_0 - alpha_0)))
 
-        # Weight and buoyancy
+        # Weight and buoyancy 
+        # NOTE: SAM is initialized with the VBS half filled alread.
         self.W = self.m * self.g
         self.B = self.W 
 
@@ -339,7 +347,13 @@ class SAM():
         self.calculate_C()
         self.calculate_D()
         self.calculate_g()
-        self.calculate_tau(u)
+        self.calculate_tau(u_ref)
+
+        # Overwrite D to get better results from sim
+        self.D = np.eye(6) * self.damping_factor
+        self.D[3,3] = self.damping_rot
+        self.D[4,4] = self.damping_rot
+        self.D[5,5] = self.damping_rot
 
         np.set_printoptions(precision=3)
 
@@ -461,6 +475,7 @@ class SAM():
         J_lcg_co = J_lcg_cg - self.lcg.m_lcg * S2_r_lcg_cg
 
         self.J_total = J_ss_co + J_vbs_co + J_lcg_co
+        self.J_total[0, 0] *= self.inertia_factor
 
     def calculate_M(self):
         """
@@ -575,8 +590,8 @@ class SAM():
         u: control inputs as [x_vbs, x_lcg, delta_s, delta_r, rpm1, rpm2]
         Azimuth Thrusters: Fossen 2021, ch.9.4.2
         """
-        delta_s = u[2]
-        delta_r = u[3]
+        delta_s = -u[2]
+        delta_r = -u[3]
         n_rpm = u[4:]
 
         # Compute propeller forces
@@ -595,11 +610,13 @@ class SAM():
                 K_prop_i = self.rho * (self.D_prop**5) * (
                         self.KQ_0 * abs(n_rps[i]) * n_rps[i] +
                         (self.KQ_max-self.KQ_0)/self.Ja_max * (Va/self.D_prop) * abs(n_rps[i]))
+                dir_flip = 1
             else:
                 X_prop_i = self.rho * (self.D_prop ** 4) * (
                         self.KT_0*abs(n_rps[i])*n_rps[i]
                         )/10
                 K_prop_i = self.rho * (self.D_prop ** 5) * self.KQ_0 * abs(n_rps[i]) * n_rps[i] / 10
+                dir_flip = -1
 
             F_prop_b = C_T2C @ np.array([X_prop_i, 0, 0])
             r_prop_i = C_T2C @ self.propellers.r_t_p_sh[i] - self.p_OC_O
@@ -607,6 +624,18 @@ class SAM():
                         + np.array([(-1)**i * K_prop_i, 0, 0])  # the -1 is because we have counter rotating
                                     # propellers that are supposed to cancel out the propeller induced
                                     # momentum
+
+            # Rescale the rotation from props
+            M_prop_i[0] *= self.thruster_rot_strength # Yaw
+            M_prop_i[1] *= self.thruster_rot_strength * dir_flip # Pitch
+            M_prop_i[2] *= self.thruster_rot_strength # Roll
+
+            # Above equation return yaw, roll, pitch in other order than what the model uses
+            yaw = M_prop_i[0]
+            roll = M_prop_i[2]
+            M_prop_i[2] = yaw
+            M_prop_i[0] = roll
+
             tau_prop_i = np.concatenate([F_prop_b, M_prop_i])
             tau_prop += tau_prop_i
 
@@ -686,3 +715,9 @@ class SAM():
             u_dot[1] = self.lcg.x_lcg_dot_max * np.sign(u_dot[1])
 
         return u_dot
+
+    def update_dt(self, dt):
+        """
+        Updates dt for when doing simulations
+        """
+        self.dt = dt

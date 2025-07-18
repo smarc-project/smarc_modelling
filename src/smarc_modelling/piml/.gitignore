@@ -1,0 +1,4 @@
+# Ignore data and models folder
+/models
+/data
+**/__pycache__
