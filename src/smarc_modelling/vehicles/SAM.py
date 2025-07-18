@@ -217,17 +217,25 @@ class SAM():
         self.a = self.L / 2  # semi-axes
         self.b = self.diam / 2
 
-        self.p_OG_O = np.array([0., 0, 0.12], float)  # CG w.r.t. to the CO, we
-                                                        # recalculate that in calculate_cg
-        self.p_OB_O = np.array([0., 0, 0], float)  # CB w.r.t. to the CO
 
         # Rigid-body mass matrix expressed in CO
+        u_init = np.zeros(6)
+        u_init[0] = 50
+        u_init[1] = 50 #45
+        self.x_vbs_init = self.calculate_vbs_position(u_init)
+        # Update actuators
+        self.x_vbs = self.calculate_vbs_position(u_init) 
+        self.p_OLcg_O = self.calculate_lcg_position(u_init)
+        self.vbs.m_vbs = self.rho_w * np.pi * self.vbs.r_vbs ** 2 * self.x_vbs_init
         self.m = self.ss.m_ss + self.vbs.m_vbs + self.lcg.m_lcg
         self.J_total = np.zeros((3,3)) 
         self.MRB = np.zeros((6,6)) 
         self.MA = np.zeros((6,6)) 
         self.M = np.zeros((6,6)) 
         self.Minv = np.zeros((6,6)) 
+
+        self.p_OG_O = np.array([0., 0, 0.12], float)  # CG w.r.t. to the CO, we
+        self.p_OB_O = np.array([0., 0, 0], float)  # CB w.r.t. to the CO
 
         # Added moment of inertia in roll: A44 = r44 * Ix
         self.r44 = 0.3
@@ -242,9 +250,10 @@ class SAM():
         self.k_prime = pow(e, 4) * (beta_0 - alpha_0) / (
                 (2 - e ** 2) * (2 * e ** 2 - (2 - e ** 2) * (beta_0 - alpha_0)))
 
-        # Weight and buoyancy
+        # Weight and buoyancy 
+        # NOTE: SAM is initialized with the VBS half filled alread.
         self.W = self.m * self.g
-        self.B = self.W + self.vbs.m_vbs*0.5
+        self.B = self.W 
 
         # Damping matrix based on Bhat 2021
         # Parameters from smarc_advanced_controllers mpc_inverted_pendulum...
@@ -346,6 +355,10 @@ class SAM():
         self.D[4,4] = self.damping_rot
         self.D[5,5] = self.damping_rot
 
+        np.set_printoptions(precision=3)
+
+        np.set_printoptions(precision=3)
+
         nu_dot = self.Minv @ (self.tau - np.matmul(self.C,self.nu_r) - np.matmul(self.D,self.nu_r) - self.g_vec)
         u_dot = self.actuator_dynamics(u, u_ref)
         eta_dot = self.eta_dynamics(eta, nu)
@@ -421,6 +434,8 @@ class SAM():
                     + (self.vbs.m_vbs/self.m) * self.vbs.p_OVbs_O \
                     + (self.lcg.m_lcg/self.m) * self.p_OLcg_O
 
+        #print(f"OG_O: {self.p_OG_O}")
+
     def update_inertias(self):
         """
         Update inertias based on VBS and LCG
@@ -474,6 +489,8 @@ class SAM():
 
         # Rigid-body mass matrix with total inertia in CO
         MRB_CO = block_diag(m_diag, self.J_total)
+        # FIXME: Add the off diagonal elements that come from the difference
+        # between the CO and the CG.
         self.MRB = MRB_CO
 
         # Added moment of inertia in roll: A44 = r44 * Ix
@@ -490,6 +507,10 @@ class SAM():
         # Mass matrix including added mass
         self.M = self.MRB + self.MA
         self.Minv = np.linalg.inv(self.M)
+        #print(f"MRB: {MRB_check}, MA: {self.MA}, M: {self.M}")
+        #print(f"MRB:\n {np.sign(self.MRB)}")
+        #print(f"MA:\n {np.sign(self.MA)}")
+        #print(f"M:\n {np.sign(self.M)}")
 
     def calculate_C(self):
         """
@@ -498,7 +519,23 @@ class SAM():
         CRB = m2c(self.MRB, self.nu_r)
         CA = m2c(self.MA, self.nu_r)
 
+        # Fossen set these to 0 in his remus100 sim.
+        # But they cancel certain influences that maybe should be there for
+        # symmetry.
+        #CA[4, 0] = 0
+        #CA[0, 4] = 0
+        #CA[4, 2] = 0
+        #CA[2, 4] = 0
+        #CA[5, 0] = 0
+        #CA[0, 5] = 0
+        #CA[5, 1] = 0
+        #CA[1, 5] = 0
+
         self.C = CRB + CA
+
+        #print(f"nu_r:\n {self.nu_r}")
+        #print(f"CRB: \n {np.sign(CRB)}")
+        #print(f"CA: \n {np.sign(CA)}")
 
     def calculate_D(self):
         """
@@ -512,13 +549,20 @@ class SAM():
         self.D[4,4] = self.Mqq * np.abs(self.nu_r[4])
         self.D[5,5] = self.Nrr * np.abs(self.nu_r[5])
 
-        # Cross couplings
+        # Cross couplings from Bhat 2021
+        # NOTE: Fossen encapsulates this in the hydrodynamic parameters,
+        # similar to Bhat 2021, eq. 26. We can follow this for full symmetry of
+        # D and make use of the symmetry of the AUV to set different elements
+        # to 0
         self.D[4,0] = self.z_cp * self.Xuu * np.abs(self.nu_r[0])
         self.D[5,0] = -self.y_cp * self.Xuu * np.abs(self.nu_r[0])
         self.D[3,1] = -self.z_cp * self.Yvv * np.abs(self.nu_r[1])
         self.D[5,1] = self.x_cp * self.Yvv * np.abs(self.nu_r[1])
         self.D[3,2] = self.y_cp * self.Zww * np.abs(self.nu_r[2])
         self.D[4,2] = -self.x_cp * self.Zww * np.abs(self.nu_r[2])
+
+        #print(f"D: {self.D}")
+        #print(f"D:\n {np.sign(self.D)}")
 
     def calculate_g(self):
         """
