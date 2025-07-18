@@ -2,23 +2,12 @@
 # -*- coding: utf-8 -*-
 
 """
-SAM.py:
+BlueROV.py:
 
-   Class for the SAM (Small and Affordable Maritime) cylinder-shaped autonomous underwater vehicle (AUV),
-   designed for agile hydrobatic maneuvers, including obstacle avoidance, inspections, docking, and under-ice operations.
-   The SAM AUV is controlled using counter-rotating propellers, a thrust vectoring system, a variable buoyancy system (VBS),
-   and adjustable battery packs for center of gravity (c.g.) control. It is equipped with sensors such as IMU, DVL, GPS, and sonar.
-
-   The length of the AUV is 1.5 m, the cylinder diameter is 19 cm, and the mass of the vehicle is 17 kg.
-   It has a maximum speed of 2.5 m/s, which is obtained when the propellers run at 1525 rpm in zero currents.
-   SAM was developed by the Swedish Maritime Robotics Center and is underactuated, meaning it has fewer control inputs than
-   degrees of freedom. The control system uses both static and dynamic actuation for different maneuvers.
+   Class for the BlueROV 
 
    Actuator systems:
-   1. **Counter-Rotating Propellers**: Two propellers used for propulsion, rotating in opposite directions to balance the roll and provide forward thrust.
-   2. **Thrust Vectoring System**: Propellers can be deflected horizontally (rudder-like) and vertically (stern-plane-like) with angles up to ±7°, enabling agile maneuvers.
-   3. **Variable Buoyancy System (VBS)**: Allows for depth control by altering buoyancy through water intake and release.
-   4. **Adjustable Center of Gravity (c.g.) Control**: Movable battery packs adjust the longitudinal and transversal c.g. positions, allowing for pitch and roll control.
+    8 thrusters in the heavy configuration to allow 6DoF motions.
 
    Sensor systems:
    - **IMU**: Inertial Measurement Unit for attitude and acceleration.
@@ -26,8 +15,8 @@ SAM.py:
    - **GPS**: For surface position tracking.
    - **Sonar**: For environment sensing during navigation and inspections.
 
-   SAM()
-       Step input for tail rudder, stern plane, and propeller revolutions.
+   BlueROV()
+       Step input for force and torque control input
 
 Methods:
 
@@ -35,12 +24,6 @@ Methods:
 
     u_ref: control inputs as [x_vbs, x_lcg, delta_s, delta_r, rpm1, rpm2]
 
-        - **vbs**: Variable buoyancy system control, which adjusts buoyancy to control depth.
-        - **lcg**: Longitudinal center of gravity adjustment by moving the battery pack to control pitch.
-        - **delta_s**: Stern plane angle for vertical thrust vectoring, used to control pitch (nose up/down).
-        - **delta_r**: Rudder angle for horizontal thrust vectoring, used to control yaw (turning left/right).
-        - **rpm_1**: Propeller RPM for the first (counter-rotating) propeller, controlling forward thrust.
-        - **rpm_2**: Propeller RPM for the second (counter-rotating) propeller, also controlling forward thrust and balancing roll.
 
 References:
 
@@ -50,9 +33,7 @@ References:
     T. I. Fossen (2021). Handbook of Marine Craft Hydrodynamics and Motion Control. 2nd Edition, Wiley.
         URL: www.fossen.biz/wiley
 
-Author:     Omid Mirzaeedodangeh
-
-Refactored: David Doerner
+Author:     David Doerner
 """
 
 import numpy as np
