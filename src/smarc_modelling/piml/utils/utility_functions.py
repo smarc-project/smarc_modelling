@@ -144,6 +144,7 @@ def load_data_from_bag(data_file: str="", return_type: str=""):
     Cv = np.zeros_like(nu)
     g_eta = np.zeros_like(nu)
     tau = np.zeros_like(nu)
+    M = []
 
     for t in range(len(state_vector)):
 
@@ -167,6 +168,7 @@ def load_data_from_bag(data_file: str="", return_type: str=""):
         Cv[t] = sam.C @ nu[t]
         g_eta[t] = sam.g_vec
         tau[t] = sam.tau
+        M.append(sam.M)
 
     time = time - time[0] # Setting time to start at 0
 
@@ -181,7 +183,8 @@ def load_data_from_bag(data_file: str="", return_type: str=""):
             torch.tensor(Cv, dtype=torch.float32),
             torch.tensor(g_eta, dtype=torch.float32),
             torch.tensor(tau, dtype=torch.float32),
-            torch.tensor(time, dtype=torch.float32)
+            torch.tensor(time, dtype=torch.float32),
+            torch.tensor(M, dtype=torch.float32)
         )
     else: # Return all values as numpy matrices
         return(
@@ -194,7 +197,8 @@ def load_data_from_bag(data_file: str="", return_type: str=""):
             Cv,
             g_eta,
             tau,
-            time
+            time,
+            M
         )
     
 

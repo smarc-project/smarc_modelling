@@ -121,6 +121,7 @@ class AddTimestamp(Node):
 
     def add_stamp_velo(self, msg):
         msg_stamped = TwistStamped()
+        # The lookup frame is either sam_mocap/base_link or sam_mocap2/base_link dependent on the bag
         transform = self.tf_buffer.lookup_transform("sam_mocap2/base_link", "mocap", rclpy.time.Time(), timeout=rclpy.duration.Duration(seconds=0.5))
         msg_twist = msg.twist
         msg_stamped.twist = do_transform_twist(msg_twist, transform)

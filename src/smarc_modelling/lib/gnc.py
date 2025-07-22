@@ -253,10 +253,13 @@ def quaternion_to_dcm(q):
         numpy array: 3x3 Direction Cosine Matrix (DCM)
     """
 
-    #rot = R.from_quat(q, scalar_first=True)
+    # "Normal" version
+    rot = R.from_quat(q, scalar_first=True)
     
-    q_scalar_first = np.roll(q, 1)
-    rot = R.from_quat(q_scalar_first)
+    # For jetson
+    #q_scalar_first = np.roll(q, 1)
+    #rot = R.from_quat(q_scalar_first)
+
     dcm = rot.as_matrix()
 
     return dcm

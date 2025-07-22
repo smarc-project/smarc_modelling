@@ -284,7 +284,7 @@ class SAM_PIML():
 
         if self.piml_type == "pinn":
             print(f" Physics Informed Neural Network model initialized")
-            self.piml_model = init_pinn_model("pinn.pt")
+            self.piml_model, self.x_mean, self.x_std = init_pinn_model("pinn.pt")
 
         if self.piml_type == "pinn_hybrid":
             print(f" Hybrid Physics Informed Neural Network model initialized")
@@ -366,10 +366,6 @@ class SAM_PIML():
         nu_dot = self.Minv @ (self.tau - np.matmul(self.C,self.nu_r) - np.matmul(self.D,self.nu_r) - self.g_vec)
         u_dot = self.actuator_dynamics(u, u_ref)
         eta_dot = self.eta_dynamics(eta, nu)
-
-        # Bounding the acceleration and speed in y direction NOTE: This might be more of a bad idea than a good one?
-        #nu_dot[2] = np.min([nu_dot[2], 0.01])
-        # eta_dot[1] = np.min([eta_dot[1], 0.01])
 
         x_dot = np.concatenate([eta_dot, nu_dot, u_dot])
 
@@ -551,7 +547,7 @@ class SAM_PIML():
             self.D[5,5] = self.damping_rot
 
         if self.piml_type == "pinn":
-            self.D = pinn_predict(self.piml_model, eta, nu, u)
+            self.D = pinn_predict(self.piml_model, eta, nu, u, [self.x_mean, self.x_std])
 
             # # For debugging to validate that d is psd
             # D = np.array(self.D)

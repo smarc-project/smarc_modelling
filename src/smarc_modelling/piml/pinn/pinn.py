@@ -12,8 +12,8 @@ import scienceplots # For fancy plotting
 
 test_datasets = ["test_1", "test_2", "test_3", "test_4", "test_5", "test_6", "test_7", "test_8"]
 
-datasets = ["rosbag_1", "rosbag_2", "rosbag_3", "rosbag_4", "rosbag_5", "rosbag_6", 
-                  "rosbag_7", "rosbag_8", "rosbag_9", "rosbag_10", "rosbag_11", "rosbag_12"]
+datasets = ["rosbag_16", "rosbag_15", "rosbag_14", "rosbag_13", "rosbag_12", "rosbag_1", "rosbag_2", "rosbag_3", "rosbag_4", "rosbag_5", "rosbag_6", 
+            "rosbag_7", "rosbag_8", "rosbag_9", "rosbag_10", "rosbag_11"]
 
 class PINN(nn.Module):
 
@@ -38,38 +38,137 @@ class PINN(nn.Module):
         for i in range(1, len(layer_sizes) - 2):
             self.layers.append(nn.Linear(layer_sizes[i], layer_sizes[i+1]))
         
+        # Activation function
+        self.activation = nn.Tanh()
+
         # Creating output layer
-        self.layers.append(nn.Linear(layer_sizes[-2], layer_sizes[-1]))
+        self.output_layer = nn.Linear(layer_sizes[-2], layer_sizes[-1])
+
+        # Scaling layer to revert D to the right scale after normalizing
+        self.scale_layer = nn.Sequential(nn.Linear(layer_sizes[-2], 1), nn.Softplus())
 
     def forward(self, x):
         # Apply activation function to all layers except last
         for layer in self.layers[:-1]:
-            x = torch.relu(layer(x))
-        # Getting final prediction without relu to get full range prediction
-        A_flat = self.layers[-1](x)
-
-        # Calculating D from A
+            x = self.activation(layer(x))
+        
+        # Getting final prediction without bounds to get full range prediction
+        A_flat = self.output_layer(x)
         A_mat = A_flat.view(-1, 6, 6)
-        D = A_mat @ A_mat.transpose(-2, -1)
+        A_mat = A_mat / torch.norm(A_mat, dim=(1, 2), keepdim=True).clamp(min=1e-6)
+
+        # Predict scale factor
+        scale = self.scale_layer(x).view(-1 ,1 ,1)
+
+        # Compute D
+        D = scale * (A_mat @ A_mat.transpose(-2, -1))
         return D
 
 
-def loss_function(model, x, Dv_comp, Mv_dot, Cv, g_eta, tau, nu):
+def loss_function(model, x_traj, y_traj, n_steps=10):
     """
     Custom loss function that implements the physics loss.
     """
+
+    # Unpacking inputs
+    nu = x_traj[:, 6:12]
+
+    # Output values
+    Dv_comp = y_traj["Dv_comp"]
+    Mv_dot = y_traj["Mv_dot"]
+    Cv = y_traj["Cv"]
+    g_eta = y_traj["g_eta"]
+    tau = y_traj["tau"]
     
+    N = len(tau) # Amount of datapoints
+
     # Getting predicted D
-    D_pred = model(x)
+    D_pred = model(x_traj)
 
     # Calculate MSE physics loss using Fossen Dynamics Model
-    physics_loss = torch.mean((Mv_dot + Cv + (torch.bmm(nu.unsqueeze(1), D_pred).squeeze(1)) + g_eta - tau)**2)
-
+    # This will sum to 0 if D_pred * nu is the correct real life values
+    physics_loss = (1/N) * torch.mean((Mv_dot + Cv + (torch.bmm(D_pred, nu.unsqueeze(2)).squeeze(2)) + g_eta - tau)**2)
+    # TODO: Could change this to tank acceleration - dynamics acceleration
+    # TODO: Also plot losses after training
+  
     # Calculate data loss
-    data_loss = torch.mean((Dv_comp - (torch.bmm(nu.unsqueeze(1), D_pred).squeeze(1)))**2)
+    # data_loss = torch.mean((Dv_comp - (torch.bmm(nu.unsqueeze(1), D_pred).squeeze(1)))**2)
+    # TODO: Might be the physics loss x2
+    data_loss = (1/N) * multi_step_loss_function(model, x_traj, y_traj, n_steps)
+
+    # Encourage high damping in roll and y directions
+    damping_penalty = additional_damping_penalty(D_pred)
+
+    # Scaling to ensure losses have approximately same scale
+    alpha = 0.5
+    beta = 0.5
+    gamma = 0.001
 
     # Final loss is just the sum
-    return physics_loss + data_loss
+    return physics_loss*alpha + data_loss*beta + damping_penalty*gamma
+
+
+def multi_step_loss_function(model, x_traj, y_traj, n_steps=10):
+    """
+    Computes a multi-step integration loss based on nu over multiple steps
+    """
+
+    if n_steps == 0:
+        print(f" n_steps was set to 0, changing it to 1!")
+        n_steps = 1
+
+    # Unpacking inputs
+    eta = x_traj[:, :6]
+    nu = x_traj[:, 6:12]
+    u = x_traj[:, 12:]
+
+    # Output values
+    Dv_comp = y_traj["Dv_comp"]
+    Mv_dot = y_traj["Mv_dot"]
+    Cv = y_traj["Cv"]
+    g_eta = y_traj["g_eta"]
+    tau = y_traj["tau"]
+    t = y_traj["t"]
+    M = y_traj["M"]
+
+    # Get the dt vector
+    dt_np = np.diff(t.numpy())
+    dt = torch.tensor(dt_np, dtype=torch.float32)
+    
+    loss = 0.0
+    nu_pred = nu[0].unsqueeze(0) # x0
+
+    for i in range(n_steps):
+        if i >= len(eta) - 1:
+            # Making sure we have values to compare to
+            break
+
+        # Prep inputs for model
+        x_input = torch.cat([eta[i].unsqueeze(0), nu_pred, u[i].unsqueeze(0)], dim=1)
+        D_pred = model(x_input) 
+
+        # Euler forward integration
+        rhs = tau[i].unsqueeze(0) - Cv[i].unsqueeze(0) - g_eta[i].unsqueeze(0) - torch.bmm(D_pred, nu_pred.unsqueeze(2)).squeeze(2)
+        rhs = rhs.squeeze()
+        nu_dot = torch.linalg.solve(M[i], rhs) # Solve for the acceleration
+        nu_pred = nu_pred + dt[i] * nu_dot # Euler forward with variable dt to get model difference to real value one step ahead
+
+        # Loss as difference between real velocity and collected for the next step
+        loss += torch.mean((nu_pred.clone() - nu[i+1].unsqueeze(0))**2)
+
+    return loss / n_steps
+
+def additional_damping_penalty(D_pred):
+    # Get the elements for damping in y and for roll
+    y_damp = D_pred[:, 1, 1]
+    roll_damp = D_pred[:, 3, 3]
+
+    # Check if the damping is below the wanted threshold
+    threshold = 60.0
+    loss_y = torch.mean(torch.relu(threshold - y_damp)**2)
+    loss_roll = torch.mean(torch.relu(threshold - roll_damp)**2)
+
+    return loss_y + loss_roll
 
 
 def init_pinn_model(file_name: str):
@@ -78,8 +177,11 @@ def init_pinn_model(file_name: str):
     dict_file = torch.load(dict_path, weights_only=True)
     model = PINN(dict_file["model_shape"])
     model.load_state_dict(dict_file["state_dict"])
+    x_mean = dict_file["x_mean"]
+    x_std = dict_file["x_std"]
     model.eval()
-    return model
+    return model, x_mean, x_std
+
 
 def init_pinn_model_hybrid():
     # For easy initialization of model in other files
@@ -99,7 +201,8 @@ def init_pinn_model_hybrid():
     model_rot.eval()
     return [model_lin, model_rot]
 
-def pinn_predict(model, eta, nu, u):
+
+def pinn_predict(model, eta, nu, u, norm):
     # For easy prediction in other files
 
     # Flatten input
@@ -110,10 +213,12 @@ def pinn_predict(model, eta, nu, u):
     # Make state vector
     x = np.concatenate([eta, nu, u], axis=0)
     x = torch.tensor(x, dtype=torch.float32).unsqueeze(0)
+    x_normed = (x - norm[0]) / norm[1]
 
     # Get prediction
     D_pred = model(x).detach().numpy()
     return D_pred.squeeze()
+
 
 def pinn_predict_hybrid(models, eta, nu, u):
     
@@ -138,6 +243,7 @@ def pinn_predict_hybrid(models, eta, nu, u):
 
     return D.squeeze()
 
+
 if __name__ == "__main__":
     
     # Quick listing of commands when running file
@@ -158,7 +264,7 @@ if __name__ == "__main__":
     for dataset in datasets[:train_val_split]:
         # Load data from bag
         path = "src/smarc_modelling/piml/data/rosbags/" + dataset
-        eta, nu, u, u_cmd, Dv_comp, Mv_dot, Cv, g_eta, tau, t = load_data_from_bag(path, "torch")
+        eta, nu, u, u_cmd, Dv_comp, Mv_dot, Cv, g_eta, tau, t, M = load_data_from_bag(path, "torch")
         
         x_traj = torch.cat([eta, nu, u], dim=1)
         y_traj = {
@@ -169,12 +275,20 @@ if __name__ == "__main__":
             "g_eta": g_eta,
             "tau": tau,
             "t": t,
-            "nu": nu
+            "nu": nu,
+            "M": M
         }
 
         # Append most recently loaded data
         x_trajectories.append(x_traj)
         y_trajectories.append(y_traj)
+    
+    # Normalize the data
+    all_x = torch.cat(x_trajectories, dim=0)
+    x_mean = torch.mean(all_x, dim=0)
+    x_std = torch.std(all_x, dim=0) + 1e-8 # Preventing division by 0
+
+    x_trajectories = [(x_traj - x_mean) / x_std for x_traj in x_trajectories]
 
     # Loading validation data
     print(f" Loading validation data...")
@@ -184,7 +298,7 @@ if __name__ == "__main__":
     for dataset in datasets[train_val_split:]:
         # Load data from bag
         path = "src/smarc_modelling/piml/data/rosbags/" + dataset
-        eta, nu, u, u_cmd, Dv_comp, Mv_dot, Cv, g_eta, tau, t = load_data_from_bag(path, "torch")
+        eta, nu, u, u_cmd, Dv_comp, Mv_dot, Cv, g_eta, tau, t, M = load_data_from_bag(path, "torch")
         
         x_traj = torch.cat([eta, nu, u], dim=1)
         y_traj = {
@@ -195,20 +309,23 @@ if __name__ == "__main__":
             "g_eta": g_eta,
             "tau": tau,
             "t": t,
-            "nu": nu
+            "nu": nu,
+            "M": M
         }
 
         # Append most recently loaded data
         x_trajectories_val.append(x_traj)
         y_trajectories_val.append(y_traj)
 
+
     # Initialize model and optimizer
     shape = [19, 128, 128, 128, 128, 128, 128, 36] # Hidden layers
     model = PINN(shape)
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.1)
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
+    torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0) # Clipping to help with stability
 
     # Adaptive learning rate
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer=optimizer, mode="min", factor=0.9, patience=1000, threshold=100, min_lr=1e-5)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer=optimizer, mode="min", factor=0.9, patience=2000, threshold=100, min_lr=1e-5)
 
     # For plotting loss and lr
     if "plot" in sys.argv:
@@ -219,10 +336,13 @@ if __name__ == "__main__":
     # Early stopping using validation loss
     best_val_loss = float("inf")
     # How long we wait before stopping training
-    patience = 6000
+    patience = 5000
     counter = 0
     # Saving the best model before overfitting takes place
     best_model_state = None
+
+    # For the multi-step integration loss
+    n_steps = 25
 
     # Training loop
     epochs = 500000
@@ -237,7 +357,8 @@ if __name__ == "__main__":
         for x_traj, y_traj in zip(x_trajectories, y_trajectories):
             
             # Get the PI loss
-            loss = loss_function(model, x_traj, y_traj["Dv_comp"], y_traj["Mv_dot"], y_traj["Cv"], y_traj["g_eta"], y_traj["tau"], y_traj["nu"])
+            x_traj_normed = (x_traj - x_mean) / x_std
+            loss = loss_function(model, x_traj_normed, y_traj, n_steps)
             loss_total += loss
 
         # Forward pass on training and loss computation
@@ -254,7 +375,8 @@ if __name__ == "__main__":
             for x_traj_val, y_traj_val in zip(x_trajectories_val, y_trajectories_val):
                
                 # Get PI validation loss
-                val_loss = loss_function(model, x_traj_val, y_traj_val["Dv_comp"], y_traj_val["Mv_dot"], y_traj_val["Cv"], y_traj_val["g_eta"], y_traj_val["tau"], y_traj_val["nu"])
+                x_traj_normed_val = (x_traj_val - x_mean) / x_std
+                val_loss = loss_function(model, x_traj_normed_val, y_traj_val, n_steps)
                 val_loss_total += val_loss
 
         # Saving loss and learning rate for plotting
@@ -284,7 +406,11 @@ if __name__ == "__main__":
     
     if "save" in sys.argv:
         # Saving the best model state from training (as per based on validation loss)
-        torch.save({"model_shape": shape, "state_dict": model.state_dict()}, "src/smarc_modelling/piml/models/pinn_trained.pt")
+        torch.save({"model_shape": shape, 
+                    "state_dict": model.state_dict(), 
+                    "x_mean": x_mean,
+                    "x_std": x_std},
+                    "src/smarc_modelling/piml/models/pinn_trained.pt")
         print(f" Model weights saved to models/pinn_trained.pt")
 
     if "plot" in sys.argv:

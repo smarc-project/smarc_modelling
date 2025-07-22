@@ -12,10 +12,10 @@ import scienceplots # For fancy plotting
 class SIM:
     """Simulator for SAM / other UAVs"""
 
-    def __init__(self, piml_type: str, init_pose: list, time_vec: list, control_vec: list):
+    def __init__(self, piml_type: str, states: list, time_vec: list, control_vec: list, state_update: bool):
 
         # Initial pose
-        self.x0 = init_pose
+        self.x0 = torch.Tensor.tolist(torch.cat([states[0][0], states[1][0], states[2][0]]))
 
         # Create vehicle instance
         self.vehicle = SAM_PIML(dt=0.01, piml_type=piml_type)
@@ -24,6 +24,9 @@ class SIM:
         self.controls = control_vec
         self.n_sim = np.shape(time_vec)[0]
         self.var_dt = np.diff(time_vec)
+
+        # Decide if we are going to update the state or not
+        self.state_update = state_update
 
     def run_sim(self):
         print(f" Running simulator...")
@@ -35,12 +38,20 @@ class SIM:
         # For getting last value before quat errors
         end_val = 10e10
         once = True
+        time_since_update = 0
+        times =[]
         
         for i in range(self.n_sim-1):
+
+            if i % 3 == 0 and self.state_update:
+                data[:, i] = torch.Tensor.tolist(torch.cat([states[0][i], states[1][i], states[2][i]]))
+                times.append(time_since_update)
+                time_since_update = 0
 
             # Get the current time step
             dt = self.var_dt[i]
             self.vehicle.update_dt(dt)
+            time_since_update += dt
 
             # Do sim step using rk4 or ef
             try:
@@ -50,6 +61,9 @@ class SIM:
                 if once:
                     once = False
                     end_val = i-10
+
+        if self.state_update:
+            print(f" Average times between resets: {np.mean(times)}")
 
         return data, end_val
     
@@ -72,8 +86,8 @@ if __name__ == "__main__":
     print(f" Starting simulator...")
 
     # Loading ground truth data
-    eta, nu, u_fb, u_cmd, Dv_comp, Mv_dot, Cv, g_eta, tau, t = load_data_from_bag("src/smarc_modelling/piml/data/rosbags/rosbag_normal", "torch")
-    init_pose = torch.Tensor.tolist(torch.cat([eta[0], nu[0], u_fb[0]]))
+    eta, nu, u_fb, u_cmd, Dv_comp, Mv_dot, Cv, g_eta, tau, t, M = load_data_from_bag("src/smarc_modelling/piml/data/rosbags/rosbag_5", "torch")
+    states = [eta, nu, u_fb]
 
     # Initial positions used for flipping coordinate frames later
     x0 = eta[0, 0].item()
@@ -81,8 +95,9 @@ if __name__ == "__main__":
     z0 = eta[0, 2].item()
 
     # Setting up model for simulations
-    sam_wb = SIM(None, init_pose, t, u_cmd) # White-box sim
-    sam_pinn = SIM("pinn_hybrid", init_pose, t, u_cmd) # Physics Informed Neural Network sim
+    reset_state = True
+    sam_wb = SIM(None, states, t, u_cmd, reset_state) # White-box sim
+    sam_pinn = SIM("pinn", states, t, u_cmd, reset_state) # Physics Informed Neural Network sim
     
     # Running the simulators
     print(f" Running white-box simulation...")
