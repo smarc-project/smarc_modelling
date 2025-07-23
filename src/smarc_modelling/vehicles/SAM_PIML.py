@@ -59,7 +59,7 @@ import numpy as np
 import math
 from scipy.linalg import block_diag
 from smarc_modelling.lib.gnc import *
-from smarc_modelling.piml.pinn.pinn import init_pinn_model, pinn_predict, init_pinn_model_hybrid, pinn_predict_hybrid
+from smarc_modelling.piml.pinn.pinn import init_pinn_model, pinn_predict #, init_pinn_model_hybrid, pinn_predict_hybrid
 from smarc_modelling.piml.bpinn.bpinn import init_bpinn_model, bpinn_predict
 
 

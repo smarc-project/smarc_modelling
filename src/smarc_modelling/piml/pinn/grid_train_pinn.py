@@ -6,6 +6,7 @@ from smarc_modelling.piml.utils.utility_functions import load_data_from_bag, eta
 from smarc_modelling.piml.piml_sim import SIM
 import torch
 import numpy as np
+import matplotlib.pyplot as plt
 
 test_datasets = ["test_1", "test_2", "test_3", "test_4", "test_5", "test_6", "test_7", "test_8"]
 
@@ -15,7 +16,7 @@ datasets = ["rosbag_16", "rosbag_15", "rosbag_14", "rosbag_13", "rosbag_12", "ro
 if __name__ == "__main__":
 
     # Divide up the datasets into training and validation
-    train_procent = 0.5 # How much goes to training, the rest goes to validation
+    train_procent = 0.9 # How much goes to training, the rest goes to validation
     train_val_split = int(np.shape(datasets)[0] * train_procent)
 
     # Loading the training data
@@ -25,7 +26,7 @@ if __name__ == "__main__":
     for dataset in datasets[:train_val_split]:
         # Load data from bag
         path = "src/smarc_modelling/piml/data/rosbags/" + dataset
-        eta, nu, u, u_cmd, Dv_comp, Mv_dot, Cv, g_eta, tau, t, M = load_data_from_bag(path, "torch")
+        eta, nu, u, u_cmd, Dv_comp, Mv_dot, Cv, g_eta, tau, t, M, acc = load_data_from_bag(path, "torch")
         
         x_traj = torch.cat([eta, nu, u], dim=1)
         y_traj = {
@@ -37,7 +38,8 @@ if __name__ == "__main__":
             "tau": tau,
             "t": t,
             "nu": nu,
-            "M": M
+            "M": M,
+            "acc": acc
         }
 
         # Append most recently loaded data
@@ -56,7 +58,7 @@ if __name__ == "__main__":
     for dataset in datasets[train_val_split:]:
         # Load data from bag
         path = "src/smarc_modelling/piml/data/rosbags/" + dataset
-        eta, nu, u, u_cmd, Dv_comp, Mv_dot, Cv, g_eta, tau, t, M = load_data_from_bag(path, "torch")
+        eta, nu, u, u_cmd, Dv_comp, Mv_dot, Cv, g_eta, tau, t, M, acc = load_data_from_bag(path, "torch")
         
         x_traj = torch.cat([eta, nu, u], dim=1)
         y_traj = {
@@ -68,7 +70,8 @@ if __name__ == "__main__":
             "tau": tau,
             "t": t,
             "nu": nu,
-            "M": M
+            "M": M,
+            "acc": acc
         }
 
         # Append most recently loaded data
@@ -82,7 +85,7 @@ if __name__ == "__main__":
     for dataset in test_datasets:
         # Load data from bag
         path = "src/smarc_modelling/piml/data/rosbags/" + dataset
-        eta, nu, u, u_cmd, Dv_comp, Mv_dot, Cv, g_eta, tau, t, M = load_data_from_bag(path, "torch")
+        eta, nu, u, u_cmd, Dv_comp, Mv_dot, Cv, g_eta, tau, t, M, acc = load_data_from_bag(path, "torch")
 
         x_traj = torch.cat([eta, nu, u], dim=1)
         y_traj = {
@@ -95,7 +98,8 @@ if __name__ == "__main__":
             "t": t,
             "nu": nu,
             "eta": eta,
-            "M": M
+            "M": M,
+            "acc": acc
         }
 
         # Append most recently loaded data
@@ -103,19 +107,25 @@ if __name__ == "__main__":
         y_trajectories_test.append(y_traj)
 
     # For results
-    error_grid = np.zeros((5, 7, 1))
+    error_grid = np.zeros((5, 5, 2))
     best_error = float("inf")
 
     # We do not normalize the test dataset since we need the actual values in the sim
     # instead the normalization is done directly before prediction the damping matrix letting us 
     # retain these original values
 
-    n_steps = 10
+    n_steps = 1
+
+    best_loss_history = []
+    best_val_loss_history = []
 
     # Grid params
-    for i, layers in enumerate([20, 40, 60, 80, 100]): # Amount of layers
-        for j, size in enumerate([4, 8, 16, 32, 64, 128, 256]): # Amount of neurons in each layer 
-            for k, factor in enumerate([0.9]):
+    for i, layers in enumerate([2, 4, 6, 8, 10]): # Amount of layers
+        for j, size in enumerate([2, 4, 8, 16, 32]): # Amount of neurons in each layer 
+            for k, factor in enumerate([0.9, 0.7]):
+
+                loss_history = []
+                val_loss_history = []
 
                 # NN shape
                 shape = [size] * layers # Hidden layers
@@ -124,15 +134,15 @@ if __name__ == "__main__":
                 
                 # Initalize model
                 model = PINN(shape)
-                optimizer = torch.optim.Adam(model.parameters(), lr=0.005)
+                optimizer = torch.optim.Adam(model.parameters(), lr=0.0005)
                 torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0) # Clipping to help with stability
 
                 # Adaptive learning rate
-                scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer=optimizer, mode="min", factor=factor, patience=2500, threshold=10, min_lr=1e-7)
+                scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer=optimizer, mode="min", factor=factor, patience=2500, threshold=10, min_lr=1e-8)
 
                 # Early stopping with validation loss
                 best_val_loss = float("inf")
-                patience = 5000
+                patience = 7500
                 counter = 0
                 best_model_state = None
 
@@ -149,7 +159,7 @@ if __name__ == "__main__":
                         
                         # Get PI loss
                         x_traj_normed = (x_traj - x_mean) / x_std
-                        loss = loss_function(model, x_traj_normed, y_traj, n_steps)
+                        loss = loss_function(model, x_traj, y_traj, n_steps)
                         loss_total += loss
 
                     loss_total.backward()
@@ -166,9 +176,13 @@ if __name__ == "__main__":
 
                             # Get PI validation loss
                             x_traj_normed_val = (x_traj_val - x_mean) / x_std
-                            val_loss = loss_function(model, x_traj_normed_val, y_traj_val, n_steps)
+                            val_loss = loss_function(model, x_traj_val, y_traj_val, n_steps)
                             val_loss_total += val_loss
-                            
+
+                    # For plotting the loss 
+                    loss_history.append(loss_total.item())
+                    val_loss_history.append(val_loss_total.item())
+
                     # Handling for early stopping
                     if val_loss_total.item() < best_val_loss:
                         best_val_loss = val_loss_total.item()
@@ -179,7 +193,7 @@ if __name__ == "__main__":
 
                     # Print statement to make sure everything is still running
                     if epoch % 500 == 0:
-                        print(f" Still training, epoch {epoch}, loss: {loss_total.item()}, lr: {optimizer.param_groups[0]['lr']},\n validation loss: {val_loss_total.item()}, shape: {layers}, {size}, {factor}")
+                        print(f" Still training, epoch {epoch}, loss: {loss_total.item()}, lr: {optimizer.param_groups[0]['lr']},\n validation loss: {val_loss_total.item()}, shape: {layers}, {size}, {factor}, counter: {counter}")
 
                     # Break condition for early stopping
                     if counter >= patience:
@@ -252,6 +266,9 @@ if __name__ == "__main__":
                                         "x_std": x_std},
                                         "src/smarc_modelling/piml/models/pinn_best_grid.pt")
                             best_setup = [layers, size, factor]
+
+                            best_loss_history = loss_history
+                            best_val_loss_history = val_loss_history
     
 
     # After going trough the grid getting the smallest loss
@@ -259,6 +276,20 @@ if __name__ == "__main__":
     print(f" Training set was: {datasets[:train_val_split]}")
     print(f" Validation set was: {datasets[train_val_split:]}")
 
+    # Plotting the loss and lr
+    plt.style.use('science')
+
+    # Loss
+    ax = plt.subplot(1, 1, 1)
+    plt.plot(best_loss_history, linestyle="-", color="green", label="Training loss")
+    ax.set_yscale('log')
+    plt.xlabel("Epoch")
+    plt.ylabel("log(Loss)")
+    plt.plot(best_val_loss_history, linestyle="-", color="red", label="Validation loss")
+    plt.legend()
+
+    # Display
+    plt.show()
 
     # Grid trainer log
     # 6 - 128 best Jun 6 23:12

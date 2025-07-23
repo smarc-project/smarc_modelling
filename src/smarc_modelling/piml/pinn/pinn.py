@@ -12,8 +12,10 @@ import scienceplots # For fancy plotting
 
 test_datasets = ["test_1", "test_2", "test_3", "test_4", "test_5", "test_6", "test_7", "test_8"]
 
-datasets = ["rosbag_16", "rosbag_15", "rosbag_14", "rosbag_13", "rosbag_12", "rosbag_1", "rosbag_2", "rosbag_3", "rosbag_4", "rosbag_5", "rosbag_6", 
-            "rosbag_7", "rosbag_8", "rosbag_9", "rosbag_10", "rosbag_11"]
+datasets = ["rosbag_16", "rosbag_15", "rosbag_14", "rosbag_13",
+            "rosbag_12", "rosbag_1", "rosbag_2", "rosbag_3", 
+            "rosbag_4", "rosbag_5", "rosbag_6", "rosbag_7", 
+            "rosbag_8", "rosbag_9", "rosbag_10", "rosbag_11"]
 
 class PINN(nn.Module):
 
@@ -44,24 +46,24 @@ class PINN(nn.Module):
         # Creating output layer
         self.output_layer = nn.Linear(layer_sizes[-2], layer_sizes[-1])
 
-        # Scaling layer to revert D to the right scale after normalizing
-        self.scale_layer = nn.Sequential(nn.Linear(layer_sizes[-2], 1), nn.Softplus())
+        # # Scaling layer to revert D to the right scale after normalizing
+        # self.scale_layer = nn.Sequential(nn.Linear(layer_sizes[-2], 1), nn.Softplus())
 
     def forward(self, x):
         # Apply activation function to all layers except last
-        for layer in self.layers[:-1]:
+        for layer in self.layers:
             x = self.activation(layer(x))
         
         # Getting final prediction without bounds to get full range prediction
         A_flat = self.output_layer(x)
         A_mat = A_flat.view(-1, 6, 6)
-        A_mat = A_mat / torch.norm(A_mat, dim=(1, 2), keepdim=True).clamp(min=1e-6)
+        # A_mat = A_mat / torch.norm(A_mat, dim=(1, 2), keepdim=True).clamp(min=1e-6)
 
-        # Predict scale factor
-        scale = self.scale_layer(x).view(-1 ,1 ,1)
+        # # Predict scale factor
+        # scale = self.scale_layer(x).view(-1 ,1 ,1)
 
         # Compute D
-        D = scale * (A_mat @ A_mat.transpose(-2, -1))
+        D = (A_mat @ A_mat.transpose(-2, -1)) # * scale
         return D
 
 
@@ -79,6 +81,8 @@ def loss_function(model, x_traj, y_traj, n_steps=10):
     Cv = y_traj["Cv"]
     g_eta = y_traj["g_eta"]
     tau = y_traj["tau"]
+    M = y_traj["M"]
+    nu_dot = y_traj["acc"]
     
     N = len(tau) # Amount of datapoints
 
@@ -86,77 +90,83 @@ def loss_function(model, x_traj, y_traj, n_steps=10):
     D_pred = model(x_traj)
 
     # Calculate MSE physics loss using Fossen Dynamics Model
-    # This will sum to 0 if D_pred * nu is the correct real life values
+    # Physics loss predicted D matrix here should sum all the forces to 0
     physics_loss = (1/N) * torch.mean((Mv_dot + Cv + (torch.bmm(D_pred, nu.unsqueeze(2)).squeeze(2)) + g_eta - tau)**2)
-    # TODO: Could change this to tank acceleration - dynamics acceleration
-    # TODO: Also plot losses after training
-  
-    # Calculate data loss
-    # data_loss = torch.mean((Dv_comp - (torch.bmm(nu.unsqueeze(1), D_pred).squeeze(1)))**2)
-    # TODO: Might be the physics loss x2
-    data_loss = (1/N) * multi_step_loss_function(model, x_traj, y_traj, n_steps)
 
-    # Encourage high damping in roll and y directions
+    # Data Loss
+    rhs = tau.unsqueeze(0) - Cv.unsqueeze(0) - g_eta.unsqueeze(0) - torch.bmm(D_pred, nu.unsqueeze(2)).squeeze(2)
+    rhs = rhs.squeeze()
+    nu_dot_model = torch.linalg.solve(M, rhs) # Solve for the acceleration
+    data_loss = (1/N) * torch.mean((nu_dot_model - nu_dot)**2)
+
+    # Encourage high damping in roll and y directions by returning high values when corresponding damping terms are low
     damping_penalty = additional_damping_penalty(D_pred)
+  
+    # Multi-step loss
+    # data_loss = (1/N) * multi_step_loss_function(model, x_traj, y_traj, n_steps)
 
     # Scaling to ensure losses have approximately same scale
-    alpha = 0.5
+    alpha = 0.05
     beta = 0.5
     gamma = 0.001
+
+    # print("\n")
+    # print(f"PL: {physics_loss*alpha}")
+    # print(f"DL: {data_loss*beta}")
+    # print(f"DP: {damping_penalty*gamma}")
+    # print("\n")
 
     # Final loss is just the sum
     return physics_loss*alpha + data_loss*beta + damping_penalty*gamma
 
 
-def multi_step_loss_function(model, x_traj, y_traj, n_steps=10):
-    """
-    Computes a multi-step integration loss based on nu over multiple steps
-    """
+# def multi_step_loss_function(model, x_traj, y_traj, n_steps=10):
+#     """
+#     Computes a multi-step integration loss based on nu over multiple steps
+#     """
 
-    if n_steps == 0:
-        print(f" n_steps was set to 0, changing it to 1!")
-        n_steps = 1
+#     if n_steps == 0:
+#         print(f" n_steps was set to 0, changing it to 1!")
+#         n_steps = 1
 
-    # Unpacking inputs
-    eta = x_traj[:, :6]
-    nu = x_traj[:, 6:12]
-    u = x_traj[:, 12:]
+#     # Unpacking inputs
+#     eta = x_traj[:, :6]
+#     nu = x_traj[:, 6:12]
+#     u = x_traj[:, 12:]
 
-    # Output values
-    Dv_comp = y_traj["Dv_comp"]
-    Mv_dot = y_traj["Mv_dot"]
-    Cv = y_traj["Cv"]
-    g_eta = y_traj["g_eta"]
-    tau = y_traj["tau"]
-    t = y_traj["t"]
-    M = y_traj["M"]
+#     # Output values
+#     Cv = y_traj["Cv"]
+#     g_eta = y_traj["g_eta"]
+#     tau = y_traj["tau"]
+#     t = y_traj["t"]
+#     M = y_traj["M"]
 
-    # Get the dt vector
-    dt_np = np.diff(t.numpy())
-    dt = torch.tensor(dt_np, dtype=torch.float32)
+#     # Get the dt vector
+#     dt_np = np.diff(t.numpy())
+#     dt = torch.tensor(dt_np, dtype=torch.float32)
     
-    loss = 0.0
-    nu_pred = nu[0].unsqueeze(0) # x0
+#     loss = 0.0
+#     nu_pred = nu[0].unsqueeze(0) # x0
 
-    for i in range(n_steps):
-        if i >= len(eta) - 1:
-            # Making sure we have values to compare to
-            break
+#     for i in range(n_steps):
+#         if i >= len(eta) - 1:
+#             # Making sure we have values to compare to
+#             break
 
-        # Prep inputs for model
-        x_input = torch.cat([eta[i].unsqueeze(0), nu_pred, u[i].unsqueeze(0)], dim=1)
-        D_pred = model(x_input) 
+#         # Prep inputs for model
+#         x_input = torch.cat([eta[i].unsqueeze(0), nu_pred, u[i].unsqueeze(0)], dim=1)
+#         D_pred = model(x_input) 
 
-        # Euler forward integration
-        rhs = tau[i].unsqueeze(0) - Cv[i].unsqueeze(0) - g_eta[i].unsqueeze(0) - torch.bmm(D_pred, nu_pred.unsqueeze(2)).squeeze(2)
-        rhs = rhs.squeeze()
-        nu_dot = torch.linalg.solve(M[i], rhs) # Solve for the acceleration
-        nu_pred = nu_pred + dt[i] * nu_dot # Euler forward with variable dt to get model difference to real value one step ahead
+#         # Euler forward integration
+#         rhs = tau[i].unsqueeze(0) - Cv[i].unsqueeze(0) - g_eta[i].unsqueeze(0) - torch.bmm(D_pred, nu_pred.unsqueeze(2)).squeeze(2)
+#         rhs = rhs.squeeze()
+#         nu_dot = torch.linalg.solve(M[i], rhs) # Solve for the acceleration
+#         nu_pred = nu_pred + dt[i] * nu_dot # Euler forward with variable dt to get model difference to real value one step ahead
 
-        # Loss as difference between real velocity and collected for the next step
-        loss += torch.mean((nu_pred.clone() - nu[i+1].unsqueeze(0))**2)
+#         # Loss as difference between real velocity and collected for the next step
+#         loss += torch.mean((nu_pred.clone() - nu[i+1].unsqueeze(0))**2)
 
-    return loss / n_steps
+#     return loss / n_steps
 
 def additional_damping_penalty(D_pred):
     # Get the elements for damping in y and for roll
@@ -183,23 +193,23 @@ def init_pinn_model(file_name: str):
     return model, x_mean, x_std
 
 
-def init_pinn_model_hybrid():
-    # For easy initialization of model in other files
+# def init_pinn_model_hybrid():
+#     # For easy initialization of model in other files
 
-    # Linear model
-    dict_path = "src/smarc_modelling/piml/models/pinn/pinn_lin.pt"
-    dict_file = torch.load(dict_path, weights_only=True)
-    model_lin = PINN(dict_file["model_shape"])
-    model_lin.load_state_dict(dict_file["state_dict"])
-    model_lin.eval()
+#     # Linear model
+#     dict_path = "src/smarc_modelling/piml/models/pinn/pinn_lin.pt"
+#     dict_file = torch.load(dict_path, weights_only=True)
+#     model_lin = PINN(dict_file["model_shape"])
+#     model_lin.load_state_dict(dict_file["state_dict"])
+#     model_lin.eval()
 
-    # Rotational model
-    dict_path = "src/smarc_modelling/piml/models/pinn/pinn_rot.pt"
-    dict_file = torch.load(dict_path, weights_only=True)
-    model_rot = PINN(dict_file["model_shape"])
-    model_rot.load_state_dict(dict_file["state_dict"])
-    model_rot.eval()
-    return [model_lin, model_rot]
+#     # Rotational model
+#     dict_path = "src/smarc_modelling/piml/models/pinn/pinn_rot.pt"
+#     dict_file = torch.load(dict_path, weights_only=True)
+#     model_rot = PINN(dict_file["model_shape"])
+#     model_rot.load_state_dict(dict_file["state_dict"])
+#     model_rot.eval()
+#     return [model_lin, model_rot]
 
 
 def pinn_predict(model, eta, nu, u, norm):
@@ -220,28 +230,28 @@ def pinn_predict(model, eta, nu, u, norm):
     return D_pred.squeeze()
 
 
-def pinn_predict_hybrid(models, eta, nu, u):
+# def pinn_predict_hybrid(models, eta, nu, u):
     
-    # Flatten input
-    eta = np.array(eta, dtype=np.float32).flatten()
-    nu = np.array(nu, dtype=np.float32).flatten()
-    u = np.array(u, dtype=np.float32).flatten()
+#     # Flatten input
+#     eta = np.array(eta, dtype=np.float32).flatten()
+#     nu = np.array(nu, dtype=np.float32).flatten()
+#     u = np.array(u, dtype=np.float32).flatten()
 
-    # Make state vector
-    x = np.concatenate([eta, nu, u], axis=0)
-    x = torch.tensor(x, dtype=torch.float32).unsqueeze(0)
+#     # Make state vector
+#     x = np.concatenate([eta, nu, u], axis=0)
+#     x = torch.tensor(x, dtype=torch.float32).unsqueeze(0)
 
-    lin_model = models[0]
-    rot_model = models[1]
+#     lin_model = models[0]
+#     rot_model = models[1]
 
-    D_lin = lin_model(x).detach().numpy()
-    D_rot = rot_model(x).detach().numpy()
+#     D_lin = lin_model(x).detach().numpy()
+#     D_rot = rot_model(x).detach().numpy()
 
-    D = np.eye(6)
-    D[:3, :] = D_lin[0][:3, :]
-    D[3:, :] = D_rot[0][3:, :]
+#     D = np.eye(6)
+#     D[:3, :] = D_lin[0][:3, :]
+#     D[3:, :] = D_rot[0][3:, :]
 
-    return D.squeeze()
+#     return D.squeeze()
 
 
 if __name__ == "__main__":
@@ -253,7 +263,7 @@ if __name__ == "__main__":
  plot: Plots the loss and lr per epoch.""")
 
     # Divide up the datasets into training and validation
-    train_procent = 0.8 # How much goes to training, the rest goes to validation
+    train_procent = 0.9 # How much goes to training, the rest goes to validation
     train_val_split = int(np.shape(datasets)[0] * train_procent)
 
     # Loading training data
@@ -264,7 +274,7 @@ if __name__ == "__main__":
     for dataset in datasets[:train_val_split]:
         # Load data from bag
         path = "src/smarc_modelling/piml/data/rosbags/" + dataset
-        eta, nu, u, u_cmd, Dv_comp, Mv_dot, Cv, g_eta, tau, t, M = load_data_from_bag(path, "torch")
+        eta, nu, u, u_cmd, Dv_comp, Mv_dot, Cv, g_eta, tau, t, M, acc = load_data_from_bag(path, "torch")
         
         x_traj = torch.cat([eta, nu, u], dim=1)
         y_traj = {
@@ -276,7 +286,8 @@ if __name__ == "__main__":
             "tau": tau,
             "t": t,
             "nu": nu,
-            "M": M
+            "M": M,
+            "acc": acc
         }
 
         # Append most recently loaded data
@@ -298,7 +309,7 @@ if __name__ == "__main__":
     for dataset in datasets[train_val_split:]:
         # Load data from bag
         path = "src/smarc_modelling/piml/data/rosbags/" + dataset
-        eta, nu, u, u_cmd, Dv_comp, Mv_dot, Cv, g_eta, tau, t, M = load_data_from_bag(path, "torch")
+        eta, nu, u, u_cmd, Dv_comp, Mv_dot, Cv, g_eta, tau, t, M, acc = load_data_from_bag(path, "torch")
         
         x_traj = torch.cat([eta, nu, u], dim=1)
         y_traj = {
@@ -310,7 +321,8 @@ if __name__ == "__main__":
             "tau": tau,
             "t": t,
             "nu": nu,
-            "M": M
+            "M": M,
+            "acc": acc
         }
 
         # Append most recently loaded data
@@ -319,13 +331,13 @@ if __name__ == "__main__":
 
 
     # Initialize model and optimizer
-    shape = [19, 128, 128, 128, 128, 128, 128, 36] # Hidden layers
+    shape = [19, 8, 8, 8, 8, 8, 8, 36] # Hidden layers
     model = PINN(shape)
-    optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.0005)
     torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0) # Clipping to help with stability
 
     # Adaptive learning rate
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer=optimizer, mode="min", factor=0.9, patience=2000, threshold=100, min_lr=1e-5)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer=optimizer, mode="min", factor=0.9, patience=2500, threshold=10, min_lr=1e-8)
 
     # For plotting loss and lr
     if "plot" in sys.argv:
@@ -336,7 +348,7 @@ if __name__ == "__main__":
     # Early stopping using validation loss
     best_val_loss = float("inf")
     # How long we wait before stopping training
-    patience = 5000
+    patience = 7500
     counter = 0
     # Saving the best model before overfitting takes place
     best_model_state = None
@@ -386,7 +398,7 @@ if __name__ == "__main__":
             lr_history.append(optimizer.param_groups[0]['lr'])
 
         # Early stopping based on validation loss
-        if val_loss_total.item() < best_val_loss and epoch > 500:
+        if val_loss_total.item() < best_val_loss:
             best_val_loss = val_loss_total.item()
             counter = 0 # Reset counter
             best_model_state = model.state_dict() # Saving the best model
@@ -394,7 +406,7 @@ if __name__ == "__main__":
             counter += 1
 
         if epoch % 500 == 0:
-            print(f" Still training, epoch {epoch}, loss: {loss_total.item()}, lr: {optimizer.param_groups[0]['lr']}, \n validation loss: {val_loss_total.item()}")
+            print(f" Still training, epoch {epoch}, loss: {loss_total.item()}, lr: {optimizer.param_groups[0]['lr']}, \n validation loss: {val_loss_total.item()}, counter: {counter}")
         
         if counter >= patience:
             print(f" Stopping early due to no improvement after {patience} epochs from epoch: {epoch-counter}")
@@ -418,7 +430,7 @@ if __name__ == "__main__":
         plt.style.use('science')
 
         # Loss
-        ax = plt.subplot(2, 1, 1)
+        ax = plt.subplot(1, 1, 1)
         plt.plot(loss_history, linestyle="-", color="green", label="Training loss")
         ax.set_yscale('log')
         plt.xlabel("Epoch")
@@ -426,12 +438,12 @@ if __name__ == "__main__":
         plt.plot(val_loss_history, linestyle="-", color="red", label="Validation loss")
         plt.legend()
 
-        # Learning rate
-        plt.subplot(2, 1, 2)
-        plt.plot(lr_history, linestyle="-", label="Learning Rate")
-        plt.xlabel("Epoch")
-        plt.ylabel("Learning Rate")
-        plt.ylim(0, 0.012)
+        # # Learning rate
+        # plt.subplot(2, 1, 2)
+        # plt.plot(lr_history, linestyle="-", label="Learning Rate")
+        # plt.xlabel("Epoch")
+        # plt.ylabel("Learning Rate")
+        # plt.ylim(0, 0.012)
         
         # Display
         plt.show()

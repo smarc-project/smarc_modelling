@@ -86,7 +86,7 @@ if __name__ == "__main__":
     print(f" Starting simulator...")
 
     # Loading ground truth data
-    eta, nu, u_fb, u_cmd, Dv_comp, Mv_dot, Cv, g_eta, tau, t, M = load_data_from_bag("src/smarc_modelling/piml/data/rosbags/rosbag_5", "torch")
+    eta, nu, u_fb, u_cmd, Dv_comp, Mv_dot, Cv, g_eta, tau, t, M, nu_dot = load_data_from_bag("src/smarc_modelling/piml/data/rosbags/rosbag_twosecs", "torch")
     states = [eta, nu, u_fb]
 
     # Initial positions used for flipping coordinate frames later

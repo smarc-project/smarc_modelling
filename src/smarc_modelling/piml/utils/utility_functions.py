@@ -184,7 +184,8 @@ def load_data_from_bag(data_file: str="", return_type: str=""):
             torch.tensor(g_eta, dtype=torch.float32),
             torch.tensor(tau, dtype=torch.float32),
             torch.tensor(time, dtype=torch.float32),
-            torch.tensor(M, dtype=torch.float32)
+            torch.tensor(np.array(M), dtype=torch.float32),
+            torch.tensor(acc, dtype=torch.float32)
         )
     else: # Return all values as numpy matrices
         return(
@@ -198,7 +199,8 @@ def load_data_from_bag(data_file: str="", return_type: str=""):
             g_eta,
             tau,
             time,
-            M
+            M,
+            acc
         )
     
 
