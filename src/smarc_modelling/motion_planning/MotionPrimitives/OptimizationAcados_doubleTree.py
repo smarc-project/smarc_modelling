@@ -216,7 +216,7 @@ def optimization_acados_doubleTree(waypoints, map_instance):
     dt = glbv.RESOLUTION_DT
     N = len(waypoints)
     sam = SAM_casadi(dt)
-    nmpc = NMPC_trajectory(sam, dt, N)
+    nmpc = NMPC(sam, dt, N, False)
     model = nmpc.export_dynamics_model(sam)
 
     # Create ocp
