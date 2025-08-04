@@ -153,7 +153,6 @@ void SAM_equation_system_acados_create_set_plan(ocp_nlp_plan_t* nlp_solver_plan,
     nlp_solver_plan->nlp_solver = SQP_RTI;
 
     nlp_solver_plan->ocp_qp_solver_plan.qp_solver = PARTIAL_CONDENSING_HPIPM;
-    nlp_solver_plan->relaxed_ocp_qp_solver_plan.qp_solver = PARTIAL_CONDENSING_HPIPM;
 
     nlp_solver_plan->nlp_cost[0] = LINEAR_LS;
     for (int i = 1; i < N; i++)
@@ -458,12 +457,25 @@ void SAM_equation_system_acados_setup_nlp_in(SAM_equation_system_solver_capsule*
     /**** Cost ****/
     double* yref_e = calloc(NYN, sizeof(double));
     // change only the non-zero elements:
-    yref_e[0] = 4.75;
-    yref_e[1] = -0.75;
-    yref_e[2] = 0.75;
-    yref_e[3] = 1;
-    yref_e[13] = 50;
-    yref_e[14] = 50;
+    yref_e[0] = 3.8056588136524687;
+    yref_e[1] = -0.14149277474551025;
+    yref_e[2] = 1.0497840579420417;
+    yref_e[3] = 0.9922146702253885;
+    yref_e[4] = 0.006081720415090567;
+    yref_e[5] = 0.023073516165199332;
+    yref_e[6] = -0.1257845528711094;
+    yref_e[7] = 0.8595231709341478;
+    yref_e[8] = 0.07359055735635185;
+    yref_e[9] = -0.08110812472451157;
+    yref_e[10] = 0.0016972252005124366;
+    yref_e[11] = 0.014745416130343131;
+    yref_e[12] = -0.2192029790648385;
+    yref_e[13] = 79;
+    yref_e[14] = 93.5;
+    yref_e[15] = -0.12217304763960309;
+    yref_e[16] = 0.03490658503988659;
+    yref_e[17] = 400;
+    yref_e[18] = 400;
     ocp_nlp_cost_model_set(nlp_config, nlp_dims, nlp_in, N, "yref", yref_e);
     free(yref_e);
 
@@ -527,42 +539,44 @@ void SAM_equation_system_acados_setup_nlp_in(SAM_equation_system_solver_capsule*
     double* lbx0 = lubx0;
     double* ubx0 = lubx0 + NBX0;
     // change only the non-zero elements:
-    lbx0[0] = 4.557752171945946;
-    ubx0[0] = 4.557752171945946;
-    lbx0[1] = -0.7830821578868158;
-    ubx0[1] = -0.7830821578868158;
-    lbx0[2] = 0.4395271245832924;
-    ubx0[2] = 0.4395271245832924;
-    lbx0[3] = 0.9472029839715882;
-    ubx0[3] = 0.9472029839715882;
-    lbx0[4] = -0.01339096849137078;
-    ubx0[4] = -0.01339096849137078;
-    lbx0[5] = -0.05265761139411095;
-    ubx0[5] = -0.05265761139411095;
-    lbx0[6] = -0.3229301281944523;
-    ubx0[6] = -0.3229301281944523;
-    lbx0[7] = 1.3246326388579783;
-    ubx0[7] = 1.3246326388579783;
-    lbx0[8] = 0.23557194081263383;
-    ubx0[8] = 0.23557194081263383;
-    lbx0[9] = -0.013921859628079757;
-    ubx0[9] = -0.013921859628079757;
-    lbx0[10] = -0.05482385732213416;
-    ubx0[10] = -0.05482385732213416;
-    lbx0[11] = -0.03474024185515258;
-    ubx0[11] = -0.03474024185515258;
-    lbx0[12] = -0.24977149253323003;
-    ubx0[12] = -0.24977149253323003;
-    lbx0[13] = 79;
-    ubx0[13] = 79;
-    lbx0[14] = 93.5;
-    ubx0[14] = 93.5;
+    lbx0[0] = 3.4462469483859652;
+    ubx0[0] = 3.4462469483859652;
+    lbx0[1] = -0.171976620326895;
+    ubx0[1] = -0.171976620326895;
+    lbx0[2] = 0.4113399189080474;
+    ubx0[2] = 0.4113399189080474;
+    lbx0[3] = 0.9817103692502774;
+    ubx0[3] = 0.9817103692502774;
+    lbx0[4] = 0.009041938080283196;
+    ubx0[4] = 0.009041938080283196;
+    lbx0[5] = 0.06689387341222863;
+    ubx0[5] = 0.06689387341222863;
+    lbx0[6] = -0.21396927068158303;
+    ubx0[6] = -0.21396927068158303;
+    lbx0[7] = -1.1773472714403062;
+    ubx0[7] = -1.1773472714403062;
+    lbx0[8] = -0.35612140738882586;
+    ubx0[8] = -0.35612140738882586;
+    lbx0[9] = 0.050804895833254086;
+    ubx0[9] = 0.050804895833254086;
+    lbx0[10] = 0.07802302729447153;
+    ubx0[10] = 0.07802302729447153;
+    lbx0[11] = 0.03442255342547784;
+    ubx0[11] = 0.03442255342547784;
+    lbx0[12] = -0.6738297894017098;
+    ubx0[12] = -0.6738297894017098;
+    lbx0[13] = 56;
+    ubx0[13] = 56;
+    lbx0[14] = 100;
+    ubx0[14] = 100;
+    lbx0[15] = 0.12217304763960309;
+    ubx0[15] = 0.12217304763960309;
     lbx0[16] = 0.08726646259971647;
     ubx0[16] = 0.08726646259971647;
-    lbx0[17] = 600;
-    ubx0[17] = 600;
-    lbx0[18] = 600;
-    ubx0[18] = 600;
+    lbx0[17] = -1000;
+    ubx0[17] = -1000;
+    lbx0[18] = -1000;
+    ubx0[18] = -1000;
 
     ocp_nlp_constraints_model_set(nlp_config, nlp_dims, nlp_in, 0, "idxbx", idxbx0);
     ocp_nlp_constraints_model_set(nlp_config, nlp_dims, nlp_in, 0, "lbx", lbx0);
@@ -851,6 +865,7 @@ static void SAM_equation_system_acados_create_set_opts(SAM_equation_system_solve
     ocp_nlp_solver_opts_set(nlp_config, nlp_opts, "globalization_alpha_reduction", &globalization_alpha_reduction);
 
 
+    // ocp_nlp_solver_opts_set(nlp_config, nlp_opts, "globalization", "merit_backtracking");
 
     int globalization_line_search_use_sufficient_descent = 0;
     ocp_nlp_solver_opts_set(nlp_config, capsule->nlp_opts, "globalization_line_search_use_sufficient_descent", &globalization_line_search_use_sufficient_descent);
@@ -866,9 +881,6 @@ static void SAM_equation_system_acados_create_set_opts(SAM_equation_system_solve
 
     int with_value_sens_wrt_params = false;
     ocp_nlp_solver_opts_set(nlp_config, capsule->nlp_opts, "with_value_sens_wrt_params", &with_value_sens_wrt_params);
-
-    double solution_sens_qp_t_lam_min = 0.000000001;
-    ocp_nlp_solver_opts_set(nlp_config, capsule->nlp_opts, "solution_sens_qp_t_lam_min", &solution_sens_qp_t_lam_min);
 
     int globalization_full_step_dual = 0;
     ocp_nlp_solver_opts_set(nlp_config, capsule->nlp_opts, "globalization_full_step_dual", &globalization_full_step_dual);
@@ -918,11 +930,6 @@ static void SAM_equation_system_acados_create_set_opts(SAM_equation_system_solve
     ocp_nlp_solver_opts_set(nlp_config, nlp_opts, "store_iterates", &store_iterates);
     // set HPIPM mode: should be done before setting other QP solver options
     ocp_nlp_solver_opts_set(nlp_config, nlp_opts, "qp_hpipm_mode", "ROBUST");
-
-
-
-    int qp_solver_t0_init = 2;
-    ocp_nlp_solver_opts_set(nlp_config, nlp_opts, "qp_t0_init", &qp_solver_t0_init);
 
 
 
@@ -980,24 +987,25 @@ void SAM_equation_system_acados_set_nlp_out(SAM_equation_system_solver_capsule* 
     double* x0 = xu0;
 
     // initialize with x0
-    x0[0] = 4.557752171945946;
-    x0[1] = -0.7830821578868158;
-    x0[2] = 0.4395271245832924;
-    x0[3] = 0.9472029839715882;
-    x0[4] = -0.01339096849137078;
-    x0[5] = -0.05265761139411095;
-    x0[6] = -0.3229301281944523;
-    x0[7] = 1.3246326388579783;
-    x0[8] = 0.23557194081263383;
-    x0[9] = -0.013921859628079757;
-    x0[10] = -0.05482385732213416;
-    x0[11] = -0.03474024185515258;
-    x0[12] = -0.24977149253323003;
-    x0[13] = 79;
-    x0[14] = 93.5;
+    x0[0] = 3.4462469483859652;
+    x0[1] = -0.171976620326895;
+    x0[2] = 0.4113399189080474;
+    x0[3] = 0.9817103692502774;
+    x0[4] = 0.009041938080283196;
+    x0[5] = 0.06689387341222863;
+    x0[6] = -0.21396927068158303;
+    x0[7] = -1.1773472714403062;
+    x0[8] = -0.35612140738882586;
+    x0[9] = 0.050804895833254086;
+    x0[10] = 0.07802302729447153;
+    x0[11] = 0.03442255342547784;
+    x0[12] = -0.6738297894017098;
+    x0[13] = 56;
+    x0[14] = 100;
+    x0[15] = 0.12217304763960309;
     x0[16] = 0.08726646259971647;
-    x0[17] = 600;
-    x0[18] = 600;
+    x0[17] = -1000;
+    x0[18] = -1000;
 
 
     double* u0 = xu0 + NX;
@@ -1175,8 +1183,7 @@ int SAM_equation_system_acados_update_params_sparse(SAM_equation_system_solver_c
 int SAM_equation_system_acados_set_p_global_and_precompute_dependencies(SAM_equation_system_solver_capsule* capsule, double* data, int data_len)
 {
 
-    // printf("No global_data, SAM_equation_system_acados_set_p_global_and_precompute_dependencies does nothing.\n");
-    return 0;
+    printf("p_global is not defined, SAM_equation_system_acados_set_p_global_and_precompute_dependencies does nothing.\n");
 }
 
 
@@ -1191,35 +1198,12 @@ int SAM_equation_system_acados_solve(SAM_equation_system_solver_capsule* capsule
 }
 
 
-
-int SAM_equation_system_acados_setup_qp_matrices_and_factorize(SAM_equation_system_solver_capsule* capsule)
-{
-    int solver_status = ocp_nlp_setup_qp_matrices_and_factorize(capsule->nlp_solver, capsule->nlp_in, capsule->nlp_out);
-
-    return solver_status;
-}
-
-
-
-void SAM_equation_system_acados_batch_solve(SAM_equation_system_solver_capsule ** capsules, int * status_out, int N_batch)
+void SAM_equation_system_acados_batch_solve(SAM_equation_system_solver_capsule ** capsules, int N_batch)
 {
 
     for (int i = 0; i < N_batch; i++)
     {
-        status_out[i] = ocp_nlp_solve(capsules[i]->nlp_solver, capsules[i]->nlp_in, capsules[i]->nlp_out);
-    }
-
-
-    return;
-}
-
-
-void SAM_equation_system_acados_batch_setup_qp_matrices_and_factorize(SAM_equation_system_solver_capsule ** capsules, int * status_out, int N_batch)
-{
-
-    for (int i = 0; i < N_batch; i++)
-    {
-        status_out[i] = ocp_nlp_setup_qp_matrices_and_factorize(capsules[i]->nlp_solver, capsules[i]->nlp_in, capsules[i]->nlp_out);
+        ocp_nlp_solve(capsules[i]->nlp_solver, capsules[i]->nlp_in, capsules[i]->nlp_out);
     }
 
 
@@ -1257,7 +1241,7 @@ void SAM_equation_system_acados_batch_eval_solution_sens_adj_p(SAM_equation_syst
 
 void SAM_equation_system_acados_batch_set_flat(SAM_equation_system_solver_capsule ** capsules, const char *field, double *data, int N_data, int N_batch)
 {
-    int offset = ocp_nlp_dims_get_total_from_attr(capsules[0]->nlp_solver->config, capsules[0]->nlp_solver->dims, capsules[0]->nlp_out, field);
+    int offset = ocp_nlp_dims_get_total_from_attr(capsules[0]->nlp_solver->config, capsules[0]->nlp_solver->dims, field);
 
     if (N_batch*offset != N_data)
     {
@@ -1279,7 +1263,7 @@ void SAM_equation_system_acados_batch_set_flat(SAM_equation_system_solver_capsul
 
 void SAM_equation_system_acados_batch_get_flat(SAM_equation_system_solver_capsule ** capsules, const char *field, double *data, int N_data, int N_batch)
 {
-    int offset = ocp_nlp_dims_get_total_from_attr(capsules[0]->nlp_solver->config, capsules[0]->nlp_solver->dims, capsules[0]->nlp_out, field);
+    int offset = ocp_nlp_dims_get_total_from_attr(capsules[0]->nlp_solver->config, capsules[0]->nlp_solver->dims, field);
 
     if (N_batch*offset != N_data)
     {
