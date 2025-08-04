@@ -60,7 +60,7 @@ class SIM:
                 data[:, i+1] = data[:, i-10]
                 if once:
                     once = False
-                    end_val = i-10
+                    end_val = i - 10
 
         if self.state_update:
             print(f" Average times between resets: {np.mean(times)}")

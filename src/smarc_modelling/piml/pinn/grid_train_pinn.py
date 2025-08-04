@@ -107,22 +107,22 @@ if __name__ == "__main__":
         y_trajectories_test.append(y_traj)
 
     # For results
-    error_grid = np.zeros((5, 5, 2))
+    error_grid = np.zeros((6, 6, 3))
     best_error = float("inf")
 
     # We do not normalize the test dataset since we need the actual values in the sim
     # instead the normalization is done directly before prediction the damping matrix letting us 
     # retain these original values
 
-    n_steps = 1
+    n_steps = 20
 
     best_loss_history = []
     best_val_loss_history = []
 
     # Grid params
-    for i, layers in enumerate([2, 4, 6, 8, 10]): # Amount of layers
-        for j, size in enumerate([2, 4, 8, 16, 32]): # Amount of neurons in each layer 
-            for k, factor in enumerate([0.9, 0.7]):
+    for i, layers in enumerate([5, 10, 20, 30, 50, 100]): # Amount of layers
+        for j, size in enumerate([4, 8, 16, 32, 64, 128]): # Amount of neurons in each layer 
+            for k, factor in enumerate([0.75, 0.5, 0.25]):
 
                 loss_history = []
                 val_loss_history = []
@@ -142,7 +142,7 @@ if __name__ == "__main__":
 
                 # Early stopping with validation loss
                 best_val_loss = float("inf")
-                patience = 7500
+                patience = 5000
                 counter = 0
                 best_model_state = None
 
@@ -159,7 +159,7 @@ if __name__ == "__main__":
                         
                         # Get PI loss
                         x_traj_normed = (x_traj - x_mean) / x_std
-                        loss = loss_function(model, x_traj, y_traj, n_steps)
+                        loss = loss_function(model, x_traj_normed, y_traj, n_steps)
                         loss_total += loss
 
                     loss_total.backward()
@@ -175,8 +175,8 @@ if __name__ == "__main__":
                         for x_traj_val, y_traj_val in zip(x_trajectories_val, y_trajectories_val):
 
                             # Get PI validation loss
-                            x_traj_normed_val = (x_traj_val - x_mean) / x_std
-                            val_loss = loss_function(model, x_traj_val, y_traj_val, n_steps)
+                            x_traj_val_normed = (x_traj_val - x_mean) / x_std
+                            val_loss = loss_function(model, x_traj_val_normed, y_traj_val, n_steps)
                             val_loss_total += val_loss
 
                     # For plotting the loss 

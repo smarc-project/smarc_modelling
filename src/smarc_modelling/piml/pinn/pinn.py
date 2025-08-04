@@ -93,17 +93,17 @@ def loss_function(model, x_traj, y_traj, n_steps=10):
     # Physics loss predicted D matrix here should sum all the forces to 0
     physics_loss = (1/N) * torch.mean((Mv_dot + Cv + (torch.bmm(D_pred, nu.unsqueeze(2)).squeeze(2)) + g_eta - tau)**2)
 
-    # Data Loss
-    rhs = tau.unsqueeze(0) - Cv.unsqueeze(0) - g_eta.unsqueeze(0) - torch.bmm(D_pred, nu.unsqueeze(2)).squeeze(2)
-    rhs = rhs.squeeze()
-    nu_dot_model = torch.linalg.solve(M, rhs) # Solve for the acceleration
-    data_loss = (1/N) * torch.mean((nu_dot_model - nu_dot)**2)
+    # # Data Loss
+    # rhs = tau.unsqueeze(0) - Cv.unsqueeze(0) - g_eta.unsqueeze(0) - torch.bmm(D_pred, nu.unsqueeze(2)).squeeze(2)
+    # rhs = rhs.squeeze()
+    # nu_dot_model = torch.linalg.solve(M, rhs) # Solve for the acceleration
+    # data_loss = (1/N) * torch.mean((nu_dot_model - nu_dot)**2)
 
+    # Multi-step loss
+    data_loss = (1/N) * multi_step_loss_function(model, x_traj, y_traj, n_steps)
+    
     # Encourage high damping in roll and y directions by returning high values when corresponding damping terms are low
     damping_penalty = additional_damping_penalty(D_pred)
-  
-    # Multi-step loss
-    # data_loss = (1/N) * multi_step_loss_function(model, x_traj, y_traj, n_steps)
 
     # Scaling to ensure losses have approximately same scale
     alpha = 0.05
@@ -120,53 +120,53 @@ def loss_function(model, x_traj, y_traj, n_steps=10):
     return physics_loss*alpha + data_loss*beta + damping_penalty*gamma
 
 
-# def multi_step_loss_function(model, x_traj, y_traj, n_steps=10):
-#     """
-#     Computes a multi-step integration loss based on nu over multiple steps
-#     """
+def multi_step_loss_function(model, x_traj, y_traj, n_steps=10):
+    """
+    Computes a multi-step integration loss based on nu over multiple steps
+    """
 
-#     if n_steps == 0:
-#         print(f" n_steps was set to 0, changing it to 1!")
-#         n_steps = 1
+    if n_steps == 0:
+        print(f" n_steps was set to 0, changing it to 1!")
+        n_steps = 1
 
-#     # Unpacking inputs
-#     eta = x_traj[:, :6]
-#     nu = x_traj[:, 6:12]
-#     u = x_traj[:, 12:]
+    # Unpacking inputs
+    eta = x_traj[:, :6]
+    nu = x_traj[:, 6:12]
+    u = x_traj[:, 12:]
 
-#     # Output values
-#     Cv = y_traj["Cv"]
-#     g_eta = y_traj["g_eta"]
-#     tau = y_traj["tau"]
-#     t = y_traj["t"]
-#     M = y_traj["M"]
+    # Output values
+    Cv = y_traj["Cv"]
+    g_eta = y_traj["g_eta"]
+    tau = y_traj["tau"]
+    t = y_traj["t"]
+    M = y_traj["M"]
 
-#     # Get the dt vector
-#     dt_np = np.diff(t.numpy())
-#     dt = torch.tensor(dt_np, dtype=torch.float32)
+    # Get the dt vector
+    dt_np = np.diff(t.numpy())
+    dt = torch.tensor(dt_np, dtype=torch.float32)
     
-#     loss = 0.0
-#     nu_pred = nu[0].unsqueeze(0) # x0
+    loss = 0.0
+    nu_pred = nu[0].unsqueeze(0) # x0
 
-#     for i in range(n_steps):
-#         if i >= len(eta) - 1:
-#             # Making sure we have values to compare to
-#             break
+    for i in range(n_steps):
+        if i >= len(eta) - 1:
+            # Making sure we have values to compare to
+            break
 
-#         # Prep inputs for model
-#         x_input = torch.cat([eta[i].unsqueeze(0), nu_pred, u[i].unsqueeze(0)], dim=1)
-#         D_pred = model(x_input) 
+        # Prep inputs for model
+        x_input = torch.cat([eta[i].unsqueeze(0), nu_pred, u[i].unsqueeze(0)], dim=1)
+        D_pred = model(x_input) 
 
-#         # Euler forward integration
-#         rhs = tau[i].unsqueeze(0) - Cv[i].unsqueeze(0) - g_eta[i].unsqueeze(0) - torch.bmm(D_pred, nu_pred.unsqueeze(2)).squeeze(2)
-#         rhs = rhs.squeeze()
-#         nu_dot = torch.linalg.solve(M[i], rhs) # Solve for the acceleration
-#         nu_pred = nu_pred + dt[i] * nu_dot # Euler forward with variable dt to get model difference to real value one step ahead
+        # Euler forward integration
+        rhs = tau[i].unsqueeze(0) - Cv[i].unsqueeze(0) - g_eta[i].unsqueeze(0) - torch.bmm(D_pred, nu_pred.unsqueeze(2)).squeeze(2)
+        rhs = rhs.squeeze()
+        nu_dot = torch.linalg.solve(M[i], rhs) # Solve for the acceleration
+        nu_pred = nu_pred + dt[i] * nu_dot # Euler forward with variable dt to get model difference to real value one step ahead
 
-#         # Loss as difference between real velocity and collected for the next step
-#         loss += torch.mean((nu_pred.clone() - nu[i+1].unsqueeze(0))**2)
+        # Loss as difference between real velocity and collected for the next step
+        loss += torch.mean((nu_pred.clone() - nu[i+1].unsqueeze(0))**2)
 
-#     return loss / n_steps
+    return loss / n_steps
 
 def additional_damping_penalty(D_pred):
     # Get the elements for damping in y and for roll
@@ -226,7 +226,7 @@ def pinn_predict(model, eta, nu, u, norm):
     x_normed = (x - norm[0]) / norm[1]
 
     # Get prediction
-    D_pred = model(x).detach().numpy()
+    D_pred = model(x_normed).detach().numpy()
     return D_pred.squeeze()
 
 
