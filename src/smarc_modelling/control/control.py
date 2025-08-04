@@ -69,16 +69,15 @@ class NMPC:
         # --------------------------- Cost setup ---------------------------------
         # State weight matrix
         Q_diag = np.ones(nx)
-        Q_diag[ 0:3 ] = 10      # Position:         standard 10
-        Q_diag[  2  ] = 100     # Position:         standard 10
+        Q_diag[ 0:3 ] = 500      # Position:         standard 10
         Q_diag[ 3:7 ] = 0       # Quaternion:       standard 10
         Q_diag[ 7:10] = 1       # linear velocity:  standard 1
         Q_diag[10:13] = 1       # Angular velocity: standard 1
 
         # Control weight matrix - Costs set according to Bryson's rule
         Q_diag[13:15] = 1e-4            # VBS, LCG:      Standard: 1e-4
-        Q_diag[ 15  ] = 5e3             # stern_angle:   Standard: 100
-        Q_diag[ 16  ] = 5e3             # rudder_angle:  Standard: 100
+        Q_diag[ 15  ] = 1e2             # stern_angle:   Standard: 100
+        Q_diag[ 16  ] = 1e2             # rudder_angle:  Standard: 100
         Q_diag[17:  ] = 1e-6            # RPM1 And RPM2: Standard: 1e-6
         Q_diag[13:  ] = Q_diag[13:  ]   # Adjustment to control weights
         Q = np.diag(Q_diag)
@@ -102,13 +101,13 @@ class NMPC:
         
         # Terminal cost
         self.ocp.cost.cost_type_e = 'NONLINEAR_LS'
-        Q_e = np.zeros(nx)
-        Q_e[ :3] = 1
-        Q_e[3:7] = 1
-        Q_e[7:10]= 1
-        Q_e[10:13]= 1
-        Q_e[13:] = 0
-        Q_e = np.diag(Q_e)
+        # Q_e = np.zeros(nx)
+        # Q_e[ :3] = 1
+        # Q_e[3:7] = 1
+        # Q_e[7:10]= 1
+        # Q_e[10:13]= 1
+        # Q_e[13:] = 0
+        # Q_e = np.diag(Q_e)
         self.ocp.cost.W_e = Q #np.zeros(np.shape(Q))
         self.ocp.model.cost_y_expr_e = self.x_error(self.model.x, self.model.u, self.ocp.model.p, terminal=True)
         self.ocp.cost.yref_e = np.zeros((nx,))
@@ -137,7 +136,7 @@ class NMPC:
         # Set constraints on the control
         x_ubx[0:2] = 100 
         x_ubx[2:4] = np.deg2rad(7)
-        x_ubx[4: ] = 1000
+        x_ubx[4: ] = 600
 
         x_lbx = -x_ubx
         x_lbx[0:2] = 0
