@@ -69,24 +69,25 @@ class NMPC:
         # --------------------------- Cost setup ---------------------------------
         # State weight matrix
         Q_diag = np.ones(nx)
-        Q_diag[ 0:3 ] = 500      # Position:         standard 10
+        Q_diag[ 0:3 ] = 10      # Position:         standard 10
+        Q_diag[  2 ] = 100      # Position:         standard 10
         Q_diag[ 3:7 ] = 0       # Quaternion:       standard 10
         Q_diag[ 7:10] = 1       # linear velocity:  standard 1
         Q_diag[10:13] = 1       # Angular velocity: standard 1
 
         # Control weight matrix - Costs set according to Bryson's rule
         Q_diag[13:15] = 1e-4            # VBS, LCG:      Standard: 1e-4
-        Q_diag[ 15  ] = 1e2             # stern_angle:   Standard: 100
-        Q_diag[ 16  ] = 1e2             # rudder_angle:  Standard: 100
+        Q_diag[ 15  ] = 1e1             # stern_angle:   Standard: 100
+        Q_diag[ 16  ] = 1e1             # rudder_angle:  Standard: 100
         Q_diag[17:  ] = 1e-6            # RPM1 And RPM2: Standard: 1e-6
-        Q_diag[13:  ] = Q_diag[13:  ]   # Adjustment to control weights
+        Q_diag[13:  ] = Q_diag[13:  ]   # Adjustment to all control weights
         Q = np.diag(Q_diag)
 
         # Control rate of change weight matrix - control inputs as [x_vbs, x_lcg, delta_s, delta_r, rpm1, rpm2]
         R_diag = np.ones(nu)
         R_diag[ :2] = 1e-3
-        R_diag[2] = 1
-        R_diag[3] = 1e6
+        R_diag[2] = 1e2
+        R_diag[3] = 1e2
         R_diag[4: ] = 1e-5
         R = np.diag(R_diag)*1e-3
 
