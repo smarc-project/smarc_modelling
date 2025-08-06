@@ -56,8 +56,7 @@ class NMPC:
         # --------------------------- Cost setup ---------------------------------
         # State weight matrix
         Q_diag = np.ones(nx)
-        Q_diag[ 0:3 ] = 10      # Position:         standard 10
-        Q_diag[  2  ] = 100     # Position:         standard 10
+        Q_diag[ 0:3 ] = 100      # Position:         standard 10
         Q_diag[ 3:7 ] = 0       # Quaternion:       standard 10
         Q_diag[ 7:10] = 1       # linear velocity:  standard 1
         Q_diag[10:13] = 1       # Angular velocity: standard 1
@@ -93,8 +92,8 @@ class NMPC:
         self.ocp.cost.yref_e = np.zeros((nx,))
 
         # --------------------- Constraint Setup --------------------------
-        vbs_dot = 7     # Maximum rate of change for the VBS
-        lcg_dot = 15    # Maximum rate of change for the LCG
+        vbs_dot = 200     # Maximum rate of change for the VBS
+        lcg_dot = 50     # Maximum rate of change for the LCG
 
         # Declare initial state
         self.ocp.constraints.x0 = np.zeros((nx,)) # Initial state is zero. This is set in the sim. for-loop
