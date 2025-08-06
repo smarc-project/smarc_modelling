@@ -1,11 +1,7 @@
 # Script for the acados NMPC model
-
-import os
-
 from acados_template import AcadosOcp, AcadosOcpSolver, AcadosSimSolver, AcadosModel, AcadosSim
 import numpy as np
 import casadi as ca
-
 
 
 #The original NMPC class. Uses hard constraints.
@@ -26,15 +22,6 @@ class NMPC:
         self.Tf    = Ts*N_horizon
         self.N_horizon = N_horizon
         self.update_solver = update_solver_settings
-        # ----------- Unknown stuff coming from merge --------------
-        # self.build = build          
-        # self.acados_dir = acados_dir
-
-        # # TODO: Add a acadso sim object for the integration
-        # # Then you can hopefully specify the build path!
-        # self.sim = AcadosSim()
-        # self.sim.model = self.model
-        # --------------- end of unknown stuff -------------------
         
     # Function to create a Acados model from the casadi model
     def export_dynamics_model(self, casadi_model):
@@ -70,24 +57,23 @@ class NMPC:
         # State weight matrix
         Q_diag = np.ones(nx)
         Q_diag[ 0:3 ] = 10      # Position:         standard 10
-        Q_diag[  2 ] = 100      # Position:         standard 10
+        Q_diag[  2  ] = 100     # Position:         standard 10
         Q_diag[ 3:7 ] = 0       # Quaternion:       standard 10
         Q_diag[ 7:10] = 1       # linear velocity:  standard 1
         Q_diag[10:13] = 1       # Angular velocity: standard 1
 
         # Control weight matrix - Costs set according to Bryson's rule
         Q_diag[13:15] = 1e-4            # VBS, LCG:      Standard: 1e-4
-        Q_diag[ 15  ] = 1e1             # stern_angle:   Standard: 100
-        Q_diag[ 16  ] = 1e1             # rudder_angle:  Standard: 100
-        Q_diag[17:  ] = 1e-6            # RPM1 And RPM2: Standard: 1e-6
+        Q_diag[ 15  ] = 5e1             # stern_angle:   Standard: 100
+        Q_diag[ 16  ] = 5e1             # rudder_angle:  Standard: 100
+        Q_diag[17:  ] = 1e-5            # RPM1 And RPM2: Standard: 1e-6
         Q_diag[13:  ] = Q_diag[13:  ]   # Adjustment to all control weights
         Q = np.diag(Q_diag)
 
         # Control rate of change weight matrix - control inputs as [x_vbs, x_lcg, delta_s, delta_r, rpm1, rpm2]
         R_diag = np.ones(nu)
         R_diag[ :2] = 1e-3
-        R_diag[2] = 1e2
-        R_diag[3] = 1e2
+        R_diag[2:4] = 1e2
         R_diag[4: ] = 1e-5
         R = np.diag(R_diag)*1e-3
 
@@ -95,44 +81,31 @@ class NMPC:
         self.model.p = ca.MX.sym('ref_param', nx+nu,1)
         self.ocp.parameter_values = np.zeros((nx+nu,))
 
-        self.ocp.cost.yref  = np.zeros((nx+nu,))        # Init ref point. The true references are declared in the sim. for-loop
+        self.ocp.cost.yref  = np.zeros((nx+nu,))        # Init ref point. The true references are declared in the controller for-loop
         self.ocp.cost.cost_type = 'NONLINEAR_LS'
         self.ocp.cost.W = ca.diagcat(Q, R).full()
-        self.ocp.model.cost_y_expr = self.x_error(self.model.x, self.model.u, self.model.p, terminal=False) #ca.vertcat(self.model.x, self.model.u)
+        self.ocp.model.cost_y_expr = self.x_error(self.model.x, self.model.u, self.model.p, terminal=False)
         
         # Terminal cost
         self.ocp.cost.cost_type_e = 'NONLINEAR_LS'
-        # Q_e = np.zeros(nx)
-        # Q_e[ :3] = 1
-        # Q_e[3:7] = 1
-        # Q_e[7:10]= 1
-        # Q_e[10:13]= 1
-        # Q_e[13:] = 0
-        # Q_e = np.diag(Q_e)
         self.ocp.cost.W_e = Q #np.zeros(np.shape(Q))
         self.ocp.model.cost_y_expr_e = self.x_error(self.model.x, self.model.u, self.ocp.model.p, terminal=True)
         self.ocp.cost.yref_e = np.zeros((nx,))
 
         # --------------------- Constraint Setup --------------------------
-        vbs_dot = 10    # Maximum rate of change for the VBS
+        vbs_dot = 7     # Maximum rate of change for the VBS
         lcg_dot = 15    # Maximum rate of change for the LCG
-        ds_dot  = 7     # Maximum rate of change for stern angle
-        dr_dot  = 7     # Maximum rate of change for rudder angle
-        rpm_dot = 1000  # Maximum rate of change for rpm
 
         # Declare initial state
         self.ocp.constraints.x0 = np.zeros((nx,)) # Initial state is zero. This is set in the sim. for-loop
 
         # Set constraints on the control rate of change
-        # self.ocp.constraints.lbu = np.array([-vbs_dot,-lcg_dot, -ds_dot, -dr_dot, -rpm_dot, -rpm_dot])
-        # self.ocp.constraints.ubu = np.array([ vbs_dot, lcg_dot,  ds_dot,  dr_dot,  rpm_dot,  rpm_dot])
-        # self.ocp.constraints.idxbu = np.arange(nu)
         self.ocp.constraints.lbu = np.array([-vbs_dot,-lcg_dot])
         self.ocp.constraints.ubu = np.array([ vbs_dot, lcg_dot])
         self.ocp.constraints.idxbu = np.arange(2)
 
         # Set constraints on the states and input magnitudes
-        x_ubx = np.ones(nu) # If state constraints are desired change nu to nx and declare for each state what is desired
+        x_ubx = np.ones(nu) # Only controller magnitutes are constrained
 
         # Set constraints on the control
         x_ubx[0:2] = 100 
@@ -165,17 +138,10 @@ class NMPC:
         self.ocp.solver_options.globalization = 'MERIT_BACKTRACKING'
         self.ocp.solver_options.regularize_method = 'NO_REGULARIZE'
 
-        #solver_json = 'acados_ocp_' + self.model.name + '.json'
-        #acados_ocp_solver = AcadosOcpSolver(self.ocp, json_file = solver_json)
-
-        ## create an integrator with the same settings as used in the OCP solver.
-        #acados_integrator = AcadosSimSolver(self.ocp, json_file = solver_json)
 
         solver_json = 'acados_ocp_' + self.model.name + '.json'
         if self.update_solver == False:
             acados_ocp_solver = AcadosOcpSolver(self.ocp, json_file = solver_json, generate=False, build=False)
-
-            # create an integrator with the same settings as used in the OCP solver. generate=False, build=False
             acados_integrator = AcadosSimSolver(self.ocp, json_file = solver_json, generate=False, build=False)
 
         else:
