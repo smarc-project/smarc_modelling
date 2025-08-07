@@ -9,11 +9,10 @@ import os
 class NMPC:
     def __init__(self, casadi_model, Ts, N_horizon, update_solver_settings):
         '''
-        Input:
-            casadi_model: Casadi model
-            Ts: Sampling Interval
-            N_horizon: Prediction horizon
-            Update_solver_settings: If True, the solver will be updated with the new settings.
+        :param casadi_model: The casadi model to be used
+        :param Ts: Sampling interval
+        :param N_horizon: Control horizon
+        :param update_solver_settings: If True, the solver will be updated with the new settings.
         '''
         self.ocp   = AcadosOcp()
         self.model = self.export_dynamics_model(casadi_model)
