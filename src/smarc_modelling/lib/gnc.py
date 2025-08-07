@@ -255,7 +255,7 @@ def quaternion_to_dcm(q):
 
     #rot = R.from_quat(q, scalar_first=True)
     
-    q_scalar_first = np.roll(q, 1)
+    q_scalar_first = np.roll(q, -1)
     rot = R.from_quat(q_scalar_first)
     dcm = rot.as_matrix()
 
@@ -279,7 +279,7 @@ def quaternion_to_angles(q):
 
     #rot = R.from_quat(q, scalar_first=True)
     
-    q_scalar_first = np.roll(q, 1)
+    q_scalar_first = np.roll(q, -1)
     rot = R.from_quat(q_scalar_first)
     rot_euler = rot.as_euler('xyz')
     phi, theta, psi = rot_euler

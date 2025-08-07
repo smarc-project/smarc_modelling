@@ -156,9 +156,8 @@ ACADOS_SYMBOL_EXPORT int SAM_equation_system_acados_update_params_sparse(SAM_equ
 ACADOS_SYMBOL_EXPORT int SAM_equation_system_acados_set_p_global_and_precompute_dependencies(SAM_equation_system_solver_capsule* capsule, double* data, int data_len);
 
 ACADOS_SYMBOL_EXPORT int SAM_equation_system_acados_solve(SAM_equation_system_solver_capsule * capsule);
-ACADOS_SYMBOL_EXPORT int SAM_equation_system_acados_setup_qp_matrices_and_factorize(SAM_equation_system_solver_capsule* capsule);
 
-ACADOS_SYMBOL_EXPORT void SAM_equation_system_acados_batch_solve(SAM_equation_system_solver_capsule ** capsules, int * status_out, int N_batch);
+ACADOS_SYMBOL_EXPORT void SAM_equation_system_acados_batch_solve(SAM_equation_system_solver_capsule ** capsules, int N_batch);
 
 ACADOS_SYMBOL_EXPORT void SAM_equation_system_acados_batch_set_flat(SAM_equation_system_solver_capsule ** capsules, const char *field, double *data, int N_data, int N_batch);
 ACADOS_SYMBOL_EXPORT void SAM_equation_system_acados_batch_get_flat(SAM_equation_system_solver_capsule ** capsules, const char *field, double *data, int N_data, int N_batch);
