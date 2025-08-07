@@ -13,6 +13,7 @@ class NMPC:
             casadi_model: Casadi model
             Ts: Sampling Interval
             N_horizon: Prediction horizon
+            Update_solver_settings: If True, the solver will be updated with the new settings.
         '''
         self.ocp   = AcadosOcp()
         self.model = self.export_dynamics_model(casadi_model)
