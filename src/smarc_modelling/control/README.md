@@ -8,7 +8,7 @@
         [x, y, z, q_w, q_x, q_y, q_z, u, v, w, p, q, r, x_vbs, x_lcg, delta_s, delta_r, rpm1, rpm2]
 
 
-- The vector **u** Consists of the rate of change of the control inputs, i.e. **u  ̇ _dot**. They are declared as following:
+- The vector **u** Consists of the rate of change of the control inputs, i.e. **u ̇ _dot**. They are declared as following:
 
 
         [x_vbs, x_lcg, delta_s, delta_r, rpm1, rpm2]
