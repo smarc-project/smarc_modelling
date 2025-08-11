@@ -11,7 +11,7 @@
 - The vector **u** Consists of the rate of change of the control inputs, i.e. **$\dot{u}$**. They are declared as following:
 
 
-        [x_vbs, x_lcg, delta_s, delta_r, rpm1, rpm2]
+        [$\dot{x}$_vbs, $\dot{x}$_lcg, delta_$\dot{s}$, delta_$\dot{r}$, rpm1_dot, rpm2_dot]
 ### Output (order)
 Outputs the optimal control as [x_vbs_dot, x_lcg_dot, delta_s_dot, delta_r_dot, rpm1, rpm2]
 
