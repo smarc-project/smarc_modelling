@@ -8,12 +8,12 @@
         [x, y, z, q_w, q_x, q_y, q_z, u, v, w, p, q, r, x_vbs, x_lcg, delta_s, delta_r, rpm1, rpm2]
 
 
-- The vector **u** Consists of the rate of change of the control inputs, i.e. **u_dot**. They are declared as following:
+- The vector **u** Consists of the rate of change of the control inputs, i.e. **u ̇_dot**. They are declared as following:
 
 
         [x_vbs, x_lcg, delta_s, delta_r, rpm1, rpm2]
 ### Output (order)
-Outputs the optimal control as [x_vbs, x_lcg, delta_s, delta_r, rpm1, rpm2]
+Outputs the optimal control as [x_vbs_dot, x_lcg_dot, delta_s_dot, delta_r_dot, rpm1, rpm2]
 
 #### Tuning
 - N_horizon: Length of the prediction horizon
