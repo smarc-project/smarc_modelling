@@ -1,4 +1,6 @@
 # control
+### Containts the NMPC class
+
 ### Input (order)
 
 
@@ -6,6 +8,7 @@
 
 
 #### Tuning
+  -N_horizon: Length of the prediction horizon
 
 
 
