@@ -3,7 +3,8 @@
 
 ### Input (order)
 - The vector **x** contains the state vector and control vector concatenated. The order of the state vector is:
-  
+
+
     [x, y, z, q_w, q_x, q_y, q_z, u, v, w, p, q, r, x_vbs, x_lcg, delta_s, delta_r, rpm1, rpm2]
 
 ### Output (order)
