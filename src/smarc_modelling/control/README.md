@@ -1,16 +1,16 @@
 # control
-## Input (order)
-### sTESTTST
-## Output (order)
+### Input (order)
 
+
+### Output (order)
+
+
+#### Tuning
 
 
 
 
 # acados_Trajectory_simulator
-
-
-
 
 
 
