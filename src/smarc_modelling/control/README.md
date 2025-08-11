@@ -8,7 +8,7 @@
 
 
 #### Tuning
-  -N_horizon: Length of the prediction horizon
+    N_horizon: Length of the prediction horizon
 
 
 
