@@ -11,12 +11,14 @@ The vector **u** Consists of the rate of change of the control inputs, i.e. **$\
 $\dot{u}$ = [x_vbs, x_lcg, delta_s, delta_r, rpm1, rpm2].
 
 **NOTE:** This is valid for the SAM casadi model, as the rest of the information in the README. Other models may have different orders!
-### __init\_\_(casadi_model, Ts, update_solver_settings)
+### __init\_\_(casadi_model, Ts, N_horizon, update_solver_settings)
 
 #### casadi_model: 
 The casadi model to be used
 #### Ts: 
 The desired sampling interval for the controller
+#### N_horizon: 
+Can be found in the init. It is the length of the prediction horizon (and control horizon since they are equal).
 #### update_solver_settings: 
 If true, it regenerates and rebuilds the solver. Do this if changes have been made in the tuning or anything else related to the NMPC class.
 
@@ -26,11 +28,8 @@ Method to augment the state vector with the control vector to make it work with 
 #### casadi_model: 
 The casadi model to be used
 
-#### N_horizon: 
-Can be found in the init. It is the length of the prediction horizon (and control horizon since they are equal).
-
 ### setup()
-This method setup all the constraints and tuning parameters for the NMPC. Lastly, it rebuilds the NMPC if 
+This method setup all the constraints and tuning parameters for the NMPC and should be run. Lastly, it rebuilds the NMPC if 
         
         update_solver_settings = True
 
@@ -97,9 +96,41 @@ The solution lies in the mpc_solution, where indeces [13:19] are the optimal con
 
 
 # acados_Trajectory_simulator
-
+Reads in a trajectory from .csv file and simulates the tracking with the NMPC. It also plot the reference and the actual trajectory. Can be viewed as an example. Not used anymore, can be removed.
 
 
 # NMPC_sim
 
-Can be removed - simulates a trajectory readed from a csv-file
+Reads in trajectories  multiple .csv files. Calculates statistics on the tracking and plot the reference and actual trajectory. Can be viewed as an example. Not used anymore, can be removed.
+
+# Usage in DiveController.py
+More specifically in the DiveControllerMPC class. Some key variables and functions are explained here. Everything that is used by the NMPC, such as states and waypoints, are converted to NED from ENU.
+
+
+### __init\_\_
+**build:** Variable that declares if the OCP should be generated and built.  (=update_solver_settings) 
+
+**ref_is_traj:** Variable that declares if the reference to be tracked is a trajectory or waypoint. If it is a trajectory, set:
+
+        ref_is_traj = True
+
+**_initialized:** Variable that declares if the current state have been acquired.
+
+**_acados_status:** Dictionary that is used to print the status of the solver while running the NMPC. Originally, the Acados solver only returns values 0-6 but now it is possible to see what each value means. 
+
+
+### update
+
+**Nsim:** Length of the trajectory. Used for the sub-trajectory assignments to the NMPC when tracking trajectories. Also used to print the progress along a trajectory. 
+
+Current state 
+
+
+### get_init_state
+Get the state message in the vector format presented under NMPC class. The states are converted from the ENU frame to the NED frame. Init class has a small perturbation in the thrusters in order to avoid numerical problems. NOTE: In case of numerical problems, a small perturbation can also be added to the velocity in x.
+
+### get_current_state
+Get the state message in the vector format presented under NMPC class. The states are converted from the ENU frame to the NED frame
+
+### How to start
+        ros2 launch sam_diving_controller waypoint_nmpc.launch robot_name:=sam_name
