@@ -50,7 +50,7 @@ class NMPC:
         return model
     
     def setup(self):    
-        print("\033[92mNMPC_trajectory setup is running\033[0m")    
+        print("\033[92mNMPC setup is running\033[0m")    
         nx = self.model.x.rows()
         nu = self.model.u.rows()
 
@@ -184,7 +184,7 @@ class NMPC:
         q_error = ca.vertcat(q_w, q_x, q_y, q_z)
         q_error = ca.if_else(q_w < 0, -q_error, q_error)  # Ensure the quaternion error is positive
 
-        pos_error = x[:3] - ref[:3] #+ np.array([(np.random.random()-0.5)/5,(np.random.random()-0.5)/5, (np.random.random()-0.5)/5])
+        pos_error = x[:3] - ref[:3] 
         vel_error = x[7:13] - ref[7:13]
         u_error   = x[13:19] - ref[13:19]
         
