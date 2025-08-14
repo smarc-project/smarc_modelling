@@ -204,6 +204,38 @@ def load_data_from_bag(data_file: str="", return_type: str=""):
         )
     
 
+def load_to_trajectory(data_files: list):
+    
+    x_trajectories = []
+    y_trajectories = []
+
+    for dataset in data_files:
+        # Load data from bag
+        path = "src/smarc_modelling/piml/data/rosbags/" + dataset
+        eta, nu, u, u_cmd, Dv_comp, Mv_dot, Cv, g_eta, tau, t, M, acc = load_data_from_bag(path, "torch")
+        
+        x_traj = torch.cat([eta, nu, u], dim=1)
+        y_traj = {
+            "eta": eta,
+            "u_cmd": u_cmd,
+            "Dv_comp": Dv_comp,
+            "Mv_dot": Mv_dot,
+            "Cv": Cv,
+            "g_eta": g_eta,
+            "tau": tau,
+            "t": t,
+            "nu": nu,
+            "M": M,
+            "acc": acc
+        }
+
+        # Append most recently loaded data
+        x_trajectories.append(x_traj)
+        y_trajectories.append(y_traj)
+
+    return x_trajectories, y_trajectories
+
+
 def eta_quat_to_rad(eta):
     """Turns quaternion in eta to radians"""
     pose = eta[0:3]
