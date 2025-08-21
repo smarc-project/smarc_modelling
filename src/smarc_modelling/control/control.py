@@ -153,6 +153,7 @@ class NMPC:
         # Setup the solver
         solver_json = os.path.join(save_dir, 'acados_ocp_' + self.model.name + '.json')
 
+        # FIXME: This if statement is pointless, just use the flag directly.
         if self.update_solver == False:
             acados_ocp_solver = AcadosOcpSolver(self.ocp, json_file = solver_json, generate=False, build=False)
             acados_integrator = AcadosSimSolver(self.ocp, json_file = solver_json, generate=False, build=False)
@@ -187,6 +188,9 @@ class NMPC:
         q_error = ca.vertcat(q_w, q_x, q_y, q_z)
         q_error = ca.if_else(q_w < 0, -q_error, q_error)  # Ensure the quaternion error is positive
 
+        # NOTE: usually I'd have ref - state, the standard closed loop, i.e.
+        # Astroem 2019. Since this error is squared, it should work, too,
+        # Liniger 2014 uses it in their vanilla MPC formulation
         pos_error = x[:3] - ref[:3] 
         vel_error = x[7:13] - ref[7:13]
         u_error   = x[13:19] - ref[13:19]
