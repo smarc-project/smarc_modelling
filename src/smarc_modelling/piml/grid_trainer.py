@@ -21,12 +21,12 @@ if __name__ == "__main__":
 
 # %% ## GRID TRAINER OPTIONS ## %% #
     # SELECT MODEL
-    model = BPINN()
-    sim_model_name = "bpinn"
+    model = PINN()
+    sim_model_name = "pinn"
 
     # SAVE NAME
-    save_best_name = "bpinn_best_grid.pt"
-    name_model = "bpinn.pt"
+    save_best_name = "pinn_best_grid.pt"
+    name_model = "pinn.pt"
 
     # DIVISION FOR TRAIN / VALIDATE SPLIT
     train_procent = 0.9
@@ -34,11 +34,15 @@ if __name__ == "__main__":
     # HYPER - PARAMETERS
     n_steps = 25
     dropout_rate = 0.25
-    layer_grid = [20, 50, 75]
-    size_grid = [26, 32, 40]
-    factor_grid = [0.5]
-    lr0 = 0.0005
-    max_norm = 0.75
+    layer_grid = [10, 25, 50]
+    size_grid = [16, 32, 64]
+    factor_grid = [0.9, 0.5, 0.25]
+    lr0 = 0.005
+    max_norm = 1.0
+
+    # INPUT - OUTPUT SHAPES
+    input_shape = 19
+    output_shape = 36
 
 #####################################
 
@@ -79,8 +83,8 @@ if __name__ == "__main__":
 
                 # NN shape
                 shape = [size] * layers # Hidden layers
-                shape.insert(0, 19) # Input layer
-                shape.append(36) # Output layer
+                shape.insert(0, input_shape) # Input layer
+                shape.append(output_shape) # Output layer
                 
                 # Initialize model
                 if isinstance(model, BPINN):
@@ -172,8 +176,9 @@ if __name__ == "__main__":
                     x0 = y_traj_test["eta"][0, 0].item()
                     y0 = y_traj_test["eta"][0, 1].item()
                     z0 = y_traj_test["eta"][0, 2].item()
+
                     eta_for_error = y_traj_test["eta"]
-                    eta_for_error[:, 1] = 2 * y0 - eta_for_error[:, 1]
+                    eta_for_error[:, 0] = 2 * x0 - eta_for_error[:, 0]
                     eta_for_error[:, 2] = 2 * z0 - eta_for_error[:, 2]
                     eta_test_degs = np.array([eta_quat_to_deg(eta_vec) for eta_vec in eta_for_error])
 
@@ -186,8 +191,6 @@ if __name__ == "__main__":
                         results, _ = sam.run_sim()
                         results = torch.tensor(results).T
                         eta_model = results[:, 0:7]
-                        eta_model[:, 0] = 2 * x0 - eta_model[:, 0] # Flipping to NED frame
-                        eta_model[:, 2] = 2 * z0 - eta_model[:, 2]
                         nu_model = results[:, 7:13]
 
                         # Convert quat to angles
