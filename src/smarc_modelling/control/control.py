@@ -64,10 +64,10 @@ class NMPC:
         Q_diag[10:13] = 1       # Angular velocity: standard 1
 
         # Control weight matrix - Costs set according to Bryson's rule
-        Q_diag[13] = 1e-4            # VBS:      Standard: 1e-4
-        Q_diag[14] = 1e-4            # LCG:      Standard: 1e-4
-        Q_diag[ 15  ] = 5e1             # stern_angle:   Standard: 100
-        Q_diag[ 16  ] = 5e1             # rudder_angle:  Standard: 100
+        Q_diag[13] = 1e-5            # VBS:      Standard: 1e-4
+        Q_diag[14] = 1e-5            # LCG:      Standard: 1e-4
+        Q_diag[ 15  ] = 5e2             # stern_angle:   Standard: 100
+        Q_diag[ 16  ] = 1e3             # rudder_angle:  Standard: 100
         Q_diag[17:  ] = 1e-5            # RPM1 And RPM2: Standard: 1e-6
         Q_diag[13:  ] = Q_diag[13:  ]   # Adjustment to all control weights
         Q = np.diag(Q_diag)
@@ -113,7 +113,7 @@ class NMPC:
         # Set constraints on the control magnitudes
         x_ubx[0:2] = 100 
         x_ubx[2:4] = np.deg2rad(7)
-        x_ubx[4: ] = 600
+        x_ubx[4: ] = 500
 
         x_lbx = -x_ubx
         x_lbx[0:2] = 0
