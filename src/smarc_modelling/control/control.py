@@ -108,19 +108,30 @@ class NMPC:
         self.ocp.constraints.idxbu = np.arange(2)
 
         # Set constraints on the states and input magnitudes
-        x_ubx = np.ones(nu) # NOTE: Only controller magnitutes are constrained
+        # NOTE: In the tank, we want to also constrain the position in x, y, z.
+        # The position of SAM is sam/base_link, hence we have to account for
+        # the shape of SAM when setting the bounds on the positions. Otherwise
+        # we crash anyways. Also, the MPC assumes that SAM is in an NED frame,
+        # hence, the bounds on the tank are also in NED
+        x_ubx = np.ones(3 + nu) 
 
         # Set constraints on the control magnitudes
-        x_ubx[0:2] = 100 
-        x_ubx[2:4] = np.deg2rad(7)
-        x_ubx[4: ] = 600
+        x_ubx[0] = 4
+        x_ubx[1] = 1.5
+        x_ubx[2] = 3
+        x_ubx[3:5] = 100 
+        x_ubx[5:7] = np.deg2rad(7)
+        x_ubx[7: ] = 600
 
         x_lbx = -x_ubx
-        x_lbx[0:2] = 0
+        x_lbx[0] = 0.5
+        x_lbx[1] = -1.5
+        x_lbx[3] = 0
+        x_lbx[3:5] = 0
 
         self.ocp.constraints.lbx = x_lbx
         self.ocp.constraints.ubx = x_ubx
-        self.ocp.constraints.idxbx = np.arange(13, nx)
+        self.ocp.constraints.idxbx = np.concatenate(([0, 1, 2], np.arange(13, nx)))
 
         # ----------------------- Solver Setup --------------------------
         # set prediction horizon
@@ -141,7 +152,6 @@ class NMPC:
         self.ocp.solver_options.globalization = 'MERIT_BACKTRACKING'
         self.ocp.solver_options.regularize_method = 'NO_REGULARIZE'
 
-
         # Define the folder path for the .json and c_generated code inside the home directory
         home_dir = os.path.expanduser("~")
         save_dir = os.path.join(home_dir, "acados_generated_code")
@@ -153,13 +163,8 @@ class NMPC:
         # Setup the solver
         solver_json = os.path.join(save_dir, 'acados_ocp_' + self.model.name + '.json')
 
-        if self.update_solver == False:
-            acados_ocp_solver = AcadosOcpSolver(self.ocp, json_file = solver_json, generate=False, build=False)
-            acados_integrator = AcadosSimSolver(self.ocp, json_file = solver_json, generate=False, build=False)
-
-        else:
-            acados_ocp_solver = AcadosOcpSolver(self.ocp, json_file = solver_json)
-            acados_integrator = AcadosSimSolver(self.ocp, json_file = solver_json)
+        acados_ocp_solver = AcadosOcpSolver(self.ocp, json_file = solver_json, generate=self.update_solver, build=self.update_solver)
+        acados_integrator = AcadosSimSolver(self.ocp, json_file = solver_json, generate=self.update_solver, build=self.update_solver)
 
         return acados_ocp_solver, acados_integrator
     
@@ -187,6 +192,9 @@ class NMPC:
         q_error = ca.vertcat(q_w, q_x, q_y, q_z)
         q_error = ca.if_else(q_w < 0, -q_error, q_error)  # Ensure the quaternion error is positive
 
+        # NOTE: usually I'd have ref - state, the standard closed loop, i.e.
+        # Astroem 2019. Since this error is squared, it should work, too,
+        # Liniger 2014 uses it in their vanilla MPC formulation
         pos_error = x[:3] - ref[:3] 
         vel_error = x[7:13] - ref[7:13]
         u_error   = x[13:19] - ref[13:19]
