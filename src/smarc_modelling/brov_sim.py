@@ -62,8 +62,8 @@ def run_simulation(t_span, x0, dt, blueROV):
     Run BlueROV simulation using RK4.
     """
     u = np.zeros(6)
-    u[0] =  10  # force in x-direction
-    #u[1] = 50 # force in y-direction
+    u[0] =  20  # force in x-direction
+    u[1] = 50 # force in y-direction
     #u[2] = -10 # force in z-direction
     #u[3] = -1 # torque around x-axis
     #u[4] = -1 # torque around the y-axis
@@ -79,7 +79,7 @@ def run_simulation(t_span, x0, dt, blueROV):
     data[:nx,0] = x0
     data[nx:,0] = u
 
-    in_ENU = True
+    in_ENU = False
     frame_message_printed = False
 
     for i in range(n_sim-1):

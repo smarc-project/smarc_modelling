@@ -194,6 +194,8 @@ class BlueROV():
 
         np.set_printoptions(precision=3)
 
+        print(f"C: {self.C}")
+
         nu_dot = self.Minv @ (self.tau - np.matmul(self.C,self.nu_r) - np.matmul(self.D,self.nu_r) - self.g_vec)
         eta_dot = self.eta_dynamics(eta, nu)
         x_dot = np.concatenate([eta_dot, nu_dot])
@@ -233,6 +235,8 @@ class BlueROV():
         """
         CRB = m2c(self.MRB, self.nu_r)
         CA = m2c(self.MA, self.nu_r)
+
+        #print(f"nu_r: {self.nu_r}")
 
         self.C = CRB + CA
 
