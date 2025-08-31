@@ -34,9 +34,11 @@ if __name__ == "__main__":
     # HYPER - PARAMETERS
     n_steps = 25
     dropout_rate = 0.25
-    layer_grid = [10, 25, 50]
-    size_grid = [16, 32, 64]
-    factor_grid = [0.9, 0.5, 0.25]
+
+    # Use best perform here
+    layer_grid = [50]
+    size_grid = [64]
+    factor_grid = [0.5]
     lr0 = 0.005
     max_norm = 1.0
 
@@ -59,6 +61,10 @@ if __name__ == "__main__":
     x_mean = torch.mean(all_x, dim=0)
     x_std = torch.std(all_x, dim=0) + 1e-8 # Preventing division by 0
 
+    # Overwrite normalization just to turn it off in an easy way
+    x_mean = 0
+    x_std = 1
+
     # Load validation data
     x_trajectories_val, y_trajectories_val = load_to_trajectory(datasets[train_val_split:])
 
@@ -77,6 +83,8 @@ if __name__ == "__main__":
     for i, layers in enumerate(layer_grid): # Amount of layers
         for j, size in enumerate(size_grid): # Amount of neurons in each layer 
             for k, factor in enumerate(factor_grid):
+                
+                print(f" Starting training on model {(i+1)*(j+1)*(k+1)} / {len(layer_grid) * len(size_grid) * len(factor_grid)}")
 
                 loss_history = []
                 val_loss_history = []
@@ -172,14 +180,11 @@ if __name__ == "__main__":
                 total_error = 0.0
                 for x_traj_test, y_traj_test in zip(x_trajectories_test, y_trajectories_test):
 
-                    # For flipping the sim results later
-                    x0 = y_traj_test["eta"][0, 0].item()
+                    # Initial position for flipping
                     y0 = y_traj_test["eta"][0, 1].item()
-                    z0 = y_traj_test["eta"][0, 2].item()
 
                     eta_for_error = y_traj_test["eta"]
-                    eta_for_error[:, 0] = 2 * x0 - eta_for_error[:, 0]
-                    eta_for_error[:, 2] = 2 * z0 - eta_for_error[:, 2]
+                    eta_for_error[:, 1] = 2 * y0 - eta_for_error[:, 1]
                     eta_test_degs = np.array([eta_quat_to_deg(eta_vec) for eta_vec in eta_for_error])
 
                     # Getting the state vector in such a way that we can use it in the simulator

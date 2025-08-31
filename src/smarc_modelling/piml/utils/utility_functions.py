@@ -87,13 +87,13 @@ def load_rosbag(bag_path: str=""):
         vbs_fb.append(msg.vbs_fb.value)
         vbs_cmd.append(msg.vbs_cmd.value)
 
-        # Pose
-        x.append(msg.odom_gt.pose.pose.position.x)
-        y.append(msg.odom_gt.pose.pose.position.y)
+        # Pose (flipping frames here to same as used in SAM vehicle)
+        x.append(-msg.odom_gt.pose.pose.position.x)
+        y.append(-msg.odom_gt.pose.pose.position.y)
         z.append(msg.odom_gt.pose.pose.position.z)
         q1.append(msg.odom_gt.pose.pose.orientation.x)
-        q2.append(msg.odom_gt.pose.pose.orientation.y)
-        q3.append(msg.odom_gt.pose.pose.orientation.z)
+        q2.append(-msg.odom_gt.pose.pose.orientation.y)
+        q3.append(-msg.odom_gt.pose.pose.orientation.z)
         q4.append(msg.odom_gt.pose.pose.orientation.w)
 
         # Speeds

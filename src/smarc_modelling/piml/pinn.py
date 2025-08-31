@@ -77,13 +77,17 @@ class PINN(nn.Module):
 
         # Calculate MSE physics loss using Fossen Dynamics Model
         # Physics loss predicted D matrix here should sum all the forces to 0
-        physics_loss = (1/N) * torch.mean((Mv_dot + Cv + (torch.bmm(D_pred, nu.unsqueeze(2)).squeeze(2)) + g_eta - tau)**2)
+        physics_loss = torch.mean((Mv_dot + Cv + (torch.bmm(D_pred, nu.unsqueeze(2)).squeeze(2)) + g_eta - tau)**2)
 
-        # Multi-step loss
-        data_loss = (1/N) * multi_step_loss_function(model, x_traj, y_traj, n_steps)
+        # # Multi-step loss
+        # data_loss = (1/N) * multi_step_loss_function(model, x_traj, y_traj, n_steps)
+
+        # Data loss
+        Dv_pred = torch.matmul(D_pred, nu.unsqueeze(-1)).squeeze(-1)
+        data_loss = torch.mean((Dv_comp - Dv_pred)**2)
         
-        # Encourage high damping in roll and y directions by returning high values when corresponding damping terms are low
-        damping_penalty = additional_damping_penalty(D_pred)
+        # # Encourage high damping in roll and y directions by returning high values when corresponding damping terms are low
+        # damping_penalty = additional_damping_penalty(D_pred)
 
         # Scaling to ensure losses have approximately same scale
         alpha = 0.05
@@ -91,7 +95,7 @@ class PINN(nn.Module):
         gamma = 0.001
 
         # Final loss is just the sum
-        return physics_loss*alpha + data_loss*beta + damping_penalty*gamma
+        return physics_loss*alpha + data_loss*beta #+ damping_penalty*gamma
 
 
 def multi_step_loss_function(model, x_traj, y_traj, n_steps=10):
