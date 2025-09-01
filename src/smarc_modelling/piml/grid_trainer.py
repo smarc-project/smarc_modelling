@@ -29,17 +29,17 @@ if __name__ == "__main__":
     name_model = "pinn.pt"
 
     # DIVISION FOR TRAIN / VALIDATE SPLIT
-    train_procent = 0.8
+    train_procent = 0.9
 
     # HYPER - PARAMETERS
     n_steps = 25
     dropout_rate = 0.25
 
     # Use best perform here
-    layer_grid = [5, 10]
-    size_grid = [16, 32]
-    factor_grid = [0.9, 0.5]
-    lr0 = 0.005
+    layer_grid = [30, 50, 70]
+    size_grid = [32, 64]
+    factor_grid = [0.5]
+    lr0 = 0.001
     max_norm = 1.0
 
     # INPUT - OUTPUT SHAPES
@@ -198,7 +198,6 @@ if __name__ == "__main__":
                         results, _ = sam.run_sim()
                         results = torch.tensor(results).T
                         eta_model = results[:, 0:7]
-                        eta_model[:, 1] = 2 * y0 - eta_model[:, 1]
                         nu_model = results[:, 7:13]
 
                         # Convert quat to angles

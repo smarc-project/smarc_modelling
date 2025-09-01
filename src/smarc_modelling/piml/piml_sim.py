@@ -82,7 +82,7 @@ if __name__ == "__main__":
     print(f" Starting simulator...")
 
     # Loading ground truth data
-    eta, nu, u_fb, u_cmd, Dv_comp, Mv_dot, Cv, g_eta, tau, t, M, nu_dot = load_data_from_bag("src/smarc_modelling/piml/data/rosbags/evaluate_1", "torch")
+    eta, nu, u_fb, u_cmd, Dv_comp, Mv_dot, Cv, g_eta, tau, t, M, nu_dot = load_data_from_bag("src/smarc_modelling/piml/data/rosbags/test_2", "torch")
     states = [eta, nu, u_fb]
 
     # Initial positions for flipping frames
@@ -104,7 +104,6 @@ if __name__ == "__main__":
     end_time = time.time()
     results_wb = torch.tensor(results_wb).T
     eta_wb = results_wb[:, 0:7]
-    eta_wb[:, 1] = 2 * y0 - eta_wb[:, 1]
     nu_wb = results_wb[:, 7:13]
     print(f" White-box inference time: {(end_time-start_time)*1000/end_val_wb}")
     print(f" Done with the white-box sim!")
@@ -115,7 +114,7 @@ if __name__ == "__main__":
     end_time = time.time()
     results_pinn = torch.tensor(results_pinn).T
     eta_pinn = results_pinn[:, 0:7]
-    eta_pinn[:, 1] = 2 * y0 - eta_pinn[:, 1]
+    # eta_pinn[:, 1] = 2 * y0 - eta_pinn[:, 1]
     nu_pinn = results_pinn[:, 7:13]
     print(f" PINN inference time: {(end_time-start_time)*1000/end_val_pinn}")
     print(f" Done with the PINN sim!")
@@ -126,7 +125,7 @@ if __name__ == "__main__":
     end_time = time.time()
     results_nn = torch.tensor(results_nn).T
     eta_nn = results_nn[:, 0:7]
-    eta_nn[:, 1] = 2 * y0 - eta_nn[:, 1]
+    # eta_nn[:, 1] = 2 * y0 - eta_nn[:, 1]
     nu_nn = results_nn[:, 7:13]
     print(f" NN inference time: {(end_time-start_time)*1000/end_val_nn}")
     print(f" Done with the NN sim!")
@@ -137,7 +136,7 @@ if __name__ == "__main__":
     end_time = time.time()
     results_naive_nn = torch.tensor(results_naive_nn).T
     eta_naive_nn = results_naive_nn[:, 0:7]
-    eta_naive_nn[:, 1] = 2 * y0 - eta_naive_nn[:, 1]
+    # eta_naive_nn[:, 1] = 2 * y0 - eta_naive_nn[:, 1]
     nu_naive_nn = results_naive_nn[:, 7:13]
     print(f" Naive NN inference time: {(end_time-start_time)*1000/end_val_naive_nn}")
     print(f" Done with the naive NN sim!")
@@ -148,20 +147,20 @@ if __name__ == "__main__":
     end_time = time.time()
     results_bpinn = torch.tensor(results_bpinn).T
     eta_bpinn = results_bpinn[:, 0:7]
-    eta_bpinn[:, 1] = 2 * y0 - eta_bpinn[:, 1]
+    # eta_bpinn[:, 1] = 2 * y0 - eta_bpinn[:, 1]
     nu_bpinn = results_bpinn[:, 7:13]
     print(f" B-PINN inference time: {(end_time-start_time)*1000/end_val_bpinn}")
     print(f" Done with the B-PINN sim!")
 
     print(f" Done with all sims making plots!")
 
-    # Making real life down be down
-    eta[:, 2] = 2 * z0 - eta[:, 2]
-    eta_wb[:, 2] = 2 * z0 - eta_wb[:, 2]
-    eta_pinn[:, 2] = 2 * z0 - eta_pinn[:, 2]
-    eta_bpinn[:, 2] = 2 * z0 - eta_bpinn[:, 2]
-    eta_nn[:, 2] = 2 * z0 - eta_nn[:, 2]
-    eta_naive_nn[:, 2] = 2 * z0 - eta_naive_nn[:, 2]
+    # # Making real life down be down
+    # eta[:, 2] = 2 * z0 - eta[:, 2]
+    # eta_wb[:, 2] = 2 * z0 - eta_wb[:, 2]
+    # eta_pinn[:, 2] = 2 * z0 - eta_pinn[:, 2]
+    # eta_bpinn[:, 2] = 2 * z0 - eta_bpinn[:, 2]
+    # eta_nn[:, 2] = 2 * z0 - eta_nn[:, 2]
+    # eta_naive_nn[:, 2] = 2 * z0 - eta_naive_nn[:, 2]
 
     end_val = int(np.min([end_val_wb, end_val_pinn, end_val_nn, end_val_naive_nn]))
 
@@ -324,10 +323,10 @@ if __name__ == "__main__":
         for i in range(6):
             axes[i].plot(eta_deg[:end_val, i], label="Ground Truth")
             axes[i].plot(eta_wb_deg[:end_val, i], label="White-box")
-            axes[i].plot(eta_pinn_deg[:end_val, i], label="PINN")
+            # axes[i].plot(eta_pinn_deg[:end_val, i], label="PINN")
             # axes[i].plot(eta_bpinn_deg[:end_val, i], label="B-PINN")
-            axes[i].plot(eta_nn_deg[:end_val, i], label="NN")
-            axes[i].plot(eta_naive_nn_deg[:end_val, i], label="Naive NN")
+            # axes[i].plot(eta_nn_deg[:end_val, i], label="NN")
+            # axes[i].plot(eta_naive_nn_deg[:end_val, i], label="Naive NN")
             axes[i].set_title(f"{labels_eta[i]}")
             axes[i].set_xlabel("Timestep")
             axes[i].set_ylabel(labels_unit[i])
@@ -343,10 +342,10 @@ if __name__ == "__main__":
         for j in range(6):
             axes[j].plot(nu[:end_val, j], label="Ground Truth")
             axes[j].plot(nu_wb[:end_val, j], label="White-box")
-            axes[j].plot(nu_pinn[:end_val, j], label="PINN")
+            # axes[j].plot(nu_pinn[:end_val, j], label="PINN")
             # axes[j].plot(nu_bpinn[:end_val, j], label="B-PINN")
-            axes[j].plot(nu_nn[:end_val, j], label="NN")
-            axes[j].plot(nu_naive_nn[:end_val, j], label="Naive NN")
+            # axes[j].plot(nu_nn[:end_val, j], label="NN")
+            # axes[j].plot(nu_naive_nn[:end_val, j], label="Naive NN")
             axes[j].set_title(f"{labels_nu[j]}")
             axes[j].set_xlabel("Timestep")
             axes[j].set_ylabel(labels_unit[j+6])
