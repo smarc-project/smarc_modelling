@@ -96,6 +96,7 @@ class PINN(nn.Module):
 
         # # Final loss is just the sum
         # return physics_loss*alpha + data_loss*beta + damping_penalty*gamma
+        
         rhs = (tau - Cv - torch.matmul(D_pred, nu.unsqueeze(-1)).squeeze(-1) - g_eta)
         nu_dot_pred = torch.bmm(M, rhs.unsqueeze(-1)).squeeze(-1)
         loss = torch.mean((nu_dot_pred - nu_dot)**2)
