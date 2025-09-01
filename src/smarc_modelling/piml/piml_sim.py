@@ -82,11 +82,12 @@ if __name__ == "__main__":
     print(f" Starting simulator...")
 
     # Loading ground truth data
-    eta, nu, u_fb, u_cmd, Dv_comp, Mv_dot, Cv, g_eta, tau, t, M, nu_dot = load_data_from_bag("src/smarc_modelling/piml/data/rosbags/evaluate_4", "torch")
+    eta, nu, u_fb, u_cmd, Dv_comp, Mv_dot, Cv, g_eta, tau, t, M, nu_dot = load_data_from_bag("src/smarc_modelling/piml/data/rosbags/evaluate_1", "torch")
     states = [eta, nu, u_fb]
 
     # Initial positions for flipping frames
     y0 = eta[0, 1].item()
+    z0 = eta[0, 2].item()
  
     # Setting up model for simulations
     reset_state = False
@@ -153,6 +154,14 @@ if __name__ == "__main__":
     print(f" Done with the B-PINN sim!")
 
     print(f" Done with all sims making plots!")
+
+    # Making real life down be down
+    eta[:, 2] = 2 * z0 - eta[:, 2]
+    eta_wb[:, 2] = 2 * z0 - eta_wb[:, 2]
+    eta_pinn[:, 2] = 2 * z0 - eta_pinn[:, 2]
+    eta_bpinn[:, 2] = 2 * z0 - eta_bpinn[:, 2]
+    eta_nn[:, 2] = 2 * z0 - eta_nn[:, 2]
+    eta_naive_nn[:, 2] = 2 * z0 - eta_naive_nn[:, 2]
 
     end_val = int(np.min([end_val_wb, end_val_pinn, end_val_nn, end_val_naive_nn]))
 

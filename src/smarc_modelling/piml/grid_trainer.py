@@ -29,7 +29,7 @@ if __name__ == "__main__":
     name_model = "pinn.pt"
 
     # DIVISION FOR TRAIN / VALIDATE SPLIT
-    train_procent = 0.9
+    train_procent = 0.8
 
     # HYPER - PARAMETERS
     n_steps = 25
@@ -39,7 +39,7 @@ if __name__ == "__main__":
     layer_grid = [50]
     size_grid = [64]
     factor_grid = [0.5]
-    lr0 = 0.005
+    lr0 = 0.00005
     max_norm = 1.0
 
     # INPUT - OUTPUT SHAPES
@@ -79,12 +79,14 @@ if __name__ == "__main__":
     best_loss_history = []
     best_val_loss_history = []
 
+    model_counter = 0
     # Grid params
     for i, layers in enumerate(layer_grid): # Amount of layers
         for j, size in enumerate(size_grid): # Amount of neurons in each layer 
             for k, factor in enumerate(factor_grid):
                 
-                print(f" Starting training on model {(i+1)*(j+1)*(k+1)} / {len(layer_grid) * len(size_grid) * len(factor_grid)}")
+                model_counter += 1
+                print(f" Starting training on model {model_counter} / {len(layer_grid) * len(size_grid) * len(factor_grid)}")
 
                 loss_history = []
                 val_loss_history = []
@@ -102,7 +104,6 @@ if __name__ == "__main__":
                 
                 # Optimizer and other settings
                 optimizer = torch.optim.Adam(model.parameters(), lr=lr0)
-                torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=max_norm) # Clipping to help with stability
 
                 # Adaptive learning rate
                 scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer=optimizer, mode="min", factor=factor, patience=2500, threshold=10, min_lr=1e-8)
@@ -130,10 +131,9 @@ if __name__ == "__main__":
                         loss_total += loss
 
                     loss_total.backward()
+                    # torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=max_norm) # Clipping to help with stability
                     optimizer.step()
 
-                    # Step scheduler
-                    scheduler.step(loss_total)
 
                     # Evaluate model on validation data
                     model.eval()
@@ -146,9 +146,12 @@ if __name__ == "__main__":
                             val_loss = model.loss_function(model, x_traj_val_normed, y_traj_val, n_steps)
                             val_loss_total += val_loss
                     
+                    # Step scheduler
+                    scheduler.step(val_loss_total)
+                    
                     # For plotting the loss
                     loss_history.append(loss_total.item())
-                    val_loss_history.append(val_loss.item())
+                    val_loss_history.append(val_loss_total.item())
 
                     # Handling for early stopping
                     if val_loss_total.item() < best_val_loss:
@@ -159,7 +162,7 @@ if __name__ == "__main__":
                         counter += 1
 
                     # Print statement to make sure everything is still running
-                    if epoch % 500 == 0:
+                    if epoch % 100 == 0:
                         print(f" Still training, epoch {epoch}, loss: {loss_total.item()}, lr: {optimizer.param_groups[0]['lr']},\n validation loss: {val_loss_total.item()}, shape: {layers}, {size}, {factor}, counter: {counter}")
 
                     # Break condition for early stopping
@@ -184,7 +187,6 @@ if __name__ == "__main__":
                     y0 = y_traj_test["eta"][0, 1].item()
 
                     eta_for_error = y_traj_test["eta"]
-                    eta_for_error[:, 1] = 2 * y0 - eta_for_error[:, 1]
                     eta_test_degs = np.array([eta_quat_to_deg(eta_vec) for eta_vec in eta_for_error])
 
                     # Getting the state vector in such a way that we can use it in the simulator
@@ -196,6 +198,7 @@ if __name__ == "__main__":
                         results, _ = sam.run_sim()
                         results = torch.tensor(results).T
                         eta_model = results[:, 0:7]
+                        eta_model[:, 1] = 2 * y0 - eta_model[:, 1]
                         nu_model = results[:, 7:13]
 
                         # Convert quat to angles
