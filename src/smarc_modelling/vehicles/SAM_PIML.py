@@ -193,7 +193,7 @@ class SAM_PIML():
         self.inertia_factor = 2 # Adjust how quickly we can change direction
         self.damping_factor = 60 # Adjust how much the damping affect acceleration high number = move less
         self.damping_rot = 10 # Adjust how much the damping affects the rotation high number = less rotation should be tuned on bag where we turn without any control inputs
-        self.thruster_rot_strength = 2  # Just making the thruster a bit stronger for rotation
+        self.thruster_rot_strength = 1  # Just making the thruster a bit stronger for rotation
 
         # Constants
         self.p_OC_O = np.array([-0.75, 0, 0.06], float)  # Measurement frame C in CO (O)
@@ -648,7 +648,7 @@ class SAM_PIML():
             yaw = M_prop_i[0]
             roll = M_prop_i[2]
             M_prop_i[2] = yaw
-            M_prop_i[0] = -roll
+            M_prop_i[0] = roll
 
             tau_prop_i = np.concatenate([F_prop_b, M_prop_i])
             tau_prop += tau_prop_i
@@ -738,8 +738,3 @@ class SAM_PIML():
         Updates dt for when doing simulations
         """
         self.dt = dt
-
-    def roll_yaw_swap(vector):
-        [x, y, z, q1, q2, q3, q4] = vector
-        position = [x, y, z]
-        roll, pitch, yaw

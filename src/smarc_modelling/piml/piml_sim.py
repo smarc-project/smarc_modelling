@@ -254,7 +254,7 @@ if __name__ == "__main__":
         fig, axes = plt.subplots(3, 2, figsize=(12, 10))
         axes = axes.flatten()
 
-        labels_eta = ["x", "y", "z", "roll", "pitch", "yaw"]
+        labels_eta = ["x", "y", "z", "yaw", "pitch", "roll"]
         labels_nu = ["u", "v", "w", "p", "q", "r"]
         labels_error = ["Cumulative Squared Error [$m^2$]", "Cumulative Squared Error [$m^2$]", "Cumulative Squared Error [$m^2$]", 
                         "Cumulative Squared Error [$\circ^2$]", "Cumulative Squared Error [$\circ^2$]", "Cumulative Squared Error [$\circ^2$]", 
@@ -312,7 +312,7 @@ if __name__ == "__main__":
         fig, axes = plt.subplots(3, 2, figsize=(12, 10))
         axes = axes.flatten()
 
-        labels_eta = ["x", "y", "z", "roll", "pitch", "yaw"]
+        labels_eta = ["x", "y", "z", "yaw", "pitch", "roll"]
         labels_nu = ["u", "v", "w", "p", "q", "r"]
         labels_unit = ["State [m]", "State [m]", "State [m]",
                        "State [$\circ$]", "State [$\circ$]", "State [$\circ$]",
