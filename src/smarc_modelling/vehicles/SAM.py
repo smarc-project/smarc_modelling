@@ -363,7 +363,7 @@ class SAM():
         u_dot = self.actuator_dynamics(u, u_ref)
         eta_dot = self.eta_dynamics(eta, nu)
         x_dot = np.concatenate([eta_dot, nu_dot, u_dot])
-
+  
         return x_dot
 
     def bound_actuators(self, u):

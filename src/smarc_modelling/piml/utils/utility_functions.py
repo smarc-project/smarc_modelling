@@ -45,10 +45,10 @@ def load_rosbag(bag_path: str=""):
     x = []
     y = []
     z = []
+    q0 = []
     q1 = []
     q2 = []
     q3 = []
-    q4 = []
     # Speeds
     u = []
     v = []
@@ -91,10 +91,10 @@ def load_rosbag(bag_path: str=""):
         x.append(msg.odom_gt.pose.pose.position.x)
         y.append(msg.odom_gt.pose.pose.position.y)
         z.append(msg.odom_gt.pose.pose.position.z)
+        q0.append(msg.odom_gt.pose.pose.orientation.w)
         q1.append(msg.odom_gt.pose.pose.orientation.x)
         q2.append(msg.odom_gt.pose.pose.orientation.y)
         q3.append(msg.odom_gt.pose.pose.orientation.z)
-        q4.append(msg.odom_gt.pose.pose.orientation.w)
 
         # Speeds
         u.append(msg.odom_gt.twist.twist.linear.x)
@@ -112,7 +112,8 @@ def load_rosbag(bag_path: str=""):
     q_dot = np.gradient(q, time)
     r_dot = np.gradient(r, time)
     
-    eta = [x, y, z, q1, q2, q3, q4]
+    # Frame fix for eta ENU --> NED
+    eta = [x, y, z, q0, q1, q2, q3]
     nu = [u, v, w, p, q, r]
     acc = [u_dot, v_dot, w_dot, p_dot, q_dot, r_dot]
     u_control = [vbs_cmd, lcg_cmd, dS, dR, rpm1_cmd, rpm2_cmd]
@@ -128,7 +129,6 @@ def load_data_from_bag(data_file: str="", return_type: str=""):
     from smarc_modelling.vehicles.SAM import SAM
 
     # Loading bag
-    print(f" Getting data from ROS bag...")
     time, eta, nu, acc, u_cmd, u_fb = load_rosbag(data_file)
 
     # Transposing data
@@ -145,8 +145,7 @@ def load_data_from_bag(data_file: str="", return_type: str=""):
     Cv = np.zeros_like(nu)
     g_eta = np.zeros_like(nu)
     tau = np.zeros_like(nu)
-
-    print(f" Calculating D(v)v...")
+    M = []
 
     for t in range(len(state_vector)):
 
@@ -170,10 +169,10 @@ def load_data_from_bag(data_file: str="", return_type: str=""):
         Cv[t] = sam.C @ nu[t]
         g_eta[t] = sam.g_vec
         tau[t] = sam.tau
+        M.append(sam.M)
 
     time = time - time[0] # Setting time to start at 0
 
-    print(f" Data has been loaded and processed!")
     if return_type == "torch": # Return all values as torch tensors
         return(
             torch.tensor(eta, dtype=torch.float32),
@@ -185,7 +184,9 @@ def load_data_from_bag(data_file: str="", return_type: str=""):
             torch.tensor(Cv, dtype=torch.float32),
             torch.tensor(g_eta, dtype=torch.float32),
             torch.tensor(tau, dtype=torch.float32),
-            torch.tensor(time, dtype=torch.float32)
+            torch.tensor(time, dtype=torch.float32),
+            torch.tensor(np.array(M), dtype=torch.float32),
+            torch.tensor(acc, dtype=torch.float32)
         )
     else: # Return all values as numpy matrices
         return(
@@ -198,9 +199,43 @@ def load_data_from_bag(data_file: str="", return_type: str=""):
             Cv,
             g_eta,
             tau,
-            time
+            time,
+            M,
+            acc
         )
     
+
+def load_to_trajectory(data_files: list):
+    
+    x_trajectories = []
+    y_trajectories = []
+
+    for dataset in data_files:
+        # Load data from bag
+        path = "src/smarc_modelling/piml/data/rosbags/" + dataset
+        eta, nu, u, u_cmd, Dv_comp, Mv_dot, Cv, g_eta, tau, t, M, acc = load_data_from_bag(path, "torch")
+        
+        x_traj = torch.cat([eta, nu, u], dim=1)
+        y_traj = {
+            "eta": eta,
+            "u_cmd": u_cmd,
+            "Dv_comp": Dv_comp,
+            "Mv_dot": Mv_dot,
+            "Cv": Cv,
+            "g_eta": g_eta,
+            "tau": tau,
+            "t": t,
+            "nu": nu,
+            "M": M,
+            "acc": acc
+        }
+
+        # Append most recently loaded data
+        x_trajectories.append(x_traj)
+        y_trajectories.append(y_traj)
+
+    return x_trajectories, y_trajectories
+
 
 def eta_quat_to_rad(eta):
     """Turns quaternion in eta to radians"""
