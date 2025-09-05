@@ -32,15 +32,17 @@ if __name__ == "__main__":
     train_procent = 0.9
 
     # HYPER - PARAMETERS
-    n_steps = 25
+    n_steps = 20
     dropout_rate = 0.25
 
     # Use best perform here
-    layer_grid = [30, 50, 70]
-    size_grid = [32, 64]
-    factor_grid = [0.5]
+    layer_grid = [25, 40]
+    size_grid = [16, 32]
+    factor_grid = [0.9, 0.5, 0.1]
     lr0 = 0.001
     max_norm = 1.0
+    patience = 5000
+    epochs = 50000
 
     # INPUT - OUTPUT SHAPES
     input_shape = 19
@@ -61,9 +63,9 @@ if __name__ == "__main__":
     x_mean = torch.mean(all_x, dim=0)
     x_std = torch.std(all_x, dim=0) + 1e-8 # Preventing division by 0
 
-    # Overwrite normalization just to turn it off in an easy way
-    x_mean = 0
-    x_std = 1
+    # # Overwrite normalization just to turn it off in an easy way
+    # x_mean = 0
+    # x_std = 1
 
     # Load validation data
     x_trajectories_val, y_trajectories_val = load_to_trajectory(datasets[train_val_split:])
@@ -110,12 +112,10 @@ if __name__ == "__main__":
 
                 # Early stopping with validation loss
                 best_val_loss = float("inf")
-                patience = 5000
                 counter = 0
                 best_model_state = None
 
                 # Training loop
-                epochs = 500000
                 for epoch in range(epochs):
 
                     model.train()
@@ -131,9 +131,8 @@ if __name__ == "__main__":
                         loss_total += loss
 
                     loss_total.backward()
-                    # torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=max_norm) # Clipping to help with stability
+                    torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=max_norm) # Clipping to help with stability
                     optimizer.step()
-
 
                     # Evaluate model on validation data
                     model.eval()
@@ -184,8 +183,6 @@ if __name__ == "__main__":
                 for x_traj_test, y_traj_test in zip(x_trajectories_test, y_trajectories_test):
 
                     # Initial position for flipping
-                    y0 = y_traj_test["eta"][0, 1].item()
-
                     eta_for_error = y_traj_test["eta"]
                     eta_test_degs = np.array([eta_quat_to_deg(eta_vec) for eta_vec in eta_for_error])
 

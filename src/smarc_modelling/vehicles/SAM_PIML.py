@@ -189,10 +189,10 @@ class SAM_PIML():
         self.dt = dt # Sim time step, necessary for evaluation of the actuator dynamics
         
         # Some factors to make sim agree with real life data, these are eyeballed from sim vs gt data
-        self.vbs_factor = 0.5 # How sensitive the vbs is
-        self.inertia_factor = 10 # Adjust how quickly we can change direction
+        self.vbs_factor = 1 # How sensitive the vbs is
+        self.inertia_factor = 2 # Adjust how quickly we can change direction
         self.damping_factor = 60 # Adjust how much the damping affect acceleration high number = move less
-        self.damping_rot = 5 # Adjust how much the damping affects the rotation high number = less rotation should be tuned on bag where we turn without any control inputs
+        self.damping_rot = 10 # Adjust how much the damping affects the rotation high number = less rotation should be tuned on bag where we turn without any control inputs
         self.thruster_rot_strength = 2  # Just making the thruster a bit stronger for rotation
 
         # Constants
@@ -382,6 +382,9 @@ class SAM_PIML():
         if self.piml_type == "naive_nn":
             x_dot = naive_nn_predict(self.piml_model, eta, nu, u, [self.x_mean, self.x_std])
             x_dot = np.concatenate([x_dot, u_dot])
+
+        # # Type compatibility with C++ extension
+        # x_dot = np.array(x_dot, dtype=np.float32).reshape(1, -1)
 
         return x_dot
 
@@ -575,6 +578,9 @@ class SAM_PIML():
         self.W = self.m * self.g
         self.g_vec = gvect(self.W, self.B, self.theta, self.phi, self.p_OG_O, self.p_OB_O)
 
+
+        self.g_vec[5] = 0
+
     def calculate_tau(self, u):
         """
         All external forces
@@ -590,14 +596,15 @@ class SAM_PIML():
         tau_prop = self.calculate_propeller_force(u)
         self.tau = tau_prop
 
+
     def calculate_propeller_force(self, u):
         """
         Calculate force and torque of the propellers
         u: control inputs as [x_vbs, x_lcg, delta_s, delta_r, rpm1, rpm2]
         Azimuth Thrusters: Fossen 2021, ch.9.4.2
         """
-        delta_s = -u[2]
-        delta_r = -u[3]
+        delta_s = u[2]
+        delta_r = u[3]
         n_rpm = u[4:]
 
         # Compute propeller forces
@@ -616,13 +623,14 @@ class SAM_PIML():
                 K_prop_i = self.rho * (self.D_prop**5) * (
                         self.KQ_0 * abs(n_rps[i]) * n_rps[i] +
                         (self.KQ_max-self.KQ_0)/self.Ja_max * (Va/self.D_prop) * abs(n_rps[i]))
-                dir_flip = 1
+                
             else:
+                prop_scaling = 5 # Propellers generate less thrust going backwards
                 X_prop_i = self.rho * (self.D_prop ** 4) * (
                         self.KT_0*abs(n_rps[i])*n_rps[i]
-                        )/10
-                K_prop_i = self.rho * (self.D_prop ** 5) * self.KQ_0 * abs(n_rps[i]) * n_rps[i] / 10
-                dir_flip = -1
+                        ) / prop_scaling
+                K_prop_i = self.rho * (self.D_prop ** 5) * self.KQ_0 * abs(n_rps[i]) * n_rps[i] / prop_scaling
+                
 
             F_prop_b = C_T2C @ np.array([X_prop_i, 0, 0])
             r_prop_i = C_T2C @ self.propellers.r_t_p_sh[i] - self.p_OC_O
@@ -633,7 +641,7 @@ class SAM_PIML():
 
             # Rescale the rotation from props
             M_prop_i[0] *= self.thruster_rot_strength # Yaw
-            M_prop_i[1] *= self.thruster_rot_strength * dir_flip # Pitch
+            M_prop_i[1] *= self.thruster_rot_strength # Pitch
             M_prop_i[2] *= self.thruster_rot_strength # Roll
 
             # Above equation return yaw, roll, pitch in other order than what the model uses
@@ -647,6 +655,7 @@ class SAM_PIML():
 
         return tau_prop
 
+
     def calculate_vbs_position(self, u):
         """
         Control input is scaled between 0 and 100. This converts it into the actual position
@@ -655,6 +664,7 @@ class SAM_PIML():
         """
         x_vbs = (u[0]/100) * self.vbs.l_vbs_l
         return x_vbs
+
 
     def calculate_lcg_position(self, u):
         """
@@ -668,6 +678,7 @@ class SAM_PIML():
         p_OLcg_O = self.lcg.p_OLcgPos_O + p_LcgPos_LcgO
 
         return p_OLcg_O
+
 
     def eta_dynamics(self, eta, nu):
         """
@@ -727,3 +738,8 @@ class SAM_PIML():
         Updates dt for when doing simulations
         """
         self.dt = dt
+
+    def roll_yaw_swap(vector):
+        [x, y, z, q1, q2, q3, q4] = vector
+        position = [x, y, z]
+        roll, pitch, yaw

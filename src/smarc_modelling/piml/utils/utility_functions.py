@@ -45,10 +45,10 @@ def load_rosbag(bag_path: str=""):
     x = []
     y = []
     z = []
+    q0 = []
     q1 = []
     q2 = []
     q3 = []
-    q4 = []
     # Speeds
     u = []
     v = []
@@ -87,14 +87,14 @@ def load_rosbag(bag_path: str=""):
         vbs_fb.append(msg.vbs_fb.value)
         vbs_cmd.append(msg.vbs_cmd.value)
 
-        # Pose (flipping frames here to same as used in SAM vehicle)
-        x.append(-msg.odom_gt.pose.pose.position.x)
-        y.append(-msg.odom_gt.pose.pose.position.y)
+        # Pose
+        x.append(msg.odom_gt.pose.pose.position.x)
+        y.append(msg.odom_gt.pose.pose.position.y)
         z.append(msg.odom_gt.pose.pose.position.z)
+        q0.append(msg.odom_gt.pose.pose.orientation.w)
         q1.append(msg.odom_gt.pose.pose.orientation.x)
-        q2.append(-msg.odom_gt.pose.pose.orientation.y)
-        q3.append(-msg.odom_gt.pose.pose.orientation.z)
-        q4.append(msg.odom_gt.pose.pose.orientation.w)
+        q2.append(msg.odom_gt.pose.pose.orientation.y)
+        q3.append(msg.odom_gt.pose.pose.orientation.z)
 
         # Speeds
         u.append(msg.odom_gt.twist.twist.linear.x)
@@ -112,7 +112,8 @@ def load_rosbag(bag_path: str=""):
     q_dot = np.gradient(q, time)
     r_dot = np.gradient(r, time)
     
-    eta = [x, y, z, q1, q2, q3, q4]
+    # Frame fix for eta ENU --> NED
+    eta = [x, y, z, q0, q1, q2, q3]
     nu = [u, v, w, p, q, r]
     acc = [u_dot, v_dot, w_dot, p_dot, q_dot, r_dot]
     u_control = [vbs_cmd, lcg_cmd, dS, dR, rpm1_cmd, rpm2_cmd]

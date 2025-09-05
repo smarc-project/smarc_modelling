@@ -54,14 +54,14 @@ class SIM:
             self.vehicle.update_dt(dt)
             time_since_update += dt
 
-            # Do sim step using rk4 or ef
+            # Do sim step using ef
             try:
-                data[:, i+1] = self.rk4(data[:, i], self.controls[i], dt, self.vehicle.dynamics)
+                data[:, i+1] = self.ef(data[:, i], self.controls[i], dt, self.vehicle.dynamics)
             except:
                 data[:, i+1] = data[:, i-10]
                 if once:
                     once = False
-                    end_val = i - 3
+                    end_val = i - 100
 
         if self.state_update:
             print(f" Average times between resets: {np.mean(times)}")
@@ -77,12 +77,16 @@ class SIM:
         k4 = fun(x+dt*k3, u)
         dxdt = x + dt/6 * (k1 + 2*k2 + 2*k3 + k4)
         return dxdt
+
+    def ef(self, x, u, dt, fun):
+        dxdt = x + fun(x, u) * dt
+        return dxdt
     
 if __name__ == "__main__":
     print(f" Starting simulator...")
 
     # Loading ground truth data
-    eta, nu, u_fb, u_cmd, Dv_comp, Mv_dot, Cv, g_eta, tau, t, M, nu_dot = load_data_from_bag("src/smarc_modelling/piml/data/rosbags/test_2", "torch")
+    eta, nu, u_fb, u_cmd, Dv_comp, Mv_dot, Cv, g_eta, tau, t, M, nu_dot = load_data_from_bag("src/smarc_modelling/piml/data/rosbags/rosbag_9", "torch")
     states = [eta, nu, u_fb]
 
     # Initial positions for flipping frames
@@ -108,49 +112,45 @@ if __name__ == "__main__":
     print(f" White-box inference time: {(end_time-start_time)*1000/end_val_wb}")
     print(f" Done with the white-box sim!")
 
-    print(f" Running PINN simulation...")
-    start_time = time.time()
-    results_pinn, end_val_pinn = sam_pinn.run_sim()
-    end_time = time.time()
-    results_pinn = torch.tensor(results_pinn).T
-    eta_pinn = results_pinn[:, 0:7]
-    # eta_pinn[:, 1] = 2 * y0 - eta_pinn[:, 1]
-    nu_pinn = results_pinn[:, 7:13]
-    print(f" PINN inference time: {(end_time-start_time)*1000/end_val_pinn}")
-    print(f" Done with the PINN sim!")
-
-    print(f" Running NN simulation...")
-    start_time = time.time()
-    results_nn, end_val_nn = sam_nn.run_sim()
-    end_time = time.time()
-    results_nn = torch.tensor(results_nn).T
-    eta_nn = results_nn[:, 0:7]
-    # eta_nn[:, 1] = 2 * y0 - eta_nn[:, 1]
-    nu_nn = results_nn[:, 7:13]
-    print(f" NN inference time: {(end_time-start_time)*1000/end_val_nn}")
-    print(f" Done with the NN sim!")
-
-    print(f" Running naive NN simulation...")
+    # print(f" Running PINN simulation...")
     # start_time = time.time()
-    results_naive_nn, end_val_naive_nn = sam_naive_nn.run_sim()
-    end_time = time.time()
-    results_naive_nn = torch.tensor(results_naive_nn).T
-    eta_naive_nn = results_naive_nn[:, 0:7]
-    # eta_naive_nn[:, 1] = 2 * y0 - eta_naive_nn[:, 1]
-    nu_naive_nn = results_naive_nn[:, 7:13]
-    print(f" Naive NN inference time: {(end_time-start_time)*1000/end_val_naive_nn}")
-    print(f" Done with the naive NN sim!")
+    # results_pinn, end_val_pinn = sam_pinn.run_sim()
+    # end_time = time.time()
+    # results_pinn = torch.tensor(results_pinn).T
+    # eta_pinn = results_pinn[:, 0:7]
+    # nu_pinn = results_pinn[:, 7:13]
+    # print(f" PINN inference time: {(end_time-start_time)*1000/end_val_pinn}")
+    # print(f" Done with the PINN sim!")
 
-    print(f" Running B-PINN simulation...")
-    start_time = time.time()
-    results_bpinn, end_val_bpinn = sam_bpinn.run_sim()
-    end_time = time.time()
-    results_bpinn = torch.tensor(results_bpinn).T
-    eta_bpinn = results_bpinn[:, 0:7]
-    # eta_bpinn[:, 1] = 2 * y0 - eta_bpinn[:, 1]
-    nu_bpinn = results_bpinn[:, 7:13]
-    print(f" B-PINN inference time: {(end_time-start_time)*1000/end_val_bpinn}")
-    print(f" Done with the B-PINN sim!")
+    # print(f" Running NN simulation...")
+    # start_time = time.time()
+    # results_nn, end_val_nn = sam_nn.run_sim()
+    # end_time = time.time()
+    # results_nn = torch.tensor(results_nn).T
+    # eta_nn = results_nn[:, 0:7]
+    # nu_nn = results_nn[:, 7:13]
+    # print(f" NN inference time: {(end_time-start_time)*1000/end_val_nn}")
+    # print(f" Done with the NN sim!")
+
+    # print(f" Running naive NN simulation...")
+    # # start_time = time.time()
+    # results_naive_nn, end_val_naive_nn = sam_naive_nn.run_sim()
+    # end_time = time.time()
+    # results_naive_nn = torch.tensor(results_naive_nn).T
+    # eta_naive_nn = results_naive_nn[:, 0:7]
+    # nu_naive_nn = results_naive_nn[:, 7:13]
+    # print(f" Naive NN inference time: {(end_time-start_time)*1000/end_val_naive_nn}")
+    # print(f" Done with the naive NN sim!")
+
+    # print(f" Running B-PINN simulation...")
+    # start_time = time.time()
+    # results_bpinn, end_val_bpinn = sam_bpinn.run_sim()
+    # end_time = time.time()
+    # results_bpinn = torch.tensor(results_bpinn).T
+    # eta_bpinn = results_bpinn[:, 0:7]
+    # nu_bpinn = results_bpinn[:, 7:13]
+    # print(f" B-PINN inference time: {(end_time-start_time)*1000/end_val_bpinn}")
+    # print(f" Done with the B-PINN sim!")
 
     print(f" Done with all sims making plots!")
 
@@ -162,8 +162,8 @@ if __name__ == "__main__":
     # eta_nn[:, 2] = 2 * z0 - eta_nn[:, 2]
     # eta_naive_nn[:, 2] = 2 * z0 - eta_naive_nn[:, 2]
 
-    end_val = int(np.min([end_val_wb, end_val_pinn, end_val_nn, end_val_naive_nn]))
-
+    end_val = int(np.min([end_val_wb]))#, end_val_pinn, end_val_nn, end_val_naive_nn]))
+    print(end_val)
     plt.style.use('science')
 
     # 3D trajectory plot
@@ -171,8 +171,8 @@ if __name__ == "__main__":
         # Plotting trajectory in 3d
         fig = plt.figure()
         ax = fig.add_subplot(111, projection="3d")
-        states = [eta, eta_wb, eta_pinn, eta_nn, eta_naive_nn, eta_bpinn]
-        state_names =  ["Ground Truth", "White-Box", "PINN", "NN", "Naive NN", "B-PINN"]
+        # states = [eta, eta_wb, eta_pinn, eta_nn, eta_naive_nn, eta_bpinn]
+        # state_names =  ["Ground Truth", "White-Box", "PINN", "NN", "Naive NN", "B-PINN"]
 
         states = [eta, eta_wb]
         state_names =  ["Ground Truth", "White-Box"]
@@ -304,10 +304,10 @@ if __name__ == "__main__":
         # Quat to deg
         eta_deg = np.array([eta_quat_to_deg(eta_vec) for eta_vec in eta[:end_val]])
         eta_wb_deg = np.array([eta_quat_to_deg(eta_vec) for eta_vec in eta_wb[:end_val]])
-        eta_pinn_deg = np.array([eta_quat_to_deg(eta_vec) for eta_vec in eta_pinn[:end_val]])
-        eta_nn_deg = np.array([eta_quat_to_deg(eta_vec) for eta_vec in eta_nn[:end_val]])
-        eta_naive_nn_deg = np.array([eta_quat_to_deg(eta_vec) for eta_vec in eta_naive_nn[:end_val]])
-        eta_bpinn_deg = np.array([eta_quat_to_deg(eta_vec) for eta_vec in eta_bpinn[:end_val]])
+        # eta_pinn_deg = np.array([eta_quat_to_deg(eta_vec) for eta_vec in eta_pinn[:end_val]])
+        # eta_nn_deg = np.array([eta_quat_to_deg(eta_vec) for eta_vec in eta_nn[:end_val]])
+        # eta_naive_nn_deg = np.array([eta_quat_to_deg(eta_vec) for eta_vec in eta_naive_nn[:end_val]])
+        # eta_bpinn_deg = np.array([eta_quat_to_deg(eta_vec) for eta_vec in eta_bpinn[:end_val]])
 
         fig, axes = plt.subplots(3, 2, figsize=(12, 10))
         axes = axes.flatten()
