@@ -87,6 +87,10 @@ if __name__ == "__main__":
 
     # Loading ground truth data
     eta, nu, u_fb, u_cmd, Dv_comp, Mv_dot, Cv, g_eta, tau, t, M, nu_dot = load_data_from_bag("src/smarc_modelling/piml/data/rosbags/rosbag_9", "torch")
+    print(eta.shape)
+    eta = eta[75:, :]
+    nu = nu[75:, :]
+    u_fb = u_fb[75:, :]
     states = [eta, nu, u_fb]
 
     # Initial positions for flipping frames
