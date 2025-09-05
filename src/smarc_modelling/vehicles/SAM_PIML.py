@@ -630,6 +630,14 @@ class SAM_PIML():
                         self.KT_0*abs(n_rps[i])*n_rps[i]
                         ) / prop_scaling
                 K_prop_i = self.rho * (self.D_prop ** 5) * self.KQ_0 * abs(n_rps[i]) * n_rps[i] / prop_scaling
+
+                # X_prop_i = self.rho*(self.D_prop**4)*(
+                #         self.KT_0*abs(n_rps[i])*n_rps[i] +
+                #         (self.KT_max-self.KT_0)/self.Ja_max * (Va/self.D_prop) * abs(n_rps[i])
+                #         ) / prop_scaling
+                # K_prop_i = self.rho * (self.D_prop**5) * (
+                #         self.KQ_0 * abs(n_rps[i]) * n_rps[i] +
+                #         (self.KQ_max-self.KQ_0)/self.Ja_max * (Va/self.D_prop) * abs(n_rps[i])) / prop_scaling
                 
 
             F_prop_b = C_T2C @ np.array([X_prop_i, 0, 0])
