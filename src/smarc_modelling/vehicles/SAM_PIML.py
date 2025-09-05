@@ -383,8 +383,8 @@ class SAM_PIML():
             x_dot = naive_nn_predict(self.piml_model, eta, nu, u, [self.x_mean, self.x_std])
             x_dot = np.concatenate([x_dot, u_dot])
 
-        # Type compatibility with C++ extension
-        x_dot = np.array(x_dot, dtype=np.float32).reshape(1, -1)
+        # # Type compatibility with C++ extension
+        # x_dot = np.array(x_dot, dtype=np.float32).reshape(1, -1)
 
         return x_dot
 
@@ -629,9 +629,7 @@ class SAM_PIML():
                 X_prop_i = self.rho * (self.D_prop ** 4) * (
                         self.KT_0*abs(n_rps[i])*n_rps[i]
                         ) / prop_scaling
-                K_prop_i = self.rho * (self.D_prop ** 5) * (
-                     self.KQ_0 * abs(n_rps[i]) * n_rps[i] +
-                     (self.KQ_max-self.KQ_0)/self.Ja_max * (Va/self.D_prop) * abs(n_rps[i])) / prop_scaling
+                K_prop_i = self.rho * (self.D_prop ** 5) * self.KQ_0 * abs(n_rps[i]) * n_rps[i] / prop_scaling
                 
 
             F_prop_b = C_T2C @ np.array([X_prop_i, 0, 0])
