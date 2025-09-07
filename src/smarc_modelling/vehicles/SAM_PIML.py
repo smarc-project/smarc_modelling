@@ -641,7 +641,9 @@ class SAM_PIML():
                 
 
             F_prop_b = C_T2C @ np.array([X_prop_i, 0, 0])
-            r_prop_i = C_T2C @ self.propellers.r_t_p_sh[i] - self.p_OC_O
+            var = self.p_OC_O
+            var[2] = 0
+            r_prop_i = C_T2C @ self.propellers.r_t_p_sh[i] - var
             M_prop_i = np.cross(r_prop_i, F_prop_b) \
                         + np.array([(-1)**i * K_prop_i, 0, 0])  # the -1 is because we have counter rotating
                                     # propellers that are supposed to cancel out the propeller induced
@@ -652,11 +654,11 @@ class SAM_PIML():
             M_prop_i[1] *= self.thruster_rot_strength # Pitch
             M_prop_i[2] *= self.thruster_rot_strength # Roll
 
-            # Above equation return yaw, roll, pitch in other order than what the model uses
-            yaw = M_prop_i[0]
-            roll = M_prop_i[2]
-            M_prop_i[2] = yaw
-            M_prop_i[0] = roll
+            # # Above equation return yaw, roll, pitch in other order than what the model uses
+            # yaw = M_prop_i[0]
+            # roll = M_prop_i[2]
+            # M_prop_i[2] = yaw
+            # M_prop_i[0] = roll
 
             tau_prop_i = np.concatenate([F_prop_b, M_prop_i])
             tau_prop += tau_prop_i
