@@ -112,7 +112,6 @@ def load_rosbag(bag_path: str=""):
     q_dot = np.gradient(q, time)
     r_dot = np.gradient(r, time)
     
-    # Frame fix for eta ENU --> NED
     eta = [x, y, z, q0, q1, q2, q3]
     nu = [u, v, w, p, q, r]
     acc = [u_dot, v_dot, w_dot, p_dot, q_dot, r_dot]
@@ -237,12 +236,17 @@ def load_to_trajectory(data_files: list):
     return x_trajectories, y_trajectories
 
 
-def eta_quat_to_rad(eta):
+def eta_quat_to_rad(eta, return_type="numpy"):
     """Turns quaternion in eta to radians"""
     pose = eta[0:3]
     quat = eta[3:]
     euler = R.from_quat(quat).as_euler("xyz", degrees=False)
-    return np.hstack([pose, euler])
+    if return_type == "numpy":
+        return np.hstack([pose, euler])
+    if return_type == "torch":
+        pose = torch.tensor(pose, dtype=torch.float32)
+        euler = torch.tensor(euler, dtype=torch.float32)
+        return torch.cat([pose, euler])
 
 
 def eta_quat_to_deg(eta):

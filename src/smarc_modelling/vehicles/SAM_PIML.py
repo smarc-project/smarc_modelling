@@ -654,11 +654,11 @@ class SAM_PIML():
             M_prop_i[1] *= self.thruster_rot_strength # Pitch
             M_prop_i[2] *= self.thruster_rot_strength # Roll
 
-            # # Above equation return yaw, roll, pitch in other order than what the model uses
-            # yaw = M_prop_i[0]
-            # roll = M_prop_i[2]
-            # M_prop_i[2] = yaw
-            # M_prop_i[0] = roll
+            # Above equation return yaw, roll, pitch in other order than what the model uses
+            yaw = M_prop_i[0]
+            roll = M_prop_i[2]
+            M_prop_i[2] = yaw
+            M_prop_i[0] = roll
 
             tau_prop_i = np.concatenate([F_prop_b, M_prop_i])
             tau_prop += tau_prop_i

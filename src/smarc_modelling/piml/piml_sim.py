@@ -3,7 +3,7 @@
 
 import numpy as np
 from smarc_modelling.vehicles.SAM_PIML import SAM_PIML
-from smarc_modelling.piml.utils.utility_functions import load_data_from_bag, eta_quat_to_deg
+from smarc_modelling.piml.utils.utility_functions import load_data_from_bag, eta_quat_to_rad
 import matplotlib.pyplot as plt
 import torch
 import scienceplots # For fancy plotting
@@ -86,8 +86,8 @@ if __name__ == "__main__":
     print(f" Starting simulator...")
 
     # Loading ground truth data
-    eta, nu, u_fb, u_cmd, Dv_comp, Mv_dot, Cv, g_eta, tau, t, M, nu_dot = load_data_from_bag("src/smarc_modelling/piml/data/rosbags/rosbag_9", "torch")
-    print(eta.shape)
+    eta, nu, u_fb, u_cmd, Dv_comp, Mv_dot, Cv, g_eta, tau, t, M, nu_dot = load_data_from_bag("src/smarc_modelling/piml/data/rosbags/evaluate_4", "torch")
+    
     start_val = 0
     eta = eta[start_val:, :]
     nu = nu[start_val:, :]
@@ -216,32 +216,32 @@ if __name__ == "__main__":
 
     # Cumulative error plots
     if False:
-        # Quat to deg
-        eta_deg = np.array([eta_quat_to_deg(eta_vec) for eta_vec in eta[:end_val]])
-        eta_wb_deg = np.array([eta_quat_to_deg(eta_vec) for eta_vec in eta_wb[:end_val]])
-        eta_pinn_deg = np.array([eta_quat_to_deg(eta_vec) for eta_vec in eta_pinn[:end_val]])
-        eta_nn_deg = np.array([eta_quat_to_deg(eta_vec) for eta_vec in eta_nn[:end_val]])
-        eta_naive_nn_deg = np.array([eta_quat_to_deg(eta_vec) for eta_vec in eta_naive_nn[:end_val]])
-        eta_bpinn_deg = np.array([eta_quat_to_deg(eta_vec) for eta_vec in eta_bpinn[:end_val]])
+        # Quat to rad
+        eta_rad = np.array([eta_quat_to_rad(eta_vec) for eta_vec in eta[:end_val]])
+        eta_wb_rad = np.array([eta_quat_to_rad(eta_vec) for eta_vec in eta_wb[:end_val]])
+        eta_pinn_rad = np.array([eta_quat_to_rad(eta_vec) for eta_vec in eta_pinn[:end_val]])
+        eta_nn_rad = np.array([eta_quat_to_rad(eta_vec) for eta_vec in eta_nn[:end_val]])
+        eta_naive_nn_rad = np.array([eta_quat_to_rad(eta_vec) for eta_vec in eta_naive_nn[:end_val]])
+        eta_bpinn_rad = np.array([eta_quat_to_rad(eta_vec) for eta_vec in eta_bpinn[:end_val]])
 
         # Errors WB
-        eta_wb_mse = (eta_wb_deg - eta_deg)**2
+        eta_wb_mse = (eta_wb_rad - eta_rad)**2
         nu_wb_mse = (nu_wb - nu)**2
 
         # Errors PINN
-        eta_pinn_mse = (eta_pinn_deg - eta_deg)**2
+        eta_pinn_mse = (eta_pinn_rad - eta_rad)**2
         nu_pinn_mse = (nu_pinn - nu)**2
 
         # Errors NN
-        eta_nn_mse = (eta_nn_deg - eta_deg)**2
+        eta_nn_mse = (eta_nn_rad - eta_rad)**2
         nu_nn_mse = (nu_nn - nu)**2
 
         # Errors naive NN
-        eta_naive_nn_mse = (eta_naive_nn_deg - eta_deg)**2
+        eta_naive_nn_mse = (eta_naive_nn_rad - eta_rad)**2
         nu_naive_nn_mse = (nu_naive_nn - nu)**2
 
         # Errors B-PINN
-        eta_bpinn_mse = (eta_bpinn_deg - eta_deg)**2
+        eta_bpinn_mse = (eta_bpinn_rad - eta_rad)**2
         nu_bpinn_mse = (nu_bpinn - nu)**2
 
         # Cumulative error
@@ -262,9 +262,9 @@ if __name__ == "__main__":
         labels_eta = ["x", "y", "z", "yaw", "pitch", "roll"]
         labels_nu = ["u", "v", "w", "p", "q", "r"]
         labels_error = ["Cumulative Squared Error [$m^2$]", "Cumulative Squared Error [$m^2$]", "Cumulative Squared Error [$m^2$]", 
-                        "Cumulative Squared Error [$\circ^2$]", "Cumulative Squared Error [$\circ^2$]", "Cumulative Squared Error [$\circ^2$]", 
+                        "Cumulative Squared Error [$rad^2$]", "Cumulative Squared Error [$rad^2$]", "Cumulative Squared Error [$rad^2$]", 
                         "Cumulative Squared Error [$(m/s)^2$]", "Cumulative Squared Error [$(m/s)^2$]", "Cumulative Squared Error [$(m/s)^2$]",
-                        "Cumulative Squared Error [$(\circ/s)^2$]", "Cumulative Squared Error [$(\circ/s)^2$]", "Cumulative Squared Error [$(\circ/s)^2$]"]
+                        "Cumulative Squared Error [$(rad/s)^2$]", "Cumulative Squared Error [$(rad/s)^2$]", "Cumulative Squared Error [$(rad/s)^2$]"]
 
         # Plotting error in eta
         for i in range(6):
@@ -307,8 +307,8 @@ if __name__ == "__main__":
     # Plots of each state
     if True:
         # Quat to deg
-        eta_deg = np.array([eta_quat_to_deg(eta_vec) for eta_vec in eta[:end_val]])
-        eta_wb_deg = np.array([eta_quat_to_deg(eta_vec) for eta_vec in eta_wb[:end_val]])
+        eta_rad = np.array([eta_quat_to_rad(eta_vec) for eta_vec in eta[:end_val]])
+        eta_wb_rad = np.array([eta_quat_to_rad(eta_vec) for eta_vec in eta_wb[:end_val]])
         # eta_pinn_deg = np.array([eta_quat_to_deg(eta_vec) for eta_vec in eta_pinn[:end_val]])
         # eta_nn_deg = np.array([eta_quat_to_deg(eta_vec) for eta_vec in eta_nn[:end_val]])
         # eta_naive_nn_deg = np.array([eta_quat_to_deg(eta_vec) for eta_vec in eta_naive_nn[:end_val]])
@@ -320,14 +320,14 @@ if __name__ == "__main__":
         labels_eta = ["x", "y", "z", "yaw", "pitch", "roll"]
         labels_nu = ["u", "v", "w", "p", "q", "r"]
         labels_unit = ["State [m]", "State [m]", "State [m]",
-                       "State [$\circ$]", "State [$\circ$]", "State [$\circ$]",
+                       "State [$rad$]", "State [$rad$]", "State [$rad$]",
                        "State [m/s]", "State [m/s]", "State [m/s]",
-                       "State [$\circ/s$]", "State [$\circ/s$]", "State [$\circ/s$]"]
+                       "State [$rad/s$]", "State [$rad/s$]", "State [$rad/s$]"]
 
         # Plotting error in eta
         for i in range(6):
-            axes[i].plot(eta_deg[:end_val, i], label="Ground Truth")
-            axes[i].plot(eta_wb_deg[:end_val, i], label="White-box")
+            axes[i].plot(eta_rad[:end_val, i], label="Ground Truth")
+            axes[i].plot(eta_wb_rad[:end_val, i], label="White-box")
             # axes[i].plot(eta_pinn_deg[:end_val, i], label="PINN")
             # axes[i].plot(eta_bpinn_deg[:end_val, i], label="B-PINN")
             # axes[i].plot(eta_nn_deg[:end_val, i], label="NN")

@@ -5,7 +5,7 @@
 import torch
 import torch.nn as nn
 import numpy as np
-
+from smarc_modelling.piml.utils.utility_functions import eta_quat_to_rad
 
 class NaiveNN(nn.Module):
 
@@ -49,57 +49,21 @@ class NaiveNN(nn.Module):
 
     def loss_function(self, model, x_traj, y_traj, n_steps=10):
         """
-        Custom loss function that implements the physics loss.
+        Loss function
         """
-        tau = y_traj["tau"]
-        N = len(tau) # Amount of datapoints
 
-        # Multi-step loss
-        data_loss = (1/N) * multi_step_loss_function(model, x_traj, y_traj, n_steps)
-        
-        # Final loss is just the sum
-        return data_loss
+        eta = x_traj[:, 0:7]  # (N, 7) in quats
+        eta = torch.stack([eta_quat_to_rad(eta_vec, "torch") for eta_vec in eta])  # Convert to rads
 
+        nu_dot = model(x_traj)  # (N, 6)
+        dt = torch.diff(y_traj["t"]).unsqueeze(1)  # (N-1, 1)
 
-def multi_step_loss_function(model, x_traj, y_traj, n_steps=10):
-    """
-    Computes a multi-step integration loss based on nu over multiple steps
-    """
+        # Integrate with trapezoidal rule
+        nu_pred = torch.cumsum(0.5 * (nu_dot[:-1, :] + nu_dot[1:, :]) * dt, dim=0)  # (N-1, 6)
+        eta_pred = eta[:-1, :] + nu_pred  # t+1 prediction
 
-    if n_steps == 0:
-        print(f" n_steps was set to 0, changing it to 1!")
-        n_steps = 1
-
-    # Unpacking inputs
-    eta = x_traj[:, :6]
-    nu = x_traj[:, 6:12]
-    u = x_traj[:, 12:]
-
-    # Output values
-    t = y_traj["t"]
-
-    # Get the dt vector
-    dt_np = np.diff(t.numpy())
-    dt = torch.tensor(dt_np, dtype=torch.float32)
-    
-    loss = 0.0
-    nu_pred = nu[0].unsqueeze(0) # x0
-
-    for i in range(n_steps):
-        if i >= len(eta) - 1:
-            # Making sure we have values to compare to
-            break
-
-        # Prep inputs for model
-        x_input = torch.cat([eta[i].unsqueeze(0), nu_pred, u[i].unsqueeze(0)], dim=1)
-        x_dot = model(x_input) 
-        nu_dot = x_dot[0, 7:13].unsqueeze(0)
-        nu_pred = nu_pred + dt[i] * nu_dot
-
-        # Loss as difference between real velocity and collected for the next step
-        loss += torch.mean((nu_pred.clone() - nu[i+1].unsqueeze(0))**2)
-
-    return loss / n_steps
+        loss = torch.mean((eta_pred - eta[1:, :]) ** 2) # Residual in pos as loss
+        return loss 
 
 
 def init_naive_nn_model(file_name: str):
