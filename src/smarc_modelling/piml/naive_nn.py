@@ -52,17 +52,12 @@ class NaiveNN(nn.Module):
         Loss function
         """
 
-        eta = x_traj[:, 0:7]  # (N, 7) in quats
-        eta = torch.stack([eta_quat_to_rad(eta_vec, "torch") for eta_vec in eta])  # Convert to rads
-
-        nu_dot = model(x_traj)  # (N, 6)
-        dt = torch.diff(y_traj["t"]).unsqueeze(1)  # (N-1, 1)
-
-        # Integrate with trapezoidal rule
-        nu_pred = torch.cumsum(0.5 * (nu_dot[:-1, :] + nu_dot[1:, :]) * dt, dim=0)  # (N-1, 6)
-        eta_pred = eta[:-1, :] + nu_pred  # t+1 prediction
-
-        loss = torch.mean((eta_pred - eta[1:, :]) ** 2) # Residual in pos as loss
+        # Get the two accelerations
+        acc = y_traj["acc"]
+        acc_pred = model(x_traj)  # (N, 6)
+        
+        # Loss as difference
+        loss = torch.mean((acc_pred - acc) ** 2)
         return loss 
 
 
@@ -93,5 +88,5 @@ def naive_nn_predict(model, eta, nu, u, norm):
     x_normed = (x - norm[0]) / norm[1]
 
     # Get prediction
-    x_dot = model(x_normed).detach().numpy()
-    return x_dot.squeeze()
+    nu_dot = model(x_normed).detach().numpy()
+    return nu_dot.squeeze()
