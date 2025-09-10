@@ -382,7 +382,7 @@ class SAM_PIML():
 
         if self.piml_type == "naive_nn":
             nu_dot = naive_nn_predict(self.piml_model, eta, nu, u, [self.x_mean, self.x_std])
-            nu_dot_ang = angular_vel_to_quat_vel(nu_dot) # Convert to quat accelerations
+            nu_dot_ang = angular_vel_to_quat_vel(eta, nu_dot) # Convert to quat accelerations
             eta_dot = nu_dot_ang * self.dt # Closest approximation we have with only access to one instance
             x_dot = np.concatenate([eta_dot, nu_dot, u_dot])
 

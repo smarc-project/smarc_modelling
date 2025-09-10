@@ -28,12 +28,12 @@ if __name__ == "__main__":
 
 # %% ## GRID TRAINER OPTIONS ## %% #
     # SELECT MODEL
-    model = PINN()
-    sim_model_name = "pinn"
+    model = NaiveNN()
+    sim_model_name = "naive_nn"
 
     # SAVE NAME
-    save_best_name = "pinn_best_grid.pt"
-    save_model_name = "pinn.pt"
+    save_best_name = "naive_nn_best_grid.pt"
+    save_model_name = "naive_nn.pt"
 
     # DIVISION FOR TRAIN / VALIDATE SPLIT
     rng_seed = 0
@@ -54,7 +54,7 @@ if __name__ == "__main__":
 
     # INPUT - OUTPUT SHAPES
     input_shape = 19
-    output_shape = 36 # 36 - 6x6 - D, 6 - nu_dot 
+    output_shape = 6 # 36 - 6x6 - D, 6 - nu_dot 
 
 #####################################
 
