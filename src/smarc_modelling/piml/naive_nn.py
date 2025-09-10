@@ -63,43 +63,50 @@ class NaiveNN(nn.Module):
 
         return loss 
     
-def multi_step_loss_function(model, x_traj, y_traj, n_steps):
+def multi_step_loss_function(model, x_traj, y_traj, h_steps):
 
-    if n_steps == 0:
-        n_steps = 1
+    if h_steps == 0:
+        h_steps = 1
 
     dt = torch.diff(y_traj["t"])
     loss = 0.0
+    runs = 0
     
     eta = x_traj[:, :7]
     nu = x_traj[:, 7:13]
     u = x_traj[:, 13:]
     nu_dot = y_traj["acc"]
 
-    eta_pred = eta[0]
-    nu_pred = nu[0]
+    N = len(eta)
 
-    for i in range(n_steps):
-        if i >= len(eta) - 1:
-            break
-        
-        # Get predicted acceleration
-        x_input = torch.cat([eta_pred, nu_pred, u[i]])
-        nu_dot_pred = model(x_input)
+    for start_index in range(N - 1):
+        eta_pred = eta[start_index]
+        nu_pred = nu[start_index]
 
-        # Get loss
-        loss += torch.mean((nu_dot_pred - nu_dot[i])**2)
-       
-        # EF for next state
-        eta_ang = eta_quat_to_rad(eta_pred)
-        nu_dot_pred_ang = torch.tensor(angular_vel_to_quat_vel(eta_ang, nu_dot_pred.detach().numpy()), dtype=torch.float32)
-        eta_dot_pred = nu_dot_pred_ang * dt[i]
+        for step in range(h_steps):
+            i = start_index + step
+            if i >= N - 1:
+                break
 
-        # Integration step
-        eta_pred = eta_pred + eta_dot_pred * dt[i]
-        nu_pred = nu_pred + nu_dot_pred * dt[i]
+            # Input vector
+            x_input = torch.cat([eta_pred, nu_pred, u[i]])
+            nu_dot_pred = model(x_input)
 
-    return loss / n_steps
+            # Loss
+            run_loss += torch.mean((nu_dot_pred - nu_dot[i])**2)
+
+            # EF integration for next step
+            eta_ang = eta_quat_to_rad(eta_pred)
+            nu_dot_pred_ang = torch.tensor(angular_vel_to_quat_vel(eta_ang, nu_dot_pred.detach().numpy()), dtype=torch.float32)
+            eta_dot_pred = nu_dot_pred_ang * dt[i]
+            eta_pred = eta_pred + eta_dot_pred * dt[i]
+            nu_pred = nu_pred + nu_dot_pred_ang * dt[i]
+
+        # Loss
+        runs += 1
+        loss += run_loss / h_steps
+
+    return loss / runs
 
 
 
