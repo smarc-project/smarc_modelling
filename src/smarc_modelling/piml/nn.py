@@ -27,13 +27,13 @@ class NN(nn.Module):
             self.layers.append(nn.Linear(layer_sizes[i], layer_sizes[i+1]))
         
         # Activation function
-        self.activation = nn.Tanh()
+        self.activation = nn.ReLU()
 
         # Creating output layer
         self.output_layer = nn.Linear(layer_sizes[-2], layer_sizes[-1])
 
         # Dropout for aiding with reduced overfitting
-        self.dropout = nn.Dropout(p=0.25)
+        self.dropout = nn.Dropout(p=0.0)
 
 
     def forward(self, x):

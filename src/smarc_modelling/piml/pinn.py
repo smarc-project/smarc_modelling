@@ -33,7 +33,7 @@ class PINN(nn.Module):
             self.layers.append(nn.Linear(layer_sizes[i], layer_sizes[i+1]))
         
         # Activation function
-        self.activation = nn.Tanh()
+        self.activation = nn.ReLU()
 
         # Creating output layer
         self.output_layer = nn.Linear(layer_sizes[-2], layer_sizes[-1])
@@ -72,27 +72,27 @@ class PINN(nn.Module):
         # Getting predicted D
         D_pred = model(x_traj)
 
-        # # Calculate MSE physics loss using Fossen Dynamics Model
-        # # Physics loss predicted D matrix here should sum all the forces to 0
-        # physics_loss = torch.mean((Mv_dot + Cv + (torch.bmm(D_pred, nu.unsqueeze(2)).squeeze(2)) + g_eta - tau)**2)
+        # Calculate MSE physics loss using Fossen Dynamics Model
+        # Physics loss predicted D matrix here should sum all the forces to 0
+        physics_loss = torch.mean((Mv_dot + Cv + (torch.bmm(D_pred, nu.unsqueeze(2)).squeeze(2)) + g_eta - tau)**2)
 
-        # # Multi-step loss
-        # data_loss = multi_step_loss_function(model, x_traj, y_traj, n_steps)
+        # Multi-step loss
+        data_loss = multi_step_loss_function(model, x_traj, y_traj, n_steps)
 
-        # # Encourage high damping in roll and y directions by returning high values when corresponding damping terms are low
-        # damping_penalty = additional_damping_penalty(D_pred)
+        # Encourage high damping in roll and y directions by returning high values when corresponding damping terms are low
+        damping_penalty = additional_damping_penalty(D_pred)
 
-        # # Scaling to ensure losses have approximately same scale
-        # alpha = 0.05
-        # beta = 0.5
-        # gamma = 0.001
+        # Scaling to ensure losses have approximately same scale
+        alpha = 0.05
+        beta = 0.5
+        gamma = 0.001
 
-        rhs = (tau - Cv - torch.matmul(D_pred, nu.unsqueeze(-1)).squeeze(-1) - g_eta)
-        nu_dot_pred = torch.bmm(torch.linalg.inv(M), rhs.unsqueeze(-1)).squeeze(-1)
-        loss = torch.mean((nu_dot_pred - nu_dot)**2)
+        # rhs = (tau - Cv - torch.matmul(D_pred, nu.unsqueeze(-1)).squeeze(-1) - g_eta)
+        # nu_dot_pred = torch.bmm(torch.linalg.inv(M), rhs.unsqueeze(-1)).squeeze(-1)
+        # loss = torch.mean((nu_dot_pred - nu_dot)**2)
 
         # Final loss is just the sum
-        return loss #physics_loss*alpha + data_loss*beta + damping_penalty*gamma
+        return physics_loss*alpha + data_loss*beta + damping_penalty*gamma
 
 
 def multi_step_loss_function(model, x_traj, y_traj, n_steps=10):

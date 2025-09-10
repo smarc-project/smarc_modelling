@@ -28,25 +28,25 @@ if __name__ == "__main__":
 
 # %% ## GRID TRAINER OPTIONS ## %% #
     # SELECT MODEL
-    model = NaiveNN()
-    sim_model_name = "naive_nn"
+    model = PINN()
+    sim_model_name = "pinn"
 
     # SAVE NAME
-    save_best_name = "naivenn_best_grid.pt"
-    name_model = "naivenn.pt"
+    save_best_name = "pinn_best_grid.pt"
+    save_model_name = "pinn.pt"
 
     # DIVISION FOR TRAIN / VALIDATE SPLIT
-    rng_seed = 1
-    train_procent = 0.9
+    rng_seed = 0
+    train_procent = 0.8
 
     # HYPER - PARAMETERS
     n_steps = 20
     dropout_rate = 0.25
 
     # Use best perform here
-    layer_grid = [10, 20, 30]
-    size_grid = [16, 32]
-    factor_grid = [0.5, 0.1]
+    layer_grid = [25, 50]
+    size_grid = [32, 64]
+    factor_grid = [0.5, 0.25]
     lr0 = 0.001
     max_norm = 1.0
     patience = 5000
@@ -54,7 +54,7 @@ if __name__ == "__main__":
 
     # INPUT - OUTPUT SHAPES
     input_shape = 19
-    output_shape = 6 # 36 - 6x6 - D, 6 - nu_dot 
+    output_shape = 36 # 36 - 6x6 - D, 6 - nu_dot 
 
 #####################################
 
@@ -73,9 +73,9 @@ if __name__ == "__main__":
     x_mean = torch.mean(all_x, dim=0)
     x_std = torch.std(all_x, dim=0) + 1e-8 # Preventing division by 0
 
-    # Overwrite normalization just to turn it off in an easy way
-    x_mean = 0
-    x_std = 1
+    # # Overwrite normalization just to turn it off in an easy way
+    # x_mean = 0
+    # x_std = 1
 
     # Load validation data
     x_trajectories_val, y_trajectories_val = load_to_trajectory(datasets[train_val_split:])
@@ -156,7 +156,7 @@ if __name__ == "__main__":
                             val_loss_total += val_loss
                     
                     # Step scheduler
-                    scheduler.step(val_loss_total)
+                    scheduler.step(loss_total)
                     
                     # For plotting the loss
                     loss_history.append(loss_total.item())
@@ -186,7 +186,7 @@ if __name__ == "__main__":
                             "x_mean": x_mean,
                             "x_std": x_std,
                             "dropout": dropout_rate}, 
-                            "src/smarc_modelling/piml/models/"+name_model) 
+                            "src/smarc_modelling/piml/models/"+save_model_name) 
                 model.eval() # Just to doubly ensure that it is in eval mode
 
                 total_error = 0.0

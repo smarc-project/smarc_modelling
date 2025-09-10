@@ -5,7 +5,7 @@
 import torch
 import torch.nn as nn
 import numpy as np
-from smarc_modelling.piml.utils.utility_functions import eta_quat_to_rad
+from smarc_modelling.piml.utils.utility_functions import angular_vel_to_quat_vel
 
 class NaiveNN(nn.Module):
 
@@ -28,13 +28,13 @@ class NaiveNN(nn.Module):
             self.layers.append(nn.Linear(layer_sizes[i], layer_sizes[i+1]))
         
         # Activation function
-        self.activation = nn.Tanh()
+        self.activation = nn.ReLU()
 
         # Creating output layer
         self.output_layer = nn.Linear(layer_sizes[-2], layer_sizes[-1])
 
         # Dropout for aiding with reduced overfitting
-        self.dropout = nn.Dropout(p=0.25)
+        self.dropout = nn.Dropout(p=0.0)
 
 
     def forward(self, x):
@@ -59,6 +59,42 @@ class NaiveNN(nn.Module):
         # Loss as difference
         loss = torch.mean((acc_pred - acc) ** 2)
         return loss 
+    
+def multi_step_loss_function(model, x_traj, y_traj, n_steps=10):
+
+    if n_steps == 0:
+        n_steps = 1
+
+    dt = torch.diff(y_traj["t"])
+    loss = 0.0
+    
+    eta = x_traj[:, :6]
+    nu = x_traj[:, 6:12]
+    u = x_traj[:, 12:]
+    nu_dot = y_traj["acc"]
+
+    eta_pred = eta[0]
+    nu_pred = nu[0]
+
+    for i in range(n_steps):
+        if i >= len(eta) - 1:
+            break
+        
+        # Get predicted acceleration
+        x_input = torch.cat([eta_pred, nu_pred, u[i]])
+        nu_dot_pred = model(x_input)
+
+        # Get loss
+        loss += torch.mean((nu_dot_pred - nu_dot[i])**2)
+       
+        # EF for next state
+        nu_dot_pred_ang = angular_vel_to_quat_vel(nu_dot_pred)
+        eta_dot = nu_dot_pred_ang * dt[i]
+        nu_pred += nu_dot * dt[i]
+        eta_pred += eta_dot * dt[i]
+        
+    return loss / n_steps
+
 
 
 def init_naive_nn_model(file_name: str):
