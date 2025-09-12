@@ -11,34 +11,42 @@ import torch
 import numpy as np
 import matplotlib.pyplot as plt
 import scienceplots # For fancy plotting
+import random
 
-test_datasets = ["test_1", "test_2", "test_3", "test_4", "test_5", "test_6", "test_7", "test_8"]
+test_datasets = ["rosbag_3", "rosbag_18", "rosbag_85", "rosbag_112", "rosbag_113", "rosbag_114"]
 
-datasets = ["rosbag_16", "rosbag_15", "rosbag_14", "rosbag_13", "rosbag_12", "rosbag_1", "rosbag_2", "rosbag_3", "rosbag_4", "rosbag_5", "rosbag_6", 
-            "rosbag_7", "rosbag_8", "rosbag_9", "rosbag_10", "rosbag_11"]
+datasets = ["rosbag_1", "rosbag_5", "rosbag_9", "rosbag_10", "rosbag_11", "rosbag_12", "rosbag_13", 
+            "rosbag_15", "rosbag_16", "rosbag_17", "rosbag_19", "rosbag_20", "rosbag_25", "rosbag_28", 
+            "rosbag_31", "rosbag_34", "rosbag_38", "rosbag_39", "rosbag_41", "rosbag_43", "rosbag_46",
+            "rosbag_47", "rosbag_48", "rosbag_49", "rosbag_50", "rosbag_53", "rosbag_54", "rosbag_55",
+            "rosbag_58", "rosbag_59", "rosbag_61", "rosbag_62", "rosbag_66", "rosbag_67", "rosbag_69",
+            "rosbag_70", "rosbag_73", "rosbag_74", "rosbag_75", "rosbag_76", "rosbag_80", "rosbag_82",
+            "rosbag_86", "rosbag_88", "rosbag_91", "rosbag_92", "rosbag_94", "rosbag_96", "rosbag_97", 
+            "rosbag_102", "rosbag_105", "rosbag_107", "rosbag_108"]
 
 if __name__ == "__main__":
 
 # %% ## GRID TRAINER OPTIONS ## %% #
     # SELECT MODEL
-    model = PINN()
-    sim_model_name = "pinn"
+    model = NaiveNN()
+    sim_model_name = "naive_nn"
 
     # SAVE NAME
-    save_best_name = "pinn_best_grid.pt"
-    name_model = "pinn.pt"
+    save_best_name = "naive_nn_best_grid.pt"
+    save_model_name = "naive_nn.pt"
 
     # DIVISION FOR TRAIN / VALIDATE SPLIT
-    train_procent = 0.9
+    rng_seed = 0
+    train_procent = 0.8
 
     # HYPER - PARAMETERS
     n_steps = 20
     dropout_rate = 0.25
 
     # Use best perform here
-    layer_grid = [25, 40]
-    size_grid = [16, 32]
-    factor_grid = [0.9, 0.5, 0.1]
+    layer_grid = [25, 50]
+    size_grid = [32, 64]
+    factor_grid = [0.5, 0.25]
     lr0 = 0.001
     max_norm = 1.0
     patience = 5000
@@ -46,13 +54,15 @@ if __name__ == "__main__":
 
     # INPUT - OUTPUT SHAPES
     input_shape = 19
-    output_shape = 36
+    output_shape = 6 # 36 - 6x6 - D, 6 - nu_dot 
 
 #####################################
 
 # %% # 
 
     # Divide up the datasets into training and validation
+    random.seed(rng_seed)
+    random.shuffle(datasets)
     train_val_split = int(np.shape(datasets)[0] * train_procent)
 
     # Load training data
@@ -146,7 +156,7 @@ if __name__ == "__main__":
                             val_loss_total += val_loss
                     
                     # Step scheduler
-                    scheduler.step(val_loss_total)
+                    scheduler.step(loss_total)
                     
                     # For plotting the loss
                     loss_history.append(loss_total.item())
@@ -176,7 +186,7 @@ if __name__ == "__main__":
                             "x_mean": x_mean,
                             "x_std": x_std,
                             "dropout": dropout_rate}, 
-                            "src/smarc_modelling/piml/models/"+name_model) 
+                            "src/smarc_modelling/piml/models/"+save_model_name) 
                 model.eval() # Just to doubly ensure that it is in eval mode
 
                 total_error = 0.0

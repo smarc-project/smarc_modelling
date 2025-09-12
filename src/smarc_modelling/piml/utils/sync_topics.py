@@ -28,6 +28,8 @@ class SyncSubscriber(Node):
         self.thruster1_cmd_msg.rpm = 0
         self.thruster2_cmd_msg = ThrusterRPMStamped()
         self.thruster2_cmd_msg.rpm = 0
+        self.t1cmd_got = False
+        self.t2cmd_got = False
 
         # Thrusters
         self.thruster1_cmd_sub = self.create_subscription(ThrusterRPMStamped, "/piml/thruster1_cmd", self.thruster1_cmd_cb, 1) 
@@ -86,14 +88,17 @@ class SyncSubscriber(Node):
         sync_msg.vbs_cmd = vbs_cmd
 
         # Publish message
-        self.synched_pub.publish(sync_msg)
-        self.get_logger().info("Published synched data!")
+        if self.t1cmd_got and self.t2cmd_got:
+            self.synched_pub.publish(sync_msg)
+            self.get_logger().info("Published synched data!")
 
     def thruster1_cmd_cb(self, msg):
         self.thruster1_cmd_msg = msg
+        self.t1cmd_got = True
 
     def thruster2_cmd_cb(self, msg):
         self.thruster2_cmd_msg = msg
+        self.t2cmd_got = True
 
     def thrust_vector_cb(self, msg):
         self.thrust_vector_msg = msg

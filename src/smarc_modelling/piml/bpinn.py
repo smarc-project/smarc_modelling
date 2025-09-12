@@ -45,7 +45,7 @@ class BPINN(nn.Module):
     def forward(self, x):
         # Apply activation function and dropout to all layers except last
         for layer in self.layers[:-1]:
-            x = torch.relu(layer(x))
+            x = torch.nn.ReLU(layer(x))
             x = self.dropout(x)
         # Getting final prediction without relu to get full range prediction
         A_flat = self.layers[-1](x)

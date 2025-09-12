@@ -63,6 +63,7 @@ from smarc_modelling.piml.pinn import init_pinn_model, pinn_predict
 from smarc_modelling.piml.nn import init_nn_model, nn_predict
 from smarc_modelling.piml.naive_nn import init_naive_nn_model, naive_nn_predict
 from smarc_modelling.piml.bpinn import init_bpinn_model, bpinn_predict
+from smarc_modelling.piml.utils.utility_functions import angular_vel_to_quat_vel
 
 
 class SolidStructure:
@@ -380,8 +381,10 @@ class SAM_PIML():
         x_dot = np.concatenate([eta_dot, nu_dot, u_dot])
 
         if self.piml_type == "naive_nn":
-            x_dot = naive_nn_predict(self.piml_model, eta, nu, u, [self.x_mean, self.x_std])
-            x_dot = np.concatenate([x_dot, u_dot])
+            nu_dot = naive_nn_predict(self.piml_model, eta, nu, u, [self.x_mean, self.x_std])
+            nu_dot_ang = angular_vel_to_quat_vel(eta, nu_dot) # Convert to quat accelerations
+            eta_dot = nu_dot_ang * self.dt # Closest approximation we have with only access to one instance
+            x_dot = np.concatenate([eta_dot, nu_dot, u_dot])
 
         # # Type compatibility with C++ extension
         # x_dot = np.array(x_dot, dtype=np.float32).reshape(1, -1)
@@ -630,10 +633,20 @@ class SAM_PIML():
                         self.KT_0*abs(n_rps[i])*n_rps[i]
                         ) / prop_scaling
                 K_prop_i = self.rho * (self.D_prop ** 5) * self.KQ_0 * abs(n_rps[i]) * n_rps[i] / prop_scaling
+
+                # X_prop_i = self.rho*(self.D_prop**4)*(
+                #         self.KT_0*abs(n_rps[i])*n_rps[i] +
+                #         (self.KT_max-self.KT_0)/self.Ja_max * (Va/self.D_prop) * abs(n_rps[i])
+                #         ) / prop_scaling
+                # K_prop_i = self.rho * (self.D_prop**5) * (
+                #         self.KQ_0 * abs(n_rps[i]) * n_rps[i] +
+                #         (self.KQ_max-self.KQ_0)/self.Ja_max * (Va/self.D_prop) * abs(n_rps[i])) / prop_scaling
                 
 
             F_prop_b = C_T2C @ np.array([X_prop_i, 0, 0])
-            r_prop_i = C_T2C @ self.propellers.r_t_p_sh[i] - self.p_OC_O
+            var = self.p_OC_O
+            var[2] = 0
+            r_prop_i = C_T2C @ self.propellers.r_t_p_sh[i] - var
             M_prop_i = np.cross(r_prop_i, F_prop_b) \
                         + np.array([(-1)**i * K_prop_i, 0, 0])  # the -1 is because we have counter rotating
                                     # propellers that are supposed to cancel out the propeller induced
