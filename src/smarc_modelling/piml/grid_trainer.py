@@ -37,23 +37,23 @@ if __name__ == "__main__":
 
     # DIVISION FOR TRAIN / VALIDATE SPLIT
     rng_seed = 0
-    train_procent = 0.8
+    train_procent = 0.9
 
     # HYPER - PARAMETERS
-    n_steps = 20
+    h_steps = 1
     dropout_rate = 0.25
 
     # Use best perform here
-    layer_grid = [25, 50]
-    size_grid = [32, 64]
-    factor_grid = [0.5, 0.25]
+    layer_grid = [10]
+    size_grid = [64]
+    factor_grid = [0.5]
     lr0 = 0.001
     max_norm = 1.0
     patience = 5000
     epochs = 50000
 
     # INPUT - OUTPUT SHAPES
-    input_shape = 19
+    input_shape = 16 # 19
     output_shape = 6 # 36 - 6x6 - D, 6 - nu_dot 
 
 #####################################
@@ -70,18 +70,30 @@ if __name__ == "__main__":
 
     # Get normalization constants
     all_x = torch.cat(x_trajectories, dim=0)
-    x_mean = torch.mean(all_x, dim=0)
-    x_std = torch.std(all_x, dim=0) + 1e-8 # Preventing division by 0
+    x_min, _ = torch.min(all_x, dim=0)
+    x_max, _ = torch.max(all_x, dim=0)
+    x_range = x_max - x_min
 
-    # # Overwrite normalization just to turn it off in an easy way
-    # x_mean = 0
-    # x_std = 1
+
+    acc_list = [traj["acc"] for traj in y_trajectories]
+    all_nu_dot = torch.cat(acc_list, dim=0)
+
+    nu_dot_min, _ = torch.min(all_nu_dot, dim=0)
+    nu_dot_max, _ = torch.max(all_nu_dot, dim=0)
+    nu_dot_range = nu_dot_max - nu_dot_min
+
+    for y_traj in y_trajectories:
+        y_traj["acc"] = (y_traj["acc"] - nu_dot_min) / nu_dot_range
 
     # Load validation data
     x_trajectories_val, y_trajectories_val = load_to_trajectory(datasets[train_val_split:])
+    for y_traj in y_trajectories_val:
+        y_traj["acc"] = (y_traj["acc"] - nu_dot_min) / nu_dot_range
 
     # Load test data
     x_trajectories_test, y_trajectories_test = load_to_trajectory(test_datasets)
+    for y_traj in y_trajectories_test:
+        y_traj["acc"] = (y_traj["acc"] - nu_dot_min) / nu_dot_range
 
     # For results
     error_grid = np.zeros((len(layer_grid), len(size_grid), len(factor_grid)))
@@ -115,10 +127,10 @@ if __name__ == "__main__":
                     model.initialize(shape)
                 
                 # Optimizer and other settings
-                optimizer = torch.optim.Adam(model.parameters(), lr=lr0)
+                optimizer = torch.optim.Adam(model.parameters(), lr=lr0) # weight_decay=1e-5)
 
-                # Adaptive learning rate
-                scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer=optimizer, mode="min", factor=factor, patience=2500, threshold=10, min_lr=1e-8)
+                # # Adaptive learning rate
+                # scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer=optimizer, mode="min", factor=factor, patience=2500, min_lr=1e-8)
 
                 # Early stopping with validation loss
                 best_val_loss = float("inf")
@@ -136,12 +148,12 @@ if __name__ == "__main__":
                     for x_traj, y_traj in zip(x_trajectories, y_trajectories):
                         
                         # Get PI loss
-                        x_traj_normed = (x_traj - x_mean) / x_std
-                        loss = model.loss_function(model, x_traj_normed, y_traj, n_steps)
+                        x_traj_normed = (x_traj - x_min) / x_range
+                        loss = model.loss_function(model, x_traj_normed, y_traj, h_steps)
                         loss_total += loss
 
                     loss_total.backward()
-                    torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=max_norm) # Clipping to help with stability
+                    # torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=max_norm) # Clipping to help with stability
                     optimizer.step()
 
                     # Evaluate model on validation data
@@ -151,12 +163,12 @@ if __name__ == "__main__":
                         for x_traj_val, y_traj_val in zip(x_trajectories_val, y_trajectories_val):
 
                             # Get PI validation loss
-                            x_traj_val_normed = (x_traj_val - x_mean) / x_std
-                            val_loss = model.loss_function(model, x_traj_val_normed, y_traj_val, n_steps)
+                            x_traj_val_normed = (x_traj_val - x_min) / x_range
+                            val_loss = model.loss_function(model, x_traj_val_normed, y_traj_val, h_steps)
                             val_loss_total += val_loss
                     
-                    # Step scheduler
-                    scheduler.step(loss_total)
+                    # # Step scheduler
+                    # scheduler.step(loss_total)
                     
                     # For plotting the loss
                     loss_history.append(loss_total.item())
@@ -173,19 +185,35 @@ if __name__ == "__main__":
                     # Print statement to make sure everything is still running
                     if epoch % 100 == 0:
                         print(f" Still training, epoch {epoch}, loss: {loss_total.item()}, lr: {optimizer.param_groups[0]['lr']},\n validation loss: {val_loss_total.item()}, shape: {layers}, {size}, {factor}, counter: {counter}")
+                        # Saving model as we run to check how it evolves
+                        running_save = "running_save_" + str(epoch)
+                        torch.save({"model_shape": shape, 
+                            "state_dict": model.state_dict(),
+                            "x_min": x_min,
+                            "x_range": x_range,
+                            "dropout": dropout_rate,
+                            "y_min": nu_dot_min,
+                            "y_range": nu_dot_range}, 
+                            "src/smarc_modelling/piml/models/"+running_save)
 
                     # Break condition for early stopping
                     if counter >= patience:
                         print(f" Stopping early due to no improvement after {patience} epochs from epoch: {epoch-counter}\n")
+                        break
+
+                    if loss_total.item() == float("nan"):
+                        print(f" Stopping due to NaN loss")
                         break
                 
                 # Calculating the model error
                 model.load_state_dict(best_model_state) # Loading the best model state
                 torch.save({"model_shape": shape, 
                             "state_dict": model.state_dict(),
-                            "x_mean": x_mean,
-                            "x_std": x_std,
-                            "dropout": dropout_rate}, 
+                            "x_min": x_min,
+                            "x_range": x_range,
+                            "dropout": dropout_rate,
+                            "y_min": nu_dot_min,
+                            "y_range": nu_dot_range}, 
                             "src/smarc_modelling/piml/models/"+save_model_name) 
                 model.eval() # Just to doubly ensure that it is in eval mode
 
@@ -233,8 +261,10 @@ if __name__ == "__main__":
                             torch.save({"model_shape": shape, 
                                         "state_dict": model.state_dict(), 
                                         "dropout": dropout_rate,
-                                        "x_mean": x_mean,
-                                        "x_std": x_std},
+                                        "x_min": x_min,
+                                        "x_range": x_range,
+                                        "y_min": nu_dot_min,
+                                        "y_range": nu_dot_range},
                                         "src/smarc_modelling/piml/models/"+save_best_name)
                             best_setup = [layers, size, factor]
 

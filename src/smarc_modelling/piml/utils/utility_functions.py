@@ -214,7 +214,7 @@ def load_to_trajectory(data_files: list):
         path = "src/smarc_modelling/piml/data/rosbags/" + dataset
         eta, nu, u, u_cmd, Dv_comp, Mv_dot, Cv, g_eta, tau, t, M, acc = load_data_from_bag(path, "torch")
         
-        x_traj = torch.cat([eta, nu, u], dim=1)
+        x_traj = torch.cat([eta[:, 3:], nu, u], dim=1)
         y_traj = {
             "eta": eta,
             "u_cmd": u_cmd,
@@ -226,7 +226,8 @@ def load_to_trajectory(data_files: list):
             "t": t,
             "nu": nu,
             "M": M,
-            "acc": acc
+            "acc": acc,
+            "u": u
         }
 
         # Append most recently loaded data

@@ -287,19 +287,20 @@ class SAM_PIML():
 
         if self.piml_type == "pinn":
             print(f" Physics Informed Neural Network model initialized")
-            self.piml_model, self.x_mean, self.x_std = init_pinn_model("pinn.pt")
-
-        if self.piml_type == "nn":
-            print(f" Standard Neural Network model initialized")
-            self.piml_model, self.x_mean, self.x_std = init_nn_model("nn.pt")
-
-        if self.piml_type == "naive_nn":
-            print(f" Naive Neural Network model initialized")
-            self.piml_model, self.x_mean, self.x_std = init_naive_nn_model("naive_nn.pt")
+            self.piml_model, self.x_min, self.x_range = init_pinn_model("pinn.pt")
 
         if self.piml_type == "bpinn":
             print(f" Bayesian - Physics Informed Neural Network model initialized")
-            self.piml_model, self.x_mean, self.x_std = init_bpinn_model("bpinn.pt")
+            self.piml_model, self.x_min, self.x_range = init_bpinn_model("bpinn.pt")
+
+        if self.piml_type == "nn":
+            print(f" Standard Neural Network model initialized")
+            self.piml_model, self.x_min, self.x_range = init_nn_model("nn.pt")
+
+        if self.piml_type == "naive_nn":
+            print(f" Naive Neural Network model initialized")
+            self.piml_model, self.x_min, self.x_range, self.y_min, self.y_range = init_naive_nn_model("naive_nn.pt")
+
 
         # For white-box
         if piml_type == None:
@@ -375,15 +376,16 @@ class SAM_PIML():
         eta_dot = self.eta_dynamics(eta, nu)
 
         if self.piml_type == "bpinn":
-            Dv, _ = bpinn_predict(self.piml_model, eta, nu, u, [self.x_mean, self.x_std])
+            Dv, _ = bpinn_predict(self.piml_model, eta, nu, u, [self.x_min, self.x_range])
             nu_dot = self.Minv @ (self.tau - np.matmul(self.C,self.nu_r) - Dv - self.g_vec)
 
         x_dot = np.concatenate([eta_dot, nu_dot, u_dot])
 
         if self.piml_type == "naive_nn":
-            nu_dot = naive_nn_predict(self.piml_model, eta, nu, u, [self.x_mean, self.x_std])
+            nu_dot = naive_nn_predict(self.piml_model, eta, nu, u, [self.x_min, self.x_range, self.y_min, self.y_range])
             nu_dot_ang = angular_vel_to_quat_vel(eta, nu_dot) # Convert to quat accelerations
             eta_dot = nu_dot_ang * self.dt # Closest approximation we have with only access to one instance
+            
             x_dot = np.concatenate([eta_dot, nu_dot, u_dot])
 
         # # Type compatibility with C++ extension

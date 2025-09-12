@@ -34,7 +34,7 @@ class NaiveNN(nn.Module):
         self.output_layer = nn.Linear(layer_sizes[-2], layer_sizes[-1])
 
         # Dropout for aiding with reduced overfitting
-        self.dropout = nn.Dropout(p=0.0)
+        self.dropout = nn.Dropout(p=0.1)
 
 
     def forward(self, x):
@@ -72,16 +72,15 @@ def multi_step_loss_function(model, x_traj, y_traj, h_steps):
     loss = 0.0
     runs = 0
     
-    eta = x_traj[:, :7]
-    nu = x_traj[:, 7:13]
-    u = x_traj[:, 13:]
+    nu = x_traj[:, :6]
+    u = x_traj[:, 6:]
     nu_dot = y_traj["acc"]
 
-    N = len(eta)
+    N = len(nu)
 
     for start_index in range(N - 1):
-        eta_pred = eta[start_index]
         nu_pred = nu[start_index]
+        run_loss = 0.0
 
         for step in range(h_steps):
             i = start_index + step
@@ -89,25 +88,20 @@ def multi_step_loss_function(model, x_traj, y_traj, h_steps):
                 break
 
             # Input vector
-            x_input = torch.cat([eta_pred, nu_pred, u[i]])
+            x_input = torch.cat([nu_pred, u[i]])
             nu_dot_pred = model(x_input)
 
             # Loss
             run_loss += torch.mean((nu_dot_pred - nu_dot[i])**2)
 
             # EF integration for next step
-            eta_ang = eta_quat_to_rad(eta_pred)
-            nu_dot_pred_ang = torch.tensor(angular_vel_to_quat_vel(eta_ang, nu_dot_pred.detach().numpy()), dtype=torch.float32)
-            eta_dot_pred = nu_dot_pred_ang * dt[i]
-            eta_pred = eta_pred + eta_dot_pred * dt[i]
-            nu_pred = nu_pred + nu_dot_pred_ang * dt[i]
+            nu_pred = nu_pred + nu_dot_pred * dt[i]
 
         # Loss
         runs += 1
         loss += run_loss / h_steps
 
     return loss / runs
-
 
 
 def init_naive_nn_model(file_name: str):
@@ -117,14 +111,18 @@ def init_naive_nn_model(file_name: str):
     model = NaiveNN()
     model.initialize(dict_file["model_shape"])
     model.load_state_dict(dict_file["state_dict"])
-    x_mean = dict_file["x_mean"]
-    x_std = dict_file["x_std"]
+    x_min = dict_file["x_mean"]
+    x_range = dict_file["x_std"]
+    y_min = dict_file["y_min"]
+    y_range = dict_file["y_range"]
     model.eval()
-    return model, x_mean, x_std
+    return model, x_min, x_range, y_min, y_range
 
 
 def naive_nn_predict(model, eta, nu, u, norm):
     # For easy prediction in other files
+
+    # norm = [x_min, x_range, y_min, y_range]
 
     # Flatten input
     eta = np.array(eta, dtype=np.float32).flatten()
@@ -138,4 +136,5 @@ def naive_nn_predict(model, eta, nu, u, norm):
 
     # Get prediction
     nu_dot = model(x_normed).detach().numpy()
+    nu_dot =  nu_dot * norm[3] + norm[2]
     return nu_dot.squeeze()
