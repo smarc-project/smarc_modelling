@@ -25,6 +25,7 @@ class SIM:
         self.controls = control_vec
         self.n_sim = np.shape(time_vec)[0]
         self.var_dt = np.diff(time_vec)
+        print(self.var_dt[45:60])
 
         # Decide if we are going to update the state or not
         self.state_update = state_update
@@ -115,11 +116,11 @@ if __name__ == "__main__":
     print(f" Done with the white-box sim!")
 
     print(f" Done with all sims making plots!")
-    eta_gt[:, 2] = 2*z0 - eta_gt[:, 2]
-    eta_gt[:, 1] = 2*y0 - eta_gt[:, 1]
+ 
     end_val = end_val_gt
     print(end_val)
     plt.style.use('science')
+    end_val = 50
 
     # 3D trajectory plot
     if True:

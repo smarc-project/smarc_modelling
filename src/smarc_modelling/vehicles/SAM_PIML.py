@@ -597,8 +597,6 @@ class SAM_PIML():
         self.g_vec = gvect(self.W, self.B, self.theta, self.phi, self.p_OG_O, self.p_OB_O)
 
 
-        self.g_vec[5] = 0
-
     def calculate_tau(self, u):
         """
         All external forces
