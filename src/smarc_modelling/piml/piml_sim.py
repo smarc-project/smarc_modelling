@@ -44,7 +44,7 @@ class SIM:
         
         for i in range(self.n_sim-1):
         
-            if i % 5 == 0 and self.state_update:
+            if i % 3 == 0 and self.state_update:
                 self.data[:, i] = torch.Tensor.tolist(torch.cat([states[0][i], states[1][i], states[2][i]]))
                 times.append(time_since_update)
                 time_since_update = 0
@@ -56,7 +56,7 @@ class SIM:
 
             # Do sim step using ef
             try:
-                self.data[:, i+1] = self.ef(self.data[:, i], self.controls[i], dt, self.vehicle.dynamics)
+                self.data[:, i+1] = self.rk4(self.data[:, i], self.controls[i], dt, self.vehicle.dynamics)
             except:
                 self.data[:, i+1] = self.data[:, i]
                 if once:
@@ -86,7 +86,7 @@ if __name__ == "__main__":
     print(f" Starting simulator...")
 
     # Loading ground truth data
-    eta, nu, u_fb, u_cmd, Dv_comp, Mv_dot, Cv, g_eta, tau, t, M, nu_dot = load_data_from_bag("src/smarc_modelling/piml/data/rosbags/rosbag_1", "torch")
+    eta, nu, u_fb, u_cmd, Dv_comp, Mv_dot, Cv, g_eta, tau, t, M, nu_dot = load_data_from_bag("src/smarc_modelling/piml/data/rosbags/evaluate_2", "torch")
     
     start_val = 0
     eta = eta[start_val:, :]
@@ -99,7 +99,7 @@ if __name__ == "__main__":
     z0 = eta[0, 2].item()
  
     # Setting up model for simulations
-    reset_state = False
+    reset_state = True
     sam_wb = SIM(None, states, t, u_cmd, reset_state) # White-box
     sam_pinn = SIM("pinn", states, t, u_cmd, reset_state) # Physics Informed Neural Network 
     sam_nn = SIM("nn", states, t, u_cmd, reset_state) # Standard Neural Network
@@ -117,15 +117,15 @@ if __name__ == "__main__":
     print(f" White-box inference time: {(end_time-start_time)*1000/end_val_wb}")
     print(f" Done with the white-box sim!")
 
-    print(f" Running PINN simulation...")
-    start_time = time.time()
-    results_pinn, end_val_pinn = sam_pinn.run_sim()
-    end_time = time.time()
-    results_pinn = torch.tensor(results_pinn).T
-    eta_pinn = results_pinn[:, 0:7]
-    nu_pinn = results_pinn[:, 7:13]
-    print(f" PINN inference time: {(end_time-start_time)*1000/end_val_pinn}")
-    print(f" Done with the PINN sim!")
+    # print(f" Running PINN simulation...")
+    # start_time = time.time()
+    # results_pinn, end_val_pinn = sam_pinn.run_sim()
+    # end_time = time.time()
+    # results_pinn = torch.tensor(results_pinn).T
+    # eta_pinn = results_pinn[:, 0:7]
+    # nu_pinn = results_pinn[:, 7:13]
+    # print(f" PINN inference time: {(end_time-start_time)*1000/end_val_pinn}")
+    # print(f" Done with the PINN sim!")
 
     # print(f" Running B-PINN simulation...")
     # start_time = time.time()
@@ -147,21 +147,22 @@ if __name__ == "__main__":
     # print(f" NN inference time: {(end_time-start_time)*1000/end_val_nn}")
     # print(f" Done with the NN sim!")
 
-    # print(f" Running naive NN simulation...")
-    # # start_time = time.time()
-    # results_naive_nn, end_val_naive_nn = sam_naive_nn.run_sim()
-    # end_time = time.time()
-    # results_naive_nn = torch.tensor(results_naive_nn).T
-    # eta_naive_nn = results_naive_nn[:, 0:7]
-    # nu_naive_nn = results_naive_nn[:, 7:13]
-    # print(f" Naive NN inference time: {(end_time-start_time)*1000/end_val_naive_nn}")
-    # print(f" Done with the naive NN sim!")
+    print(f" Running naive NN simulation...")
+    # start_time = time.time()
+    results_naive_nn, end_val_naive_nn = sam_naive_nn.run_sim()
+    end_time = time.time()
+    results_naive_nn = torch.tensor(results_naive_nn).T
+    eta_naive_nn = results_naive_nn[:, 0:7]
+    nu_naive_nn = results_naive_nn[:, 7:13]
+    print(f" Naive NN inference time: {(end_time-start_time)*1000/end_val_naive_nn}")
+    print(f" Done with the naive NN sim!")
 
     print(f" Done with all sims making plots!")
 
-    end_val = int(np.min([end_val_wb, end_val_pinn]))
+    end_val = int(np.min([end_val_wb, end_val_naive_nn]))
     print(end_val)
     plt.style.use('science')
+    end_val = 60
 
     # 3D trajectory plot
     if False:
@@ -211,18 +212,18 @@ if __name__ == "__main__":
         # Quat to rad
         eta_rad = np.array([eta_quat_to_rad(eta_vec) for eta_vec in eta[:end_val]])
         eta_wb_rad = np.array([eta_quat_to_rad(eta_vec) for eta_vec in eta_wb[:end_val]])
-        eta_pinn_rad = np.array([eta_quat_to_rad(eta_vec) for eta_vec in eta_pinn[:end_val]])
+        # eta_pinn_rad = np.array([eta_quat_to_rad(eta_vec) for eta_vec in eta_pinn[:end_val]])
         # eta_nn_rad = np.array([eta_quat_to_rad(eta_vec) for eta_vec in eta_nn[:end_val]])
         # eta_bpinn_rad = np.array([eta_quat_to_rad(eta_vec) for eta_vec in eta_bpinn[:end_val]])
-        # eta_naive_nn_rad = np.array([eta_quat_to_rad(eta_vec) for eta_vec in eta_naive_nn[:end_val]])
+        eta_naive_nn_rad = np.array([eta_quat_to_rad(eta_vec) for eta_vec in eta_naive_nn[:end_val]])
 
         # Errors WB
         eta_wb_mse = (eta_wb_rad - eta_rad)**2
         nu_wb_mse = (nu_wb - nu)**2
 
-        # Errors PINN
-        eta_pinn_mse = (eta_pinn_rad - eta_rad)**2
-        nu_pinn_mse = (nu_pinn - nu)**2
+        # # Errors PINN
+        # eta_pinn_mse = (eta_pinn_rad - eta_rad)**2
+        # nu_pinn_mse = (nu_pinn - nu)**2
 
         # Errors B-PINN
         # eta_bpinn_mse = (eta_bpinn_rad - eta_rad)**2
@@ -233,20 +234,20 @@ if __name__ == "__main__":
         # nu_nn_mse = (nu_nn - nu)**2
 
         # Errors naive NN
-        # eta_naive_nn_mse = (eta_naive_nn_rad - eta_rad)**2
-        # nu_naive_nn_mse = (nu_naive_nn - nu)**2
+        eta_naive_nn_mse = (eta_naive_nn_rad - eta_rad)**2
+        nu_naive_nn_mse = (nu_naive_nn - nu)**2
 
         # Cumulative error
         eta_wb_error = np.cumsum(eta_wb_mse, axis=0)
         nu_wb_error = np.cumsum(nu_wb_mse, axis=0)
-        eta_pinn_error = np.cumsum(eta_pinn_mse, axis=0)
-        nu_pinn_error = np.cumsum(nu_pinn_mse, axis=0)
+        # eta_pinn_error = np.cumsum(eta_pinn_mse, axis=0)
+        # nu_pinn_error = np.cumsum(nu_pinn_mse, axis=0)
         # eta_bpinn_error = np.cumsum(eta_bpinn_mse, axis=0)
         # nu_bpinn_error = np.cumsum(nu_bpinn_mse, axis=0)
         # eta_nn_error = np.cumsum(eta_nn_mse, axis=0)
         # nu_nn_error = np.cumsum(nu_nn_mse, axis=0)
-        # eta_naive_nn_error = np.cumsum(eta_naive_nn_mse, axis=0)
-        # nu_naive_nn_error = np.cumsum(nu_naive_nn_mse, axis=0)
+        eta_naive_nn_error = np.cumsum(eta_naive_nn_mse, axis=0)
+        nu_naive_nn_error = np.cumsum(nu_naive_nn_mse, axis=0)
 
         fig, axes = plt.subplots(3, 2, figsize=(12, 10))
         axes = axes.flatten()
@@ -262,10 +263,10 @@ if __name__ == "__main__":
         for i in range(6):
             # axes[i].set_yscale('log')
             axes[i].plot(eta_wb_error[:end_val, i], label="White-box")
-            axes[i].plot(eta_pinn_error[:end_val, i], label="PINN", linestyle=":")
+            # axes[i].plot(eta_pinn_error[:end_val, i], label="PINN", linestyle=":")
             # axes[i].plot(eta_bpinn_error[:end_val, i], label="B-PINN", linestyle=(0, (1, 1)))
             # axes[i].plot(eta_nn_error[:end_val, i], label="NN", linestyle="--")
-            # axes[i].plot(eta_naive_nn_error[:end_val, i], label="Naive NN", linestyle="-.")
+            axes[i].plot(eta_naive_nn_error[:end_val, i], label="Naive NN", linestyle="-.")
             axes[i].set_title(f"{labels_eta[i]}")
             axes[i].set_xlabel("Timestep")
             axes[i].set_ylabel(labels_error[i])
@@ -280,10 +281,10 @@ if __name__ == "__main__":
         for j in range(6):
             # axes[j+6].set_yscale('log')
             axes[j].plot(nu_wb_error[:end_val, j], label="White-box")
-            axes[j].plot(nu_pinn_error[:end_val, j], label="PINN", linestyle=":")
+            # axes[j].plot(nu_pinn_error[:end_val, j], label="PINN", linestyle=":")
             # axes[j].plot(nu_bpinn_error[:end_val, i], label="B-PINN", linestyle=(0, (1, 1)))
             # axes[j].plot(nu_nn_error[:end_val, i], label="NN", linestyle="--")
-            # axes[j].plot(nu_naive_nn_error[:end_val, i], label="Naive NN", linestyle="-.")
+            axes[j].plot(nu_naive_nn_error[:end_val, i], label="Naive NN", linestyle="-.")
             axes[j].set_title(f"{labels_nu[j]}")
             axes[j].set_xlabel("Timestep")
             axes[j].set_ylabel(labels_error[j+6])
@@ -291,20 +292,20 @@ if __name__ == "__main__":
 
         plt.tight_layout()
 
-        print(f" PINN: {-100*(1 - np.concatenate( (eta_pinn_error[-1, :]/eta_wb_error[-1, :], nu_pinn_error[-1, :]/nu_wb_error[-1, :])))}")
+        # print(f" PINN: {-100*(1 - np.concatenate( (eta_pinn_error[-1, :]/eta_wb_error[-1, :], nu_pinn_error[-1, :]/nu_wb_error[-1, :])))}")
         # print(f" BPINN: {-100*(1 - np.concatenate( (eta_bpinn_error[-1, :]/eta_wb_error[-1, :], nu_bpinn_error[-1, :]/nu_wb_error[-1, :])))}")
         # print(f" NN: {-100*(1 - np.concatenate( (eta_nn_error[-1, :]/eta_wb_error[-1, :], nu_nn_error[-1, :]/nu_wb_error[-1, :])))}")
-        # print(f" Naive NN: {-100*(1 - np.concatenate( (eta_naive_nn_error[-1, :]/eta_wb_error[-1, :], nu_naive_nn_error[-1, :]/nu_wb_error[-1, :])))}")
+        print(f" Naive NN: {-100*(1 - np.concatenate( (eta_naive_nn_error[-1, :]/eta_wb_error[-1, :], nu_naive_nn_error[-1, :]/nu_wb_error[-1, :])))}")
 
     # Plots of each state
     if True:
         # Quat to deg
         eta_rad = np.array([eta_quat_to_rad(eta_vec) for eta_vec in eta[:end_val]])
         eta_wb_rad = np.array([eta_quat_to_rad(eta_vec) for eta_vec in eta_wb[:end_val]])
-        eta_pinn_rad = np.array([eta_quat_to_rad(eta_vec) for eta_vec in eta_pinn[:end_val]])
+        # eta_pinn_rad = np.array([eta_quat_to_rad(eta_vec) for eta_vec in eta_pinn[:end_val]])
         # eta_bpinn_deg = np.array([eta_quat_to_rad(eta_vec) for eta_vec in eta_bpinn[:end_val]])
         # eta_nn_deg = np.array([eta_quat_to_deg(eta_vec) for eta_vec in eta_nn[:end_val]])
-        # eta_naive_nn_rad = np.array([eta_quat_to_rad(eta_vec) for eta_vec in eta_naive_nn[:end_val]])
+        eta_naive_nn_rad = np.array([eta_quat_to_rad(eta_vec) for eta_vec in eta_naive_nn[:end_val]])
 
         fig, axes = plt.subplots(3, 2, figsize=(12, 10))
         axes = axes.flatten()
@@ -320,10 +321,10 @@ if __name__ == "__main__":
         for i in range(6):
             axes[i].plot(eta_rad[:end_val, i], label="Ground Truth")
             axes[i].plot(eta_wb_rad[:end_val, i], label="White-box")
-            axes[i].plot(eta_pinn_rad[:end_val, i], label="PINN")
+            # axes[i].plot(eta_pinn_rad[:end_val, i], label="PINN")
             # axes[i].plot(eta_bpinn_deg[:end_val, i], label="B-PINN")
             # axes[i].plot(eta_nn_deg[:end_val, i], label="NN")
-            # axes[i].plot(eta_naive_nn_rad[:end_val, i], label="Naive NN")
+            axes[i].plot(eta_naive_nn_rad[:end_val, i], label="Naive NN")
             axes[i].set_title(f"{labels_eta[i]}")
             axes[i].set_xlabel("Timestep")
             axes[i].set_ylabel(labels_unit[i])
@@ -339,10 +340,10 @@ if __name__ == "__main__":
         for j in range(6):
             axes[j].plot(nu[:end_val, j], label="Ground Truth")
             axes[j].plot(nu_wb[:end_val, j], label="White-box")
-            axes[j].plot(nu_pinn[:end_val, j], label="PINN")
+            # axes[j].plot(nu_pinn[:end_val, j], label="PINN")
             # axes[j].plot(nu_bpinn[:end_val, j], label="B-PINN")
             # axes[j].plot(nu_nn[:end_val, j], label="NN")
-            # axes[j].plot(nu_naive_nn[:end_val, j], label="Naive NN")
+            axes[j].plot(nu_naive_nn[:end_val, j], label="Naive NN")
             axes[j].set_title(f"{labels_nu[j]}")
             axes[j].set_xlabel("Timestep")
             axes[j].set_ylabel(labels_unit[j+6])

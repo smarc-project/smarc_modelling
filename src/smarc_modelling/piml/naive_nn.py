@@ -111,8 +111,8 @@ def init_naive_nn_model(file_name: str):
     model = NaiveNN()
     model.initialize(dict_file["model_shape"])
     model.load_state_dict(dict_file["state_dict"])
-    x_min = dict_file["x_mean"]
-    x_range = dict_file["x_std"]
+    x_min = dict_file["x_min"]
+    x_range = dict_file["x_range"]
     y_min = dict_file["y_min"]
     y_range = dict_file["y_range"]
     model.eval()
@@ -130,11 +130,11 @@ def naive_nn_predict(model, eta, nu, u, norm):
     u = np.array(u, dtype=np.float32).flatten()
 
     # Make state vector
-    x = np.concatenate([eta, nu, u], axis=0)
+    x = np.concatenate([nu, u], axis=0)
     x = torch.tensor(x, dtype=torch.float32).unsqueeze(0)
     x_normed = (x - norm[0]) / norm[1]
 
     # Get prediction
     nu_dot = model(x_normed).detach().numpy()
-    nu_dot =  nu_dot * norm[3] + norm[2]
+    nu_dot =  nu_dot * norm[3].numpy() + norm[2].numpy()
     return nu_dot.squeeze()

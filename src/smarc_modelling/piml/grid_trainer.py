@@ -15,7 +15,7 @@ import random
 
 test_datasets = ["rosbag_3", "rosbag_18", "rosbag_85", "rosbag_112", "rosbag_113", "rosbag_114"]
 
-datasets = ["rosbag_1", "rosbag_5", "rosbag_9", "rosbag_10", "rosbag_11", "rosbag_12", "rosbag_13", 
+datasets = ["rosbag_1", "rosbag_5", "rosbag_10", "rosbag_11", "rosbag_12", "rosbag_13", 
             "rosbag_15", "rosbag_16", "rosbag_17", "rosbag_19", "rosbag_20", "rosbag_25", "rosbag_28", 
             "rosbag_31", "rosbag_34", "rosbag_38", "rosbag_39", "rosbag_41", "rosbag_43", "rosbag_46",
             "rosbag_47", "rosbag_48", "rosbag_49", "rosbag_50", "rosbag_53", "rosbag_54", "rosbag_55",
@@ -40,20 +40,20 @@ if __name__ == "__main__":
     train_procent = 0.9
 
     # HYPER - PARAMETERS
-    h_steps = 1
+    h_steps = 3
     dropout_rate = 0.25
 
     # Use best perform here
-    layer_grid = [10]
-    size_grid = [64]
+    layer_grid = [5, 10]
+    size_grid = [16, 32]
     factor_grid = [0.5]
     lr0 = 0.001
     max_norm = 1.0
-    patience = 5000
+    patience = 1000
     epochs = 50000
 
     # INPUT - OUTPUT SHAPES
-    input_shape = 16 # 19
+    input_shape = 12 # 19
     output_shape = 6 # 36 - 6x6 - D, 6 - nu_dot 
 
 #####################################
@@ -129,8 +129,8 @@ if __name__ == "__main__":
                 # Optimizer and other settings
                 optimizer = torch.optim.Adam(model.parameters(), lr=lr0) # weight_decay=1e-5)
 
-                # # Adaptive learning rate
-                # scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer=optimizer, mode="min", factor=factor, patience=2500, min_lr=1e-8)
+                # Adaptive learning rate
+                scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer=optimizer, mode="min", factor=factor, patience=2500, min_lr=1e-8)
 
                 # Early stopping with validation loss
                 best_val_loss = float("inf")
@@ -167,8 +167,8 @@ if __name__ == "__main__":
                             val_loss = model.loss_function(model, x_traj_val_normed, y_traj_val, h_steps)
                             val_loss_total += val_loss
                     
-                    # # Step scheduler
-                    # scheduler.step(loss_total)
+                    # Step scheduler
+                    scheduler.step(loss_total)
                     
                     # For plotting the loss
                     loss_history.append(loss_total.item())

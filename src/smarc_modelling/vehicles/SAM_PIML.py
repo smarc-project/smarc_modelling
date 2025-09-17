@@ -63,7 +63,7 @@ from smarc_modelling.piml.pinn import init_pinn_model, pinn_predict
 from smarc_modelling.piml.nn import init_nn_model, nn_predict
 from smarc_modelling.piml.naive_nn import init_naive_nn_model, naive_nn_predict
 from smarc_modelling.piml.bpinn import init_bpinn_model, bpinn_predict
-from smarc_modelling.piml.utils.utility_functions import angular_vel_to_quat_vel
+from smarc_modelling.piml.utils.utility_functions import angular_vel_to_quat_vel, eta_quat_to_rad
 
 
 class SolidStructure:
@@ -383,7 +383,8 @@ class SAM_PIML():
 
         if self.piml_type == "naive_nn":
             nu_dot = naive_nn_predict(self.piml_model, eta, nu, u, [self.x_min, self.x_range, self.y_min, self.y_range])
-            nu_dot_ang = angular_vel_to_quat_vel(eta, nu_dot) # Convert to quat accelerations
+            eta_ang = eta_quat_to_rad(eta)
+            nu_dot_ang = angular_vel_to_quat_vel(eta_ang, nu_dot) # Convert to quat accelerations
             eta_dot = nu_dot_ang * self.dt # Closest approximation we have with only access to one instance
             
             x_dot = np.concatenate([eta_dot, nu_dot, u_dot])
