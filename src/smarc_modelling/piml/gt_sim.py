@@ -25,7 +25,6 @@ class SIM:
         self.controls = control_vec
         self.n_sim = np.shape(time_vec)[0]
         self.var_dt = np.diff(time_vec)
-        print(self.var_dt[45:60])
 
         # Decide if we are going to update the state or not
         self.state_update = state_update
@@ -102,7 +101,6 @@ if __name__ == "__main__":
     # Setting up model for simulations
     reset_state = False
     sim = SIM(None, states, t, u_cmd, reset_state)
-
 
     # Running the simulators
     print(f" Running white-box simulation...")
