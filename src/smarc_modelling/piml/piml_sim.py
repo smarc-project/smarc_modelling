@@ -55,13 +55,13 @@ class SIM:
             time_since_update += dt
 
             # Do sim step using ef
-            try:
-                self.data[:, i+1] = self.rk4(self.data[:, i], self.controls[i], dt, self.vehicle.dynamics)
-            except:
-                self.data[:, i+1] = self.data[:, i]
-                if once:
-                    once = False
-                    end_val = i - 1
+            # try:
+            self.data[:, i+1] = self.rk4(self.data[:, i], self.controls[i], dt, self.vehicle.dynamics)
+            # except:
+            #     self.data[:, i+1] = self.data[:, i]
+            #     if once:
+            #         once = False
+            #         end_val = i - 1
 
         if self.state_update:
             print(f" Average times between resets: {np.mean(times)}")
@@ -162,7 +162,7 @@ if __name__ == "__main__":
     end_val = int(np.min([end_val_wb, end_val_naive_nn]))
     print(end_val)
     plt.style.use('science')
-    end_val = 60
+    end_val = 31
 
     # 3D trajectory plot
     if False:
