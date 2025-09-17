@@ -15,7 +15,7 @@ import random
 
 test_datasets = ["rosbag_3", "rosbag_18", "rosbag_85", "rosbag_112", "rosbag_113", "rosbag_114"]
 
-datasets = ["rosbag_1", "rosbag_5", "rosbag_10", "rosbag_11", "rosbag_12", "rosbag_13", 
+datasets = ["rosbag_1", "rosbag_5", "rosbag_9", "rosbag_10", "rosbag_11", "rosbag_12", "rosbag_13", 
             "rosbag_15", "rosbag_16", "rosbag_17", "rosbag_19", "rosbag_20", "rosbag_25", "rosbag_28", 
             "rosbag_31", "rosbag_34", "rosbag_38", "rosbag_39", "rosbag_41", "rosbag_43", "rosbag_46",
             "rosbag_47", "rosbag_48", "rosbag_49", "rosbag_50", "rosbag_53", "rosbag_54", "rosbag_55",

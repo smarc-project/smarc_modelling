@@ -9,7 +9,6 @@ import torch
 import scienceplots # For fancy plotting
 import time
 
-
 class SIM:
     """Simulator for SAM / other UAVs"""
 
@@ -29,6 +28,7 @@ class SIM:
         # Decide if we are going to update the state or not
         self.state_update = state_update
         self.data = np.empty((len(self.x0), self.n_sim))
+        self.states = states
 
     def run_sim(self):
         print(f" Running simulator...")
@@ -45,7 +45,7 @@ class SIM:
         for i in range(self.n_sim-1):
         
             if i % 3 == 0 and self.state_update:
-                self.data[:, i] = torch.Tensor.tolist(torch.cat([states[0][i], states[1][i], states[2][i]]))
+                self.data[:, i] = torch.Tensor.tolist(torch.cat([self.states[0][i], self.states[1][i], self.states[2][i]]))
                 times.append(time_since_update)
                 time_since_update = 0
 
@@ -55,13 +55,13 @@ class SIM:
             time_since_update += dt
 
             # Do sim step using ef
-            # try:
-            self.data[:, i+1] = self.rk4(self.data[:, i], self.controls[i], dt, self.vehicle.dynamics)
-            # except:
-            #     self.data[:, i+1] = self.data[:, i]
-            #     if once:
-            #         once = False
-            #         end_val = i - 1
+            try:
+                self.data[:, i+1] = self.ef(self.data[:, i], self.controls[i], dt, self.vehicle.dynamics)
+            except:
+                self.data[:, i+1] = self.data[:, i]
+                if once:
+                    once = False
+                    end_val = i - 1
 
         if self.state_update:
             print(f" Average times between resets: {np.mean(times)}")
@@ -86,7 +86,7 @@ if __name__ == "__main__":
     print(f" Starting simulator...")
 
     # Loading ground truth data
-    eta, nu, u_fb, u_cmd, Dv_comp, Mv_dot, Cv, g_eta, tau, t, M, nu_dot = load_data_from_bag("src/smarc_modelling/piml/data/rosbags/evaluate_2", "torch")
+    eta, nu, u_fb, u_cmd, Dv_comp, Mv_dot, Cv, g_eta, tau, t, M, nu_dot = load_data_from_bag("src/smarc_modelling/piml/data/rosbags/rosbag_9", "torch")
     
     start_val = 0
     eta = eta[start_val:, :]
@@ -99,7 +99,7 @@ if __name__ == "__main__":
     z0 = eta[0, 2].item()
  
     # Setting up model for simulations
-    reset_state = True
+    reset_state = False
     sam_wb = SIM(None, states, t, u_cmd, reset_state) # White-box
     sam_pinn = SIM("pinn", states, t, u_cmd, reset_state) # Physics Informed Neural Network 
     sam_nn = SIM("nn", states, t, u_cmd, reset_state) # Standard Neural Network
@@ -162,7 +162,6 @@ if __name__ == "__main__":
     end_val = int(np.min([end_val_wb, end_val_naive_nn]))
     print(end_val)
     plt.style.use('science')
-    end_val = 31
 
     # 3D trajectory plot
     if False:

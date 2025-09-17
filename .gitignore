@@ -13,6 +13,7 @@ c_generated_code/Makefile
 **/venv
 **/pics
 **/data
+**/gt_sim.py
 **/.vscode
 **/c_generated_code
 mpc_codegen

@@ -386,7 +386,7 @@ class SAM_PIML():
             nu_dot = naive_nn_predict(self.piml_model, eta, nu, u, [self.x_min, self.x_range, self.y_min, self.y_range])
             
             # Body frame speed and pose in angles
-            eta_dot_body = nu_dot * self.dt
+            eta_dot_body = nu + nu_dot * self.dt
             eta_ang = eta_quat_to_rad(eta) 
 
             # Convert speed from body frame to global
