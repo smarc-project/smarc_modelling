@@ -25,6 +25,7 @@ class SIM:
         self.controls = control_vec
         self.n_sim = np.shape(time_vec)[0]
         self.var_dt = np.diff(time_vec)
+        print(self.var_dt[45:60])
 
         # Decide if we are going to update the state or not
         self.state_update = state_update
@@ -60,13 +61,14 @@ class SIM:
             eta_dot_body = self.states[1][i] # GT speed
             eta = self.states[0][i] # GT pose
 
-            eta_ang = eta_quat_to_rad(eta_sim)
+            eta_ang = eta_quat_to_rad(eta)
 
             # Convert to global frame
-            p_dot = np.matmul(Rzyx(eta_ang[3], eta_ang[4], eta_ang[5]), eta_dot_body[0:3])
-            q_dot = np.matmul(Tzyx(eta_ang[3], eta_ang[4]), eta_dot_body[0:3])
-            eta_dot = np.hstack([p_dot, q_dot])
+            [x, y, z] = np.matmul(Rzyx(eta_ang[3], eta_ang[4], eta_ang[5]), eta_dot_body[0:3])
+            [roll, pitch, yaw] = np.matmul(Tzyx(eta_ang[3], eta_ang[4]), eta_dot_body[0:3])
+            eta_dot = np.hstack([x, y, z, -roll, -pitch, yaw])
             eta_dot = angular_vel_to_quat_vel(eta_ang, eta_dot)
+
 
             x_dot = np.concatenate([eta_dot, nu_dot, [0, 0, 0, 0, 0, 0]]) # Controls just 0 here since we dont use them
             # --------------------------------- #
@@ -91,13 +93,8 @@ if __name__ == "__main__":
     u_fb = u_fb[start_val:, :]
     nu_dot = nu_dot[start_val:, :]
     t = t[start_val:]
-    print(nu_dot.shape)
     states = [eta, nu, u_fb, nu_dot]
 
-    # Initial positions for flipping frames
-    y0 = eta[0, 1].item()
-    z0 = eta[0, 2].item()
- 
     # Setting up model for simulations
     reset_state = False
     sim = SIM(None, states, t, u_cmd, reset_state)
@@ -114,11 +111,11 @@ if __name__ == "__main__":
     print(f" Done with the white-box sim!")
 
     print(f" Done with all sims making plots!")
- 
+
     end_val = end_val_gt
     print(end_val)
     plt.style.use('science')
-    end_val = 50
+    end_val = 60
 
     # 3D trajectory plot
     if True:
