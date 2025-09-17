@@ -391,6 +391,7 @@ class SAM_casadi():
 
             # Note, the actuator dynamics are done by acados here.
             nu_dot = self.Minv @ (self.tau - ca.mtimes(self.C,self.nu_r) - ca.mtimes(self.D,self.nu_r) - self.g_vec)
+            eta_dot = self.eta_dynamics(eta, nu)
 
             x_dot = ca.vertcat(eta_dot, nu_dot)
             self.x_dot_sym = ca.Function('x_dot', [x_sym, u_ref_sym], [x_dot])
@@ -575,9 +576,6 @@ class SAM_casadi():
         self.W = self.m * self.g
         self.g_vec = gvect_ca(self.W, self.B, self.theta, self.phi, self.p_OG_O, self.p_OB_O)
 	
-	# NOTE: Why is this?
-        self.g_vec[5] = 0
-
 
     def calculate_tau(self, u):
         """

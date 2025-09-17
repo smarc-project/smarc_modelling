@@ -120,12 +120,6 @@ class BlueROV():
         self.Iy = 0.23
         self.Iz = 0.37
 
-        self.Xu = 13.7
-        self.Yv = 0
-        self.Zw = 33.0
-        self.Kp = 0
-        self.Mq = 0.8
-        self.Nr = 0
 
         # Added mass terms
         self.Xdu = 6.36
@@ -135,7 +129,15 @@ class BlueROV():
         self.Mdq = 0.135
         self.Ndr = 0.222
 
-        # Damping coefficients
+        # Linear Damping coefficients
+        self.Xu = 13.7
+        self.Yv = 0
+        self.Zw = 33.0
+        self.Kp = 0
+        self.Mq = 0.8
+        self.Nr = 0
+        
+        # Nonlienar Damping coefficients
         self.Xuu = 141.0     # x-damping
         self.Yvv = 217.0 # y-damping
         self.Zww = 190.0# z-damping
