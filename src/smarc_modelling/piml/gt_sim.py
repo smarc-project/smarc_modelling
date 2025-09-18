@@ -52,15 +52,15 @@ class SIM:
                 times.append(time_since_update)
                 time_since_update = 0
 
-   
+            # Get sim state
             eta_sim = self.data[0:7, i]
             nu_sim = self.data[7:13, i]
 
             # Getting "predictions"
             nu_dot = np.array(self.states[3][i]) # GT acceleration        
-            eta_dot_body = nu_sim + nu_dot * dt
+            eta_dot_body = nu_sim + nu_dot * dt # Integrate for speed
 
-
+            # Swap to rads
             eta_ang = eta_quat_to_rad(eta_sim)
 
             # Convert to global frame
@@ -69,9 +69,7 @@ class SIM:
             eta_dot = np.hstack([x, y, z, roll, pitch, yaw])
             eta_dot = angular_vel_to_quat_vel(eta_ang, eta_dot)
 
-
             x_dot = np.concatenate([eta_dot, nu_dot, [0, 0, 0, 0, 0, 0]]) # Controls just 0 here since we dont use them
-            # --------------------------------- #
 
             # EF
             self.data[:, i+1] =  self.data[:, i] + x_dot * dt
