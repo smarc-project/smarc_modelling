@@ -99,7 +99,7 @@ if __name__ == "__main__":
     z0 = eta[0, 2].item()
  
     # Setting up model for simulations
-    reset_state = False
+    reset_state = True
     sam_wb = SIM(None, states, t, u_cmd, reset_state) # White-box
     sam_pinn = SIM("pinn", states, t, u_cmd, reset_state) # Physics Informed Neural Network 
     sam_nn = SIM("nn", states, t, u_cmd, reset_state) # Standard Neural Network

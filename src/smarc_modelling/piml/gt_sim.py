@@ -57,16 +57,16 @@ class SIM:
             nu_sim = self.data[7:13, i]
 
             # Getting "predictions"
-            nu_dot = self.states[3][i] # GT acceleration        
-            eta_dot_body = self.states[1][i] # GT speed
-            eta = self.states[0][i] # GT pose
+            nu_dot = np.array(self.states[3][i]) # GT acceleration        
+            eta_dot_body = nu_sim + nu_dot * dt
 
-            eta_ang = eta_quat_to_rad(eta)
+
+            eta_ang = eta_quat_to_rad(eta_sim)
 
             # Convert to global frame
             [x, y, z] = np.matmul(Rzyx(eta_ang[3], eta_ang[4], eta_ang[5]), eta_dot_body[0:3])
-            [roll, pitch, yaw] = np.matmul(Tzyx(eta_ang[3], eta_ang[4]), eta_dot_body[0:3])
-            eta_dot = np.hstack([x, y, z, -roll, -pitch, yaw])
+            [roll, pitch, yaw] = np.matmul(Tzyx(eta_ang[3], eta_ang[4]), eta_dot_body[3:6])
+            eta_dot = np.hstack([x, y, z, roll, pitch, yaw])
             eta_dot = angular_vel_to_quat_vel(eta_ang, eta_dot)
 
 
@@ -85,14 +85,16 @@ if __name__ == "__main__":
     print(f" Starting simulator...")
 
     # Loading ground truth data
-    eta, nu, u_fb, u_cmd, Dv_comp, Mv_dot, Cv, g_eta, tau, t, M, nu_dot = load_data_from_bag("src/smarc_modelling/piml/data/rosbags/rosbag_9", "torch")
-    print(nu_dot.shape)
+    eta, nu, u_fb, u_cmd, _, _, _, _, _, t, _, nu_dot = load_data_from_bag("src/smarc_modelling/piml/data/rosbags/rosbag_9", "torch")
+
+    # For selecting starting value of data
     start_val = 5
     eta = eta[start_val:, :]
     nu = nu[start_val:, :]
     u_fb = u_fb[start_val:, :]
     nu_dot = nu_dot[start_val:, :]
     t = t[start_val:]
+
     states = [eta, nu, u_fb, nu_dot]
 
     # Setting up model for simulations
@@ -115,7 +117,7 @@ if __name__ == "__main__":
     end_val = end_val_gt
     print(end_val)
     plt.style.use('science')
-    end_val = 60
+    
 
     # 3D trajectory plot
     if True:

@@ -241,7 +241,7 @@ def eta_quat_to_rad(eta, return_type="numpy"):
     """Turns quaternion in eta to radians"""
     pose = eta[0:3]
     quat = eta[3:]
-    euler = R.from_quat(quat).as_euler("xyz", degrees=False)
+    euler = R.from_quat(quat, scalar_first=True).as_euler("xyz", degrees=False)
     if return_type == "numpy":
         return np.hstack([pose, euler])
     if return_type == "torch":
@@ -264,7 +264,7 @@ def angular_vel_to_quat_vel(eta, nu):
 
     # Takes an angular velocity and returns it as a quaternion velocity
     angle = eta[3:]
-    q = R.from_euler("xyz", angle).as_quat()
+    q = R.from_euler("xyz", angle).as_quat(scalar_first=True)
     q = q/np.linalg.norm(q)
 
     # Position dynamics: ṗ = C * v

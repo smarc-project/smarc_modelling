@@ -391,7 +391,7 @@ class SAM_PIML():
 
             # Convert speed from body frame to global
             p_dot = np.matmul(Rzyx(eta_ang[3], eta_ang[4], eta_ang[5]), eta_dot_body[0:3])
-            v_dot = np.matmul(Tzyx(eta_ang[3], eta_ang[4]), eta_dot_body[0:3])
+            v_dot = np.matmul(Tzyx(eta_ang[3], eta_ang[4]), eta_dot_body[3:6])
 
             # Speed in global frame
             eta_dot = np.hstack([p_dot, v_dot])

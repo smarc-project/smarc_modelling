@@ -44,8 +44,8 @@ if __name__ == "__main__":
     dropout_rate = 0.25
 
     # Use best perform here
-    layer_grid = [5, 10]
-    size_grid = [16, 32]
+    layer_grid = [10]
+    size_grid = [32]
     factor_grid = [0.5]
     lr0 = 0.001
     max_norm = 1.0
