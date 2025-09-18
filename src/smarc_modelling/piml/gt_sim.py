@@ -25,7 +25,6 @@ class SIM:
         self.controls = control_vec
         self.n_sim = np.shape(time_vec)[0]
         self.var_dt = np.diff(time_vec)
-        print(self.var_dt[45:60])
 
         # Decide if we are going to update the state or not
         self.state_update = state_update
@@ -42,6 +41,9 @@ class SIM:
         end_val = len(self.controls)
         time_since_update = 0
         times = []
+
+        from smarc_modelling.piml.naive_nn import init_naive_nn_model, naive_nn_predict
+        model, x_min, x_range, y_min, y_range = init_naive_nn_model("naive_nn.pt")
         
         for i in range(self.n_sim-1):
 
@@ -55,9 +57,11 @@ class SIM:
             # Get sim state
             eta_sim = self.data[0:7, i]
             nu_sim = self.data[7:13, i]
+            u = self.states[2][i] # We need control inputs for the nn prediction
 
             # Getting "predictions"
-            nu_dot = np.array(self.states[3][i]) # GT acceleration        
+            # nu_dot = np.array(self.states[3][i]) # GT acceleration        
+            nu_dot = naive_nn_predict(model, None, nu_sim, u, [x_min, x_range, y_min, y_range])
             eta_dot_body = nu_sim + nu_dot * dt # Integrate for speed
 
             # Swap to rads
@@ -115,6 +119,7 @@ if __name__ == "__main__":
     end_val = end_val_gt
     print(end_val)
     plt.style.use('science')
+    end_val = 50
     
 
     # 3D trajectory plot
