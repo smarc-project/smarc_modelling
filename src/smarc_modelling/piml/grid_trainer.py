@@ -13,16 +13,18 @@ import matplotlib.pyplot as plt
 import scienceplots # For fancy plotting
 import random
 
-test_datasets = ["rosbag_3", "rosbag_18", "rosbag_85", "rosbag_112", "rosbag_113", "rosbag_114"]
+test_datasets = ["rosbag_3", "rosbag_66", "rosbag_73", "rosbag_112", "rosbag_113", "rosbag_114"]
 
-datasets = ["rosbag_1", "rosbag_5", "rosbag_9", "rosbag_10", "rosbag_11", "rosbag_12", "rosbag_13", 
-            "rosbag_15", "rosbag_16", "rosbag_17", "rosbag_19", "rosbag_20", "rosbag_25", "rosbag_28", 
-            "rosbag_31", "rosbag_34", "rosbag_38", "rosbag_39", "rosbag_41", "rosbag_43", "rosbag_46",
-            "rosbag_47", "rosbag_48", "rosbag_49", "rosbag_50", "rosbag_53", "rosbag_54", "rosbag_55",
-            "rosbag_58", "rosbag_59", "rosbag_61", "rosbag_62", "rosbag_66", "rosbag_67", "rosbag_69",
-            "rosbag_70", "rosbag_73", "rosbag_74", "rosbag_75", "rosbag_76", "rosbag_80", "rosbag_82",
-            "rosbag_86", "rosbag_88", "rosbag_91", "rosbag_92", "rosbag_94", "rosbag_96", "rosbag_97", 
-            "rosbag_102", "rosbag_105", "rosbag_107", "rosbag_108"]
+datasets = ["rosbag_1", "rosbag_5", "rosbag_9.0", "rosbag_9.5", "rosbag_11", 
+            "rosbag_13", "rosbag_15", "rosbag_16", "rosbag_17", "rosbag_18",
+            "rosbag_19", "rosbag_25", "rosbag_28", "rosbag_31", "rosbag_34", 
+            "rosbag_38", "rosbag_39", "rosbag_41", "rosbag_43", "rosbag_46", 
+            "rosbag_48", "rosbag_49", "rosbag_50", "rosbag_53", "rosbag_55", 
+            "rosbag_58", "rosbag_61", "rosbag_62", "rosbag_67", "rosbag_69", 
+            "rosbag_70", "rosbag_74", "rosbag_75", "rosbag_76", "rosbag_80",
+            "rosbag_82", "rosbag_83", "rosbag_86", "rosbag_88", "rosbag_92", 
+            "rosbag_94", "rosbag_96", "rosbag_97", "rosbag_102", "rosbag_107", 
+            "rosbag_108"]
 
 if __name__ == "__main__":
 
@@ -44,9 +46,9 @@ if __name__ == "__main__":
     dropout_rate = 0.25
 
     # Use best perform here
-    layer_grid = [10]
-    size_grid = [32]
-    factor_grid = [0.5]
+    layer_grid = [10, 50]
+    size_grid = [16, 64]
+    factor_grid = [0.5, 0.25]
     lr0 = 0.001
     max_norm = 1.0
     patience = 1000
@@ -74,6 +76,8 @@ if __name__ == "__main__":
     x_max, _ = torch.max(all_x, dim=0)
     x_range = x_max - x_min
 
+    x_min = 0
+    x_range = 1
 
     acc_list = [traj["acc"] for traj in y_trajectories]
     all_nu_dot = torch.cat(acc_list, dim=0)
@@ -81,6 +85,9 @@ if __name__ == "__main__":
     nu_dot_min, _ = torch.min(all_nu_dot, dim=0)
     nu_dot_max, _ = torch.max(all_nu_dot, dim=0)
     nu_dot_range = nu_dot_max - nu_dot_min
+
+    nu_dot_min = 0
+    nu_dot_range = 1
 
     for y_traj in y_trajectories:
         y_traj["acc"] = (y_traj["acc"] - nu_dot_min) / nu_dot_range
@@ -92,9 +99,7 @@ if __name__ == "__main__":
 
     # Load test data
     x_trajectories_test, y_trajectories_test = load_to_trajectory(test_datasets)
-    for y_traj in y_trajectories_test:
-        y_traj["acc"] = (y_traj["acc"] - nu_dot_min) / nu_dot_range
-
+ 
     # For results
     error_grid = np.zeros((len(layer_grid), len(size_grid), len(factor_grid)))
     best_error = float("inf")
@@ -225,7 +230,7 @@ if __name__ == "__main__":
                     eta_test_degs = np.array([eta_quat_to_deg(eta_vec) for eta_vec in eta_for_error])
 
                     # Getting the state vector in such a way that we can use it in the simulator
-                    states_test = [x_traj_test[0:7][:], x_traj_test[7:13][:], x_traj_test[13:19][:]]
+                    states_test = [y_traj_test["eta"][:], y_traj_test["nu"][:], y_traj_test["u_cmd"][:]]
 
                     try: 
                         # Running the SAM simulator to get predicted validation path
@@ -239,7 +244,9 @@ if __name__ == "__main__":
                         eta_model_degs = np.array([eta_quat_to_deg(eta_vec) for eta_vec in eta_model])
 
                         # Calculated summed error
-                        eta_mse = np.array((eta_model_degs - eta_test_degs)**2)
+                        eta_mse_pos = (eta_model_degs[0:3] - eta_test_degs[0:3])**2
+                        eta_mse_angs = ((eta_model_degs[3:6]- eta_test_degs[3_6]) % 2*np.pi)**2
+                        eta_mse = np.hstack([eta_mse_pos, eta_mse_angs])
                         nu_mse = np.array((nu_model - y_traj_test["nu"])**2)
                         error = np.sum(eta_mse) + np.sum(nu_mse)
 

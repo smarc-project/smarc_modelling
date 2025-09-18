@@ -87,10 +87,10 @@ if __name__ == "__main__":
     print(f" Starting simulator...")
 
     # Loading ground truth data
-    eta, nu, u_fb, u_cmd, _, _, _, _, _, t, _, nu_dot = load_data_from_bag("src/smarc_modelling/piml/data/rosbags/rosbag_9", "torch")
+    eta, nu, u_fb, u_cmd, _, _, _, _, _, t, _, nu_dot = load_data_from_bag("src/smarc_modelling/piml/data/rosbags/rosbag_9.0", "torch")
 
     # For selecting starting value of data
-    start_val = 5
+    start_val = 0
     eta = eta[start_val:, :]
     nu = nu[start_val:, :]
     u_fb = u_fb[start_val:, :]
@@ -119,7 +119,6 @@ if __name__ == "__main__":
     end_val = end_val_gt
     print(end_val)
     plt.style.use('science')
-    end_val = 50
     
 
     # 3D trajectory plot

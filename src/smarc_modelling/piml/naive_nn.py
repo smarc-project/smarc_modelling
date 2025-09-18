@@ -47,19 +47,19 @@ class NaiveNN(nn.Module):
         return x_dot
 
 
-    def loss_function(self, model, x_traj, y_traj, n_steps=10):
+    def loss_function(self, model, x_traj, y_traj, n_steps=5):
         """
         Loss function
         """
 
         # # Get the two accelerations
-        # acc = y_traj["acc"]
-        # acc_pred = model(x_traj)  # (N, 6)
+        acc = y_traj["acc"]
+        acc_pred = model(x_traj)  # (N, 6)
         
         # # Loss as difference
-        # loss = torch.mean((acc_pred - acc) ** 2)
+        loss = torch.mean((acc_pred - acc) ** 2)
 
-        loss = multi_step_loss_function(model, x_traj, y_traj, n_steps)
+        # loss = multi_step_loss_function(model, x_traj, y_traj, n_steps)
 
         return loss 
     
@@ -132,7 +132,7 @@ def naive_nn_predict(model, eta, nu, u, norm):
     # Make state vector
     x = np.concatenate([nu, u], axis=0)
     x = torch.tensor(x, dtype=torch.float32).unsqueeze(0)
-    x_normed = (x - norm[0]) / norm[1]
+    x_normed = (x - norm[0]) / (norm[1] + 10e-8)
 
     # Get prediction
     nu_dot = model(x_normed).detach().numpy()
