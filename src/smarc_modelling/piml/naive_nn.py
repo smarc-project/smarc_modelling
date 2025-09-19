@@ -121,7 +121,6 @@ def init_naive_nn_model(file_name: str):
 
 def naive_nn_predict(model, eta, nu, u, norm):
     # For easy prediction in other files
-
     # norm = [x_min, x_range, y_min, y_range]
 
     # Flatten input
@@ -132,7 +131,7 @@ def naive_nn_predict(model, eta, nu, u, norm):
     # Make state vector
     x = np.concatenate([nu, u], axis=0)
     x = torch.tensor(x, dtype=torch.float32).unsqueeze(0)
-    x_normed = (x - norm[0]) / (norm[1] + 10e-8)
+    x_normed = (x - norm[0]) / (norm[1] + 10e-8) # add small number to avoid div by 0
 
     # Get prediction
     nu_dot = model(x_normed).detach().numpy()

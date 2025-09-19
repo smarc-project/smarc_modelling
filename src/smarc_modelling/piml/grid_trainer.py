@@ -46,9 +46,9 @@ if __name__ == "__main__":
     dropout_rate = 0.25
 
     # Use best perform here
-    layer_grid = [10, 50]
-    size_grid = [16, 64]
-    factor_grid = [0.5, 0.25]
+    layer_grid = [1, 5, 10]
+    size_grid = [32, 64, 128]
+    factor_grid = [0.5, 0.25, 0.1]
     lr0 = 0.001
     max_norm = 1.0
     patience = 1000
@@ -76,18 +76,12 @@ if __name__ == "__main__":
     x_max, _ = torch.max(all_x, dim=0)
     x_range = x_max - x_min
 
-    x_min = 0
-    x_range = 1
-
     acc_list = [traj["acc"] for traj in y_trajectories]
     all_nu_dot = torch.cat(acc_list, dim=0)
 
     nu_dot_min, _ = torch.min(all_nu_dot, dim=0)
     nu_dot_max, _ = torch.max(all_nu_dot, dim=0)
     nu_dot_range = nu_dot_max - nu_dot_min
-
-    nu_dot_min = 0
-    nu_dot_range = 1
 
     for y_traj in y_trajectories:
         y_traj["acc"] = (y_traj["acc"] - nu_dot_min) / nu_dot_range
