@@ -253,10 +253,8 @@ def quaternion_to_dcm(q):
         numpy array: 3x3 Direction Cosine Matrix (DCM)
     """
 
-    #rot = R.from_quat(q, scalar_first=True)
-    
-    q_scalar_first = np.roll(q, -1)
-    rot = R.from_quat(q_scalar_first)
+    # "Normal" version
+    rot = R.from_quat(q, scalar_first=True)
     dcm = rot.as_matrix()
 
     return dcm
@@ -277,10 +275,7 @@ def quaternion_to_angles(q):
         tuple: Euler angles (psi, theta, phi) in radians, that is phi=roll, theta=pitch, psi=yaw)
     """
 
-    #rot = R.from_quat(q, scalar_first=True)
-    
-    q_scalar_first = np.roll(q, -1)
-    rot = R.from_quat(q_scalar_first)
+    rot = R.from_quat(q, scalar_first=True)
     rot_euler = rot.as_euler('xyz')
     phi, theta, psi = rot_euler
 

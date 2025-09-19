@@ -19,8 +19,8 @@ class NMPC:
         self.ocp.model = self.model
         self.nx = self.model.x.rows()
         self.nu = self.model.u.rows()
-        self.Ts    = Ts
-        self.Tf    = Ts*N_horizon
+        self.Ts = Ts
+        self.Tf = Ts*N_horizon
         self.N_horizon = N_horizon
         self.update_solver = update_solver_settings
         
@@ -36,9 +36,9 @@ class NMPC:
         # Set up acados model
         model = AcadosModel()
         model.name = 'SAM_equation_system'
-        model.x    = x_sym
+        model.x = x_sym
         model.xdot = x_dot_sym
-        model.u    = u_ref_sym
+        model.u = u_ref_sym
 
         # Declaration of explicit and implicit expressions
         x_dot  = casadi_model.dynamics(export=True)    # extract casadi.MX function
