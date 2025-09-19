@@ -147,7 +147,7 @@ if __name__ == "__main__":
                     for x_traj, y_traj in zip(x_trajectories, y_trajectories):
                         
                         # Get PI loss
-                        x_traj_normed = (x_traj - x_min) / x_range
+                        x_traj_normed = (x_traj - x_min) / (x_range + 10e-8) # Add small num to avoid div by 0
                         loss = model.loss_function(model, x_traj_normed, y_traj, h_steps)
                         loss_total += loss
 
@@ -162,7 +162,7 @@ if __name__ == "__main__":
                         for x_traj_val, y_traj_val in zip(x_trajectories_val, y_trajectories_val):
 
                             # Get PI validation loss
-                            x_traj_val_normed = (x_traj_val - x_min) / x_range
+                            x_traj_val_normed = (x_traj_val - x_min) / (x_range + 10e-8)
                             val_loss = model.loss_function(model, x_traj_val_normed, y_traj_val, h_steps)
                             val_loss_total += val_loss
                     
