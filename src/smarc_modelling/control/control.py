@@ -19,8 +19,8 @@ class NMPC:
         self.ocp.model = self.model
         self.nx = self.model.x.rows()
         self.nu = self.model.u.rows()
-        self.Ts    = Ts
-        self.Tf    = Ts*N_horizon
+        self.Ts = Ts
+        self.Tf = Ts*N_horizon
         self.N_horizon = N_horizon
         self.update_solver = update_solver_settings
         
@@ -36,9 +36,9 @@ class NMPC:
         # Set up acados model
         model = AcadosModel()
         model.name = 'SAM_equation_system'
-        model.x    = x_sym
+        model.x = x_sym
         model.xdot = x_dot_sym
-        model.u    = u_ref_sym
+        model.u = u_ref_sym
 
         # Declaration of explicit and implicit expressions
         x_dot  = casadi_model.dynamics(export=True)    # extract casadi.MX function
@@ -116,16 +116,16 @@ class NMPC:
         x_ubx = np.ones(3 + nu) 
 
         # Set constraints on the control magnitudes
-        x_ubx[0] = 4
-        x_ubx[1] = 1.5
+        x_ubx[0] = 9
+        x_ubx[1] = 2.5
         x_ubx[2] = 3
         x_ubx[3:5] = 100 
         x_ubx[5:7] = np.deg2rad(7)
         x_ubx[7: ] = 600
 
         x_lbx = -x_ubx
-        x_lbx[0] = 0.5
-        x_lbx[1] = -1.5
+        x_lbx[0] = 0
+        x_lbx[1] = -2.5
         x_lbx[3] = 0
         x_lbx[3:5] = 0
 

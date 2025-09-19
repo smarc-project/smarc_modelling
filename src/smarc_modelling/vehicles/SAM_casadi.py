@@ -184,7 +184,7 @@ class SAM_casadi():
         self.dt = dt # Sim time step, necessary for evaluation of the actuator dynamics
         
         # Some factors to make sim agree with real life data, these are eyeballed from sim vs gt data
-        self.vbs_factor = 0.5 # How sensitive the vbs is
+        #self.vbs_factor = 0.5 # How sensitive the vbs is
         self.inertia_factor = 10 # Adjust how quickly we can change direction
         self.damping_factor = 60 # Adjust how much the damping affect acceleration high number = move less
         self.damping_rot = 5 # Adjust how much the damping affects the rotation high number = less rotation should be tuned on bag where we turn without any control inputs
@@ -321,7 +321,7 @@ class SAM_casadi():
             ]
         )
 
-    def dynamics(self, export = False):
+    def dynamics(self, export=False):
         """
         Main dynamics function for integrating the complete AUV state.
 
@@ -336,7 +336,14 @@ class SAM_casadi():
         """
         
         # Create the dynamical model the first time this method is executed
+        # FIXME: Shouldn't that be in the init instead? 
+        #   Joris used a create_fcn -> calculate_fcn approach, where he uses
+        #   asserts to check if the symbolic function already exists and if not
+        #   creates that one. here we use the flag create_model and then
+        #   afterwards only return the symbolic function. Kinda the same. Still
+        #   feels a bit odd to do it that way...
         if self.create_model == True and export == False:
+            # NOTE: Not sure why we need this model... 
             x_sym = ca.MX.sym('x', 19,1)
             u_ref_sym = ca.MX.sym('u_ref', 6,1)
             eta = x_sym[0:7]
@@ -345,20 +352,14 @@ class SAM_casadi():
 
             # Bound_actuators is removed -see SAM for reference
 
-            self.calculate_system_state(nu, eta, u_ref_sym)
+            self.calculate_system_state(nu, eta, u)
             self.calculate_cg()
             self.update_inertias()
             self.calculate_M()
             self.calculate_C()
             self.calculate_D()
             self.calculate_g()
-            self.calculate_tau(u_ref_sym)
-
-	        # Overwrite D to get better results from sim
-            self.D = np.eye(6) * self.damping_factor
-            self.D[3,3] = self.damping_rot
-            self.D[4,4] = self.damping_rot
-            self.D[5,5] = self.damping_rot
+            self.calculate_tau(u)
 
             nu_dot = self.Minv @ (self.tau - ca.mtimes(self.C,self.nu_r) - ca.mtimes(self.D,self.nu_r) - self.g_vec)
             u_dot = self.actuator_dynamics(u, u_ref_sym)
@@ -368,14 +369,16 @@ class SAM_casadi():
             self.x_dot_sym = ca.Function('x_dot', [x_sym, u_ref_sym], [x_dot])
             self.create_model = False
 
-        # Export the casadi model to acados or for the LQR
         elif export == True:
+            # This model is for use in the MPC with acados. Acados takes care
+            # of the actuator bounds (as state constraints) and the rate of
+            # change of the VBS and LCG as control constraints. This is
+            # necessary because acados can't solve the OCP for a system with
+            # hardware constraints otherwise.
             x_sym = ca.MX.sym('x', 13,1)
             u_ref_sym = ca.MX.sym('u_ref', 6,1)
             eta = x_sym[0:7]
             nu = x_sym[7:13]
-
-            # Bound_actuators is removed -see SAM for reference
 
             self.calculate_system_state(nu, eta, u_ref_sym)
             self.calculate_cg()
@@ -386,38 +389,15 @@ class SAM_casadi():
             self.calculate_g()
             self.calculate_tau(u_ref_sym)
 
+            # Note, the actuator dynamics are done by acados here.
             nu_dot = self.Minv @ (self.tau - ca.mtimes(self.C,self.nu_r) - ca.mtimes(self.D,self.nu_r) - self.g_vec)
             eta_dot = self.eta_dynamics(eta, nu)
 
             x_dot = ca.vertcat(eta_dot, nu_dot)
             self.x_dot_sym = ca.Function('x_dot', [x_sym, u_ref_sym], [x_dot])
 
-        #return self.x_dot_sym(x, u_ref) # returns a ca.DM
         return self.x_dot_sym  # returns a casadi MX.function
 
-    # def export_dynamics_model(self):
-    #     # Create symbolic state and control variables
-    #     x_sym     = ca.MX.sym('x', 19,1)
-    #     u_ref_sym = ca.MX.sym('u_ref', 6,1)
-
-    #     # Create symbolic derivative
-    #     x_dot_sym = ca.MX.sym('x_dot', 19, 1)
-        
-    #     # Set up acados model
-    #     model = AcadosModel()
-    #     model.name = 'SAM_equation_system'
-    #     model.x    = x_sym
-    #     model.xdot = x_dot_sym
-    #     model.u    = u_ref_sym
-
-    #     # Declaration of explicit and implicit expressions
-    #     x_dot  = self.dynamics(export=True)    # extract casadi.MX function
-    #     f_expl = ca.vertcat(x_dot(x_sym[:13], x_sym[13:]), u_ref_sym)
-    #     f_impl = x_dot_sym - f_expl
-    #     model.f_expl_expr = f_expl
-    #     model.f_impl_expr = f_impl
-
-    #     return model
 
     def calculate_system_state(self, nu, eta, u_control):
         """
@@ -456,9 +436,9 @@ class SAM_casadi():
         """
         Compute the center of gravity based on VBS and LCG position
         """
-        self.p_OG_O = ca.mtimes(self.ss.m_ss / self.m, self.ss.p_OSsg_O) + \
-              ca.mtimes(self.vbs.m_vbs / self.m, self.vbs.p_OVbs_O) + \
-              ca.mtimes(self.lcg.m_lcg / self.m, self.p_OLcg_O)
+        self.p_OG_O = ca.mtimes(self.ss.m_ss / self.m, self.ss.p_OSsg_O) \
+                    + ca.mtimes(self.vbs.m_vbs / self.m, self.vbs.p_OVbs_O) \
+                    + ca.mtimes(self.lcg.m_lcg / self.m, self.p_OLcg_O)
 
     def update_inertias(self):
         """
@@ -544,14 +524,14 @@ class SAM_casadi():
         CRB = m2c_ca(self.MRB, self.nu_r)
         CA = m2c_ca(self.MA, self.nu_r)
 
-        CA[4, 0] = 0
-        CA[0, 4] = 0
-        CA[4, 2] = 0
-        CA[2, 4] = 0
-        CA[5, 0] = 0
-        CA[0, 5] = 0
-        CA[5, 1] = 0
-        CA[1, 5] = 0
+        #CA[4, 0] = 0
+        #CA[0, 4] = 0
+        #CA[4, 2] = 0
+        #CA[2, 4] = 0
+        #CA[5, 0] = 0
+        #CA[0, 5] = 0
+        #CA[5, 1] = 0
+        #CA[1, 5] = 0
 
         self.C = CRB + CA
 
@@ -578,12 +558,24 @@ class SAM_casadi():
         self.D[3,2] = self.y_cp  * self.Zww * ca.fabs(self.nu_r[2])
         self.D[4,2] = -self.x_cp * self.Zww * ca.fabs(self.nu_r[2])
 
+ 	# Overwrite D to get better results from sim
+        # NOTE: This disregards all nonlinear damping terms and influences of
+        # velocity. Maybe it works for lower velocities, but not for higher
+        # speeds.
+        self.D[0,0] = self.damping_factor
+        self.D[1,1] = self.damping_factor
+        self.D[2,2] = self.damping_factor
+        self.D[3,3] = self.damping_rot
+        self.D[4,4] = self.damping_rot
+        self.D[5,5] = self.damping_rot
+
     def calculate_g(self):
         """
         Calculate gravity vector
         """
         self.W = self.m * self.g
         self.g_vec = gvect_ca(self.W, self.B, self.theta, self.phi, self.p_OG_O, self.p_OB_O)
+	
 
     def calculate_tau(self, u):
         """
@@ -606,31 +598,33 @@ class SAM_casadi():
         u: control inputs as [x_vbs, x_lcg, delta_s, delta_r, rpm1, rpm2]
         Azimuth Thrusters: Fossen 2021, ch.9.4.2
         """
-        delta_s = -u[2]
-        delta_r = -u[3]
+        delta_s = u[2]
+        delta_r = u[3]
         n_rpm = u[4:]
 
         # Compute propeller forces
         C_T2C = calculate_dcm_ca(order=[2, 3], angles=[delta_s, delta_r])
 
         n_rps = n_rpm / 60   
+        prop_scaling = 5 # Propellers generate less thrust going backwards
         Va = self.Va_coef * self.U
 
         tau_prop = ca.MX.zeros(6)  # Initialize tau_prop as a CasADi MX vector
         for i in range(n_rpm.size1()):
             X_prop_i = ca.if_else(n_rps[i] > 0,
+                                  # if
                                 self.rho * (self.D_prop**4) * (self.KT_0 * ca.fabs(n_rps[i]) * n_rps[i] +
                                     (self.KT_max - self.KT_0) / self.Ja_max * (Va / self.D_prop) * ca.fabs(n_rps[i])),
-
-                                self.rho * (self.D_prop**4) * (self.KT_0 * ca.fabs(n_rps[i]) * n_rps[i]) / 10)
+                                  # else
+                                self.rho * (self.D_prop**4) * (self.KT_0 * ca.fabs(n_rps[i]) * n_rps[i]) / prop_scaling)
             
             K_prop_i = ca.if_else(n_rps[i] > 0,
+                                  # if
                                 self.rho * (self.D_prop**5) * (self.KQ_0 * ca.fabs(n_rps[i]) * n_rps[i] +
                                     (self.KQ_max - self.KQ_0) / self.Ja_max * (Va / self.D_prop) * ca.fabs(n_rps[i])),
-                                    
-                                self.rho * (self.D_prop ** 5) * self.KQ_0 * ca.fabs(n_rps[i]) * n_rps[i] / 10)
+                                  # else
+                                self.rho * (self.D_prop ** 5) * self.KQ_0 * ca.fabs(n_rps[i]) * n_rps[i] / prop_scaling)
             
-            dir_flip = ca.if_else(n_rps[i] > 0, 1, -1)
 
             F_prop_b = ca.mtimes(C_T2C, ca.vertcat(X_prop_i, 0, 0))
             r_prop_i = ca.mtimes(C_T2C, self.propellers.r_t_p_sh[i]) - self.p_OC_O
@@ -640,7 +634,7 @@ class SAM_casadi():
 
             # Rescale the rotation from props
             M_prop_i[0] *= self.thruster_rot_strength # Yaw
-            M_prop_i[1] *= self.thruster_rot_strength * dir_flip # Pitch
+            M_prop_i[1] *= self.thruster_rot_strength # Pitch
             M_prop_i[2] *= self.thruster_rot_strength # Roll
 
             # Above equation return yaw, roll, pitch in other order than what the model uses
@@ -722,6 +716,8 @@ class SAM_casadi():
 
         u: control inputs as [x_vbs, x_lcg, delta_s, delta_r, rpm1, rpm2]
         """
+
+	# FIXME: Isn't that supposed to be handled by the MPC? That's the input constraints.
 
         u_dot = ca.MX.zeros(6)
 
