@@ -113,25 +113,27 @@ class NMPC:
         # the shape of SAM when setting the bounds on the positions. Otherwise
         # we crash anyways. Also, the MPC assumes that SAM is in an NED frame,
         # hence, the bounds on the tank are also in NED
-        x_ubx = np.ones(3 + nu) 
+        #x_ubx = np.ones(3 + nu) 
+        x_ubx = np.ones(nu) 
 
         # Set constraints on the control magnitudes
-        x_ubx[0] = 8
-        x_ubx[1] = 1.5
-        x_ubx[2] = 2.5
+        #x_ubx[0] = 8
+        #x_ubx[1] = 1.5
+        #x_ubx[2] = 2.5
         x_ubx[3:5] = 100 
         x_ubx[5:7] = np.deg2rad(7)
         x_ubx[7: ] = 400
 
         x_lbx = -x_ubx
-        x_lbx[0] = 0.5
-        x_lbx[1] = -1.5
-        x_lbx[2] = -0.5
+        #x_lbx[0] = 0.5
+        #x_lbx[1] = -1.5
+        #x_lbx[2] = -0.5
         x_lbx[3:5] = 0
 
         self.ocp.constraints.lbx = x_lbx
         self.ocp.constraints.ubx = x_ubx
-        self.ocp.constraints.idxbx = np.concatenate(([0, 1, 2], np.arange(13, nx)))
+        #self.ocp.constraints.idxbx = np.concatenate(([0, 1, 2], np.arange(13, nx)))
+        self.ocp.constraints.idxbx = np.arange(13, nx)
 
         # ----------------------- Solver Setup --------------------------
         # set prediction horizon
