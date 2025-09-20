@@ -387,18 +387,6 @@ class SAM_PIML():
             
             # Body frame speed and pose in angles
             eta_dot_body = nu + nu_dot * self.dt
-            eta_ang = eta_quat_to_rad(eta) 
-
-            # Convert speed from body frame to global
-            p_dot = np.matmul(Rzyx(eta_ang[3], eta_ang[4], eta_ang[5]), eta_dot_body[0:3])
-            v_dot = np.matmul(Tzyx(eta_ang[3], eta_ang[4]), eta_dot_body[3:6])
-
-            # Speed in global frame
-            eta_dot = np.hstack([p_dot, v_dot])
-
-            # Speed converted from angular velocities to quat velocities
-            eta_dot = angular_vel_to_quat_vel(eta_ang, eta_dot)
-
             eta_dot = self.eta_dynamics(eta, eta_dot_body)
 
             x_dot = np.concatenate([eta_dot, nu_dot, u_dot])
