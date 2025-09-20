@@ -3,7 +3,7 @@
 
 import numpy as np
 from smarc_modelling.vehicles.SAM_PIML import SAM_PIML
-from smarc_modelling.piml.utils.utility_functions import load_data_from_bag, eta_quat_to_rad, angular_vel_to_quat_vel, eta_quat_to_deg
+from smarc_modelling.piml.utils.utility_functions import load_data_from_bag, eta_quat_to_rad, angular_vel_to_quat_vel, eta_quat_to_deg, norm_q
 from smarc_modelling.lib.gnc import Rzyx, Tzyx
 import matplotlib.pyplot as plt
 import torch
@@ -77,6 +77,7 @@ class SIM:
 
             # EF
             self.data[:, i+1] =  self.data[:, i] + x_dot * dt
+            self.data[3:7, i+1] = norm_q(self.data[3:7, i+1])
 
         if self.state_update:
             print(f" Average times between resets: {np.mean(times)}")

@@ -282,3 +282,7 @@ def angular_vel_to_quat_vel(eta, nu):
     q_dot = T_q_n_b @ om + 100/2 * (1 - q.T.dot(q)) * q
 
     return np.concatenate([pos_dot, q_dot])
+
+def norm_q(quat):
+    n = np.linalg.norm(quat)
+    return quat / n if n > 0 else np.array([1.0, 0.0, 0.0, 0.0])

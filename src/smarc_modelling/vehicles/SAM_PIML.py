@@ -63,7 +63,7 @@ from smarc_modelling.piml.pinn import init_pinn_model, pinn_predict
 from smarc_modelling.piml.nn import init_nn_model, nn_predict
 from smarc_modelling.piml.naive_nn import init_naive_nn_model, naive_nn_predict
 from smarc_modelling.piml.bpinn import init_bpinn_model, bpinn_predict
-from smarc_modelling.piml.utils.utility_functions import angular_vel_to_quat_vel, eta_quat_to_rad
+from smarc_modelling.piml.utils.utility_functions import angular_vel_to_quat_vel, eta_quat_to_rad, norm_q
 
 
 class SolidStructure:
@@ -398,8 +398,11 @@ class SAM_PIML():
 
             # Speed converted from angular velocities to quat velocities
             eta_dot = angular_vel_to_quat_vel(eta_ang, eta_dot)
-  
+
+            eta_dot = self.eta_dynamics(eta, eta_dot_body)
+
             x_dot = np.concatenate([eta_dot, nu_dot, u_dot])
+            x_dot[3:7] = norm_q(x_dot[3:7])
 
         # # Type compatibility with C++ extension
         # x_dot = np.array(x_dot, dtype=np.float32).reshape(1, -1)

@@ -56,7 +56,7 @@ class SIM:
 
             # Do sim step using ef
             try:
-                self.data[:, i+1] = self.ef(self.data[:, i], self.controls[i], dt, self.vehicle.dynamics)
+                self.data[:, i+1] = self.rk4(self.data[:, i], self.controls[i], dt, self.vehicle.dynamics)
             except:
                 self.data[:, i+1] = self.data[:, i]
                 if once:
@@ -86,7 +86,7 @@ if __name__ == "__main__":
     print(f" Starting simulator...")
 
     # Loading ground truth data
-    eta, nu, u_fb, u_cmd, Dv_comp, Mv_dot, Cv, g_eta, tau, t, M, nu_dot = load_data_from_bag("src/smarc_modelling/piml/data/rosbags/rosbag_9", "torch")
+    eta, nu, u_fb, u_cmd, Dv_comp, Mv_dot, Cv, g_eta, tau, t, M, nu_dot = load_data_from_bag("src/smarc_modelling/piml/data/rosbags/evaluate_1", "torch")
     
     start_val = 0
     eta = eta[start_val:, :]
@@ -99,7 +99,7 @@ if __name__ == "__main__":
     z0 = eta[0, 2].item()
  
     # Setting up model for simulations
-    reset_state = True
+    reset_state = False
     sam_wb = SIM(None, states, t, u_cmd, reset_state) # White-box
     sam_pinn = SIM("pinn", states, t, u_cmd, reset_state) # Physics Informed Neural Network 
     sam_nn = SIM("nn", states, t, u_cmd, reset_state) # Standard Neural Network
@@ -164,15 +164,15 @@ if __name__ == "__main__":
     plt.style.use('science')
 
     # 3D trajectory plot
-    if False:
+    if True:
         # Plotting trajectory in 3d
         fig = plt.figure()
         ax = fig.add_subplot(111, projection="3d")
         # states = [eta, eta_wb, eta_pinn, eta_nn, eta_naive_nn, eta_bpinn]
         # state_names =  ["Ground Truth", "White-Box", "PINN", "NN", "Naive NN", "B-PINN"]
 
-        states = [eta, eta_wb]
-        state_names =  ["Ground Truth", "White-Box"]
+        states = [eta, eta_wb, eta_naive_nn]
+        state_names =  ["Ground Truth", "White-Box", "Naive NN"]
 
         for vector, label in zip(states, state_names):
             # Plotting trajectory
@@ -309,7 +309,7 @@ if __name__ == "__main__":
         fig, axes = plt.subplots(3, 2, figsize=(12, 10))
         axes = axes.flatten()
 
-        labels_eta = ["x", "y", "z", "yaw", "pitch", "roll"]
+        labels_eta = ["x", "y", "z", "roll", "pitch", "yaw"]
         labels_nu = ["u", "v", "w", "p", "q", "r"]
         labels_unit = ["State [m]", "State [m]", "State [m]",
                        "State [$rad$]", "State [$rad$]", "State [$rad$]",
