@@ -112,7 +112,6 @@ def load_rosbag(bag_path: str=""):
     q_dot = np.gradient(q, time)
     r_dot = np.gradient(r, time)
     
-    # Frame fix for eta ENU --> NED
     eta = [x, y, z, q0, q1, q2, q3]
     nu = [u, v, w, p, q, r]
     acc = [u_dot, v_dot, w_dot, p_dot, q_dot, r_dot]
@@ -215,7 +214,7 @@ def load_to_trajectory(data_files: list):
         path = "src/smarc_modelling/piml/data/rosbags/" + dataset
         eta, nu, u, u_cmd, Dv_comp, Mv_dot, Cv, g_eta, tau, t, M, acc = load_data_from_bag(path, "torch")
         
-        x_traj = torch.cat([eta, nu, u], dim=1)
+        x_traj = torch.cat([nu, u], dim=1)
         y_traj = {
             "eta": eta,
             "u_cmd": u_cmd,
@@ -227,7 +226,8 @@ def load_to_trajectory(data_files: list):
             "t": t,
             "nu": nu,
             "M": M,
-            "acc": acc
+            "acc": acc,
+            "u": u
         }
 
         # Append most recently loaded data
@@ -237,12 +237,17 @@ def load_to_trajectory(data_files: list):
     return x_trajectories, y_trajectories
 
 
-def eta_quat_to_rad(eta):
+def eta_quat_to_rad(eta, return_type="numpy"):
     """Turns quaternion in eta to radians"""
     pose = eta[0:3]
     quat = eta[3:]
-    euler = R.from_quat(quat).as_euler("xyz", degrees=False)
-    return np.hstack([pose, euler])
+    euler = R.from_quat(quat, scalar_first=True).as_euler("xyz", degrees=False)
+    if return_type == "numpy":
+        return np.hstack([pose, euler])
+    if return_type == "torch":
+        pose = torch.tensor(pose, dtype=torch.float32)
+        euler = torch.tensor(euler, dtype=torch.float32)
+        return torch.cat([pose, euler])
 
 
 def eta_quat_to_deg(eta):
@@ -259,7 +264,7 @@ def angular_vel_to_quat_vel(eta, nu):
 
     # Takes an angular velocity and returns it as a quaternion velocity
     angle = eta[3:]
-    q = R.from_euler("xyz", angle).as_quat()
+    q = R.from_euler("xyz", angle).as_quat(scalar_first=True)
     q = q/np.linalg.norm(q)
 
     # Position dynamics: ṗ = C * v
@@ -277,3 +282,7 @@ def angular_vel_to_quat_vel(eta, nu):
     q_dot = T_q_n_b @ om + 100/2 * (1 - q.T.dot(q)) * q
 
     return np.concatenate([pos_dot, q_dot])
+
+def norm_q(quat):
+    n = np.linalg.norm(quat)
+    return quat / n if n > 0 else np.array([1.0, 0.0, 0.0, 0.0])
