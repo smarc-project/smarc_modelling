@@ -108,10 +108,10 @@ class NMPC:
         self.ocp.constraints.idxbu = np.arange(2)
 
         # --- position bounds (NED: z positive down) ---
-        # Tank limits
-        x_min, x_max = -2.0,  8.0   # meters
-        y_min, y_max = -2.0,  2.0
-        z_min, z_max = -0.5,  3.0   # e.g., keep 0.1–1.1 m depth
+        # Tank limits in meters
+        x_min, x_max = -2.0, 8.0
+        y_min, y_max = -2.0, 2.0
+        z_min, z_max = 0.5, 3.0   
 
         pos_lbx = np.array([x_min, y_min, z_min])
         pos_ubx = np.array([x_max, y_max, z_max])
@@ -120,7 +120,7 @@ class NMPC:
         act_lbx = np.array([  0.0,   0.0, -np.deg2rad(7), -np.deg2rad(7),  -400.0,  -400.0])
         act_ubx = np.array([100.0, 100.0,  np.deg2rad(7),  np.deg2rad(7),   400.0,   400.0])
 
-        # --- stitch them together in the same order as the indices ---
+        ## Hard Constraints
         idxbx = np.r_[ [0,1,2], [13,14,15,16,17,18] ]     # 9 indices total
         lbx   = np.r_[ pos_lbx, act_lbx ]                 # length 9
         ubx   = np.r_[ pos_ubx, act_ubx ]                 # length 9
@@ -128,6 +128,19 @@ class NMPC:
         self.ocp.constraints.idxbx = idxbx
         self.ocp.constraints.lbx   = lbx
         self.ocp.constraints.ubx   = ubx
+
+        ## Soft Constraints
+        idxsbx = np.array([0, 1, 2])    # Index of constraints we want to slacken
+
+        # soften exactly those same state bounds:
+        self.ocp.constraints.idxsbx = idxsbx
+
+        # penalty weights (size must equal len(idxsbx))
+        n_sb = idxsbx.size
+        self.ocp.cost.Zl = 50*np.ones(n_sb)
+        self.ocp.cost.Zu = 50*np.ones(n_sb)
+        self.ocp.cost.zl =  5*np.ones(n_sb)
+        self.ocp.cost.zu =  5*np.ones(n_sb)
 
 
         # ----------------------- Solver Setup --------------------------
