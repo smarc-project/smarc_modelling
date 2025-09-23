@@ -165,8 +165,23 @@ def quaternion_to_angles_ca(quat):
         q0, q1, q2, q3 = quat[0], quat[1], quat[2], quat[3]
     
         # Compute the Euler angles from the quaternion
-        psi = ca.atan2(2 * (q0*q3 + q1*q2), 1 - 2 * (q2**2 + q3**2))
-        theta = ca.asin(2 * (q0*q2 - q3*q1))
-        phi = ca.atan2(2 * (q0*q1 + q2*q3), 1 - 2 * (q1**2 + q2**2))
+        #psi = ca.atan2(2 * (q0*q3 + q1*q2), 1 - 2 * (q2**2 + q3**2))
+        #theta = ca.asin(2 * (q0*q2 - q3*q1))
+        #phi = ca.atan2(2 * (q0*q1 + q2*q3), 1 - 2 * (q1**2 + q2**2))
+        psi = atan2_safe(2 * (q0*q3 + q1*q2), 1 - 2 * (q2**2 + q3**2))
+        theta = asin_safe(2 * (q0*q2 - q3*q1))
+        phi = atan2_safe(2 * (q0*q1 + q2*q3), 1 - 2 * (q1**2 + q2**2))
     
         return psi, theta, phi
+
+def atan2_safe(y, x, eps=1e-12):
+    # avoid undefined atan2(0,0) without branching
+    return ca.atan2(y, x + eps)
+
+def asin_safe(x):
+    return ca.asin(clamp(x, -1.0, 1.0))
+
+def clamp(x, lo=-1.0, hi=1.0):
+    # CasADi-friendly saturator: no undefined ops
+    return ca.fmax(lo, ca.fmin(hi, x))
+
