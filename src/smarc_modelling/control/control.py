@@ -142,7 +142,6 @@ class NMPC:
         self.ocp.cost.zl =  5*np.ones(n_sb)
         self.ocp.cost.zu =  5*np.ones(n_sb)
 
-
         # ----------------------- Solver Setup --------------------------
         # set prediction horizon
         self.ocp.solver_options.N_horizon = self.N_horizon
@@ -175,24 +174,17 @@ class NMPC:
 
         acados_ocp_solver = AcadosOcpSolver(self.ocp, json_file = solver_json, generate=self.update_solver, build=self.update_solver)
 
-
+        # Simulation object based on OCP model.
         sim = AcadosSim()
         sim.model = self.model
         sim.parameter_values = np.zeros(25)
 
         sim.solver_options.T = 0.1
-        #sim.solver_options.integrator_type = 'IRK'
         sim.solver_options.integrator_type = 'IRK'
-        #sim.solver_options.sim_method_newton_iter = 1      # start conservative
-        #sim.solver_options.newton_tol = 1e-8               # (if available in your acados version)
-        #sim.solver_options.sim_method_num_stages = 3       # 3-stage Gauss often more stable
-        #sim.solver_options.num_steps = 2                   # split the step if needed
-        # (optional) sim.solver_options.jac_reuse = 1
 
         sim_json = os.path.join(save_dir, 'acados_sim_' + self.model.name + '.json')
 
         acados_integrator = AcadosSimSolver(sim, json_file = sim_json, generate=self.update_solver, build=self.update_solver)
-
 
         return acados_ocp_solver, acados_integrator
     
