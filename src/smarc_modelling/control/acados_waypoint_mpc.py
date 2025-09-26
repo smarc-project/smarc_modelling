@@ -40,7 +40,7 @@ def run_simulation():
     # create ocp object to formulate the OCP
     Ts = 0.1           # Sampling time
     N_horizon = 10      # Prediction horizon
-    nmpc = NMPC(sam, Ts, N_horizon, update_solver_settings=False)
+    nmpc = NMPC(sam, Ts, N_horizon, update_solver_settings=True)
     nx = nmpc.nx        # State vector length + control vector
     nu = nmpc.nu        # Control derivative vector length
     
@@ -58,7 +58,7 @@ def run_simulation():
                    0.000e+00, 0.000e+00, -0.000e+00,  0.000e+00, 0.000e+00, 0.000e+00,              # nu
                    0.000e+00,  5.100e+01,  0.000e+00,  0.000e+00,  1.000e-06, 1.000e-06])           # control
 
-    wp = np.array([6.613, -0.046, 0.656, 0.000, 0.000, 0.000, 1.000])
+    wp = np.array([6.613, -0.046, 0.656, 1.000, 0.000, 0.000, 0.000])
     ref = np.zeros((N_horizon, (nx+nu)))
     ref[:,:7] = wp
 

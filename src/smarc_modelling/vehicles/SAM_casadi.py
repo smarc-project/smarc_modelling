@@ -619,6 +619,7 @@ class SAM_casadi():
         n_rps = n_rpm / 60.0
         rho = self.rho
         D   = self.D_prop
+        prop_scaling = 5    # arbitrary scaling factor when moving backwards
 
         tau_prop = ca.MX.zeros(6)
 
@@ -631,7 +632,7 @@ class SAM_casadi():
         n_ref=5.0
         sharp=8.0
 
-        use_Va = False
+        use_Va = True
 
         for i in range(n_rpm.size1()):
             n = n_rps[i]
@@ -642,20 +643,19 @@ class SAM_casadi():
 
             # Advance ratio (bounded, smooth)
             if use_Va:
-                Jb = self.J_eff(Va_abs, D, n, self.Ja_max, n0_rps=n0_rps)
-                KT_fwd = self.KT_0 + gn * (self.KT_max - self.KT_0)/self.Ja_max * Jb
-                KQ_fwd = self.KQ_0 + gn * (self.KQ_max - self.KQ_0)/self.Ja_max * Jb
+                Jb = Va_abs/D * nabs
+                KT_fwd = self.KT_0 * n * nabs + gn * (self.KT_max - self.KT_0)/self.Ja_max * Jb
+                KQ_fwd = self.KQ_0 * n * nabs + gn * (self.KQ_max - self.KQ_0)/self.Ja_max * Jb
             else:
                 KT_fwd, KQ_fwd = self.KT_0, self.KQ_0  # no Va dependence
 
-            # NOTE: Same coefficients for forward and backwards right now
             cT = rho * (D**4) * KT_fwd
             cQ = rho * (D**5) * KQ_fwd
     
-            X_fwd = cT * n_rps[i] * nabs # thrust ~ n|n|
-            K_fwd = cQ * n_rps[i] * nabs # torque ~ n|n|
-            X_rev = cT * n_rps[i] * nabs # thrust ~ n|n|
-            K_rev = cQ * n_rps[i] * nabs # torque ~ n|n|
+            X_fwd = cT # thrust ~ n|n|
+            K_fwd = cQ # torque ~ n|n|
+            X_rev = cT / prop_scaling # thrust ~ n|n|
+            K_rev = cQ / prop_scaling # torque ~ n|n|
 
             X_i = s*X_fwd + (1-s)*X_rev
             K_i = s*K_fwd + (1-s)*K_rev
@@ -682,22 +682,6 @@ class SAM_casadi():
     def gate_n(self, n, n_ref=5.0, sharp=8.0):
         z = ca.fabs(n)/(n_ref + 1e-9)
         return 0.5*(1 + ca.tanh(sharp*(z - 1.0)))
-
-    def J_eff(self, Va_abs, D, n_rps, Ja_max, n0_rps=3.0, Jsat=None):
-        if Jsat is None:
-            Jsat = Ja_max/3.0
-        a = ca.sqrt(n_rps*n_rps + (n0_rps*n0_rps))   # constant floor in rps
-        J_raw = Va_abs / (D * a)
-        return Ja_max * (1 - ca.exp(-J_raw/Jsat))    # ∈ [0, Ja_max], C^∞
-
-    def J_safe(self, Va, D, n_abs, Ja_max, Jsat=None, eps=1e-6):
-        # raw J >= 0
-        J = Va / (D*(n_abs + eps))
-        # smooth one-sided saturation to [0, Ja_max]
-        if Jsat is None:
-            Jsat = Ja_max/3.0   # soft knee
-        Jb = Ja_max * (1 - ca.exp(-J/Jsat))   # C∞, monotone, <= Ja_max
-        return Jb
 
     def calculate_vbs_position(self, u):
         """
