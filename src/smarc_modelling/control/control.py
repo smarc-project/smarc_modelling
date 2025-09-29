@@ -28,7 +28,7 @@ class NMPC:
     def export_dynamics_model(self, casadi_model):
         # Create symbolic state and control variables
         x_sym     = ca.MX.sym('x', 19,1)
-        u_ref_sym = ca.MX.sym('u_ref', 6,1)
+        u_sym = ca.MX.sym('u_sym', 6,1)
 
         # Create symbolic derivative
         x_dot_sym = ca.MX.sym('x_dot', 19, 1)
@@ -38,11 +38,11 @@ class NMPC:
         model.name = 'SAM_equation_system'
         model.x = x_sym
         model.xdot = x_dot_sym
-        model.u = u_ref_sym
+        model.u = u_sym
 
         # Declaration of explicit and implicit expressions
         x_dot  = casadi_model.dynamics(export=True)    # extract casadi.MX function
-        f_expl = ca.vertcat(x_dot(x_sym[:13], x_sym[13:]), u_ref_sym)
+        f_expl = ca.vertcat(x_dot(x_sym[:13], x_sym[13:]), u_sym)
         f_impl = x_dot_sym - f_expl
         model.f_expl_expr = f_expl
         model.f_impl_expr = f_impl
@@ -64,10 +64,10 @@ class NMPC:
         Q_diag[10:13] = 1       # Angular velocity: standard 1
 
         # Control weight matrix - Costs set according to Bryson's rule
-        Q_diag[13] = 1e-4            # VBS:      Standard: 1e-4
-        Q_diag[14] = 1e-4            # LCG:      Standard: 1e-4
-        Q_diag[ 15  ] = 5e1             # stern_angle:   Standard: 100
-        Q_diag[ 16  ] = 5e1             # rudder_angle:  Standard: 100
+        Q_diag[13] = 1e-5            # VBS:      Standard: 1e-4
+        Q_diag[14] = 1e-5            # LCG:      Standard: 1e-4
+        Q_diag[ 15  ] = 5e2             # stern_angle:   Standard: 100
+        Q_diag[ 16  ] = 1e3             # rudder_angle:  Standard: 100
         Q_diag[17:  ] = 1e-5            # RPM1 And RPM2: Standard: 1e-6
         Q_diag[13:  ] = Q_diag[13:  ]   # Adjustment to all control weights
         Q = np.diag(Q_diag)
@@ -107,31 +107,40 @@ class NMPC:
         self.ocp.constraints.ubu = np.array([ vbs_dot, lcg_dot])
         self.ocp.constraints.idxbu = np.arange(2)
 
-        # Set constraints on the states and input magnitudes
-        # NOTE: In the tank, we want to also constrain the position in x, y, z.
-        # The position of SAM is sam/base_link, hence we have to account for
-        # the shape of SAM when setting the bounds on the positions. Otherwise
-        # we crash anyways. Also, the MPC assumes that SAM is in an NED frame,
-        # hence, the bounds on the tank are also in NED
-        x_ubx = np.ones(3 + nu) 
+        # --- position bounds (NED: z positive down) ---
+        # Tank limits in meters
+        x_min, x_max = -2.0, 8.0
+        y_min, y_max = -2.0, 2.0
+        z_min, z_max = 0.5, 3.0   
 
-        # Set constraints on the control magnitudes
-        x_ubx[0] = 9
-        x_ubx[1] = 2.5
-        x_ubx[2] = 3
-        x_ubx[3:5] = 100 
-        x_ubx[5:7] = np.deg2rad(7)
-        x_ubx[7: ] = 600
+        pos_lbx = np.array([x_min, y_min, z_min])
+        pos_ubx = np.array([x_max, y_max, z_max])
 
-        x_lbx = -x_ubx
-        x_lbx[0] = 0
-        x_lbx[1] = -2.5
-        x_lbx[3] = 0
-        x_lbx[3:5] = 0
+        # --- actuator state bounds for x[13:19] = [x_vbs, x_lcg, δs, δr, rpm1, rpm2] ---
+        act_lbx = np.array([  0.0,   0.0, -np.deg2rad(7), -np.deg2rad(7),  -400.0,  -400.0])
+        act_ubx = np.array([100.0, 100.0,  np.deg2rad(7),  np.deg2rad(7),   400.0,   400.0])
 
-        self.ocp.constraints.lbx = x_lbx
-        self.ocp.constraints.ubx = x_ubx
-        self.ocp.constraints.idxbx = np.concatenate(([0, 1, 2], np.arange(13, nx)))
+        ## Hard Constraints
+        idxbx = np.r_[ [0,1,2], [13,14,15,16,17,18] ]     # 9 indices total
+        lbx   = np.r_[ pos_lbx, act_lbx ]                 # length 9
+        ubx   = np.r_[ pos_ubx, act_ubx ]                 # length 9
+
+        self.ocp.constraints.idxbx = idxbx
+        self.ocp.constraints.lbx   = lbx
+        self.ocp.constraints.ubx   = ubx
+
+        ## Soft Constraints
+        idxsbx = np.array([0, 1, 2])    # Index of constraints we want to slacken
+
+        # soften exactly those same state bounds:
+        self.ocp.constraints.idxsbx = idxsbx
+
+        # penalty weights (size must equal len(idxsbx))
+        n_sb = idxsbx.size
+        self.ocp.cost.Zl = 50*np.ones(n_sb)
+        self.ocp.cost.Zu = 50*np.ones(n_sb)
+        self.ocp.cost.zl =  5*np.ones(n_sb)
+        self.ocp.cost.zu =  5*np.ones(n_sb)
 
         # ----------------------- Solver Setup --------------------------
         # set prediction horizon
@@ -164,7 +173,18 @@ class NMPC:
         solver_json = os.path.join(save_dir, 'acados_ocp_' + self.model.name + '.json')
 
         acados_ocp_solver = AcadosOcpSolver(self.ocp, json_file = solver_json, generate=self.update_solver, build=self.update_solver)
-        acados_integrator = AcadosSimSolver(self.ocp, json_file = solver_json, generate=self.update_solver, build=self.update_solver)
+
+        # Simulation object based on OCP model.
+        sim = AcadosSim()
+        sim.model = self.model
+        sim.parameter_values = np.zeros(25)
+
+        sim.solver_options.T = 0.1
+        sim.solver_options.integrator_type = 'IRK'
+
+        sim_json = os.path.join(save_dir, 'acados_sim_' + self.model.name + '.json')
+
+        acados_integrator = AcadosSimSolver(sim, json_file = sim_json, generate=self.update_solver, build=self.update_solver)
 
         return acados_ocp_solver, acados_integrator
     

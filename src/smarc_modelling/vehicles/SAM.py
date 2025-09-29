@@ -607,12 +607,20 @@ class SAM():
             self.D[4,4] = self.damping_rot
             self.D[5,5] = self.damping_rot
 
+            ax, ay, az = [self.abs_smooth(self.nu_r[i]) for i in range(3)]
+            ap, aq, ar = [self.abs_smooth(self.nu_r[i]) for i in range(3, 6)]
+            self.D = np.diag([self.Xuu*ax, self.Yvv*ay, self.Zww*az,
+                                self.Kpp*ap, self.Mqq*aq, self.Nrr*ar])
+
+
         if self.piml_type == "pinn":
             self.D = pinn_predict(self.piml_model, eta, nu, u, [self.x_mean, self.x_std])
 
         if self.piml_type == "nn":
             self.D = nn_predict(self.piml_model, eta, nu, u, [self.x_mean, self.x_std])
         
+    def abs_smooth(self, x, eps=1e-9):
+        return np.sqrt(x*x + eps)
         
 
     def calculate_g(self):
@@ -653,50 +661,73 @@ class SAM():
         C_T2C = calculate_dcm(order=[2, 3], angles=[delta_s, delta_r])
 
         n_rps = n_rpm / 60   
-        Va = self.Va_coef * self.U
+        rho = self.rho
+        D   = self.D_prop
+        prop_scaling = 5    # arbitrary scaling factor when moving backwards
 
         tau_prop = np.zeros(6)
+        Va = self.Va_coef * self.U
+
+        # Relative body velocity & axial inflow
+        v_rel_b = self.nu_r[0:3]
+        t_b     = C_T2C @ np.array([1,0,0])          # thruster axis in body
+        Va_ax   = np.dot(t_b, v_rel_b)               # signed axial inflow
+        Va_abs  = self.Va_coef * np.sqrt(Va_ax*Va_ax + 1e-9)        # smooth |Va|
+        n0_rps=3.0
+        n_ref=5.0
+        sharp=8.0
+
+        use_Va = True
+
         for i in range(len(n_rpm)):
-            if n_rps[i] > 0:
-                X_prop_i = self.rho*(self.D_prop**4)*(
-                        self.KT_0*abs(n_rps[i])*n_rps[i] +
-                        (self.KT_max-self.KT_0)/self.Ja_max * (Va/self.D_prop) * abs(n_rps[i])
-                        )
-                K_prop_i = self.rho * (self.D_prop**5) * (
-                        self.KQ_0 * abs(n_rps[i]) * n_rps[i] +
-                        (self.KQ_max-self.KQ_0)/self.Ja_max * (Va/self.D_prop) * abs(n_rps[i]))
-                
+            n = n_rps[i]
+            # cubic-in-n (n*|n| ≈ n*abs_smooth(n) keeps sign, is C^1)
+            nabs = self.abs_smooth(n_rps[i])
+            s = self.smooth_switch(n_rps[i])   # smooth selector forward↔reverse
+            gn = self.gate_n(n, n_ref, sharp)  # fade-in Va by |n|
+
+            # Advance ratio (bounded, smooth)
+            if use_Va:
+                Jb = (Va_abs/self.D_prop) * nabs #self.J_eff(Va_abs, D, n, self.Ja_max, n0_rps=n0_rps) * nabs
+                KT_fwd = self.KT_0 * n_rps[i] * nabs + gn * (self.KT_max - self.KT_0)/self.Ja_max * Jb
+                KQ_fwd = self.KQ_0 * n_rps[i] * nabs + gn * (self.KQ_max - self.KQ_0)/self.Ja_max * Jb
             else:
-                prop_scaling = 5 # Propellers generate less thrust going backwards
-                X_prop_i = self.rho * (self.D_prop ** 4) * (
-                        self.KT_0*abs(n_rps[i])*n_rps[i]
-                        ) / prop_scaling
-                K_prop_i = self.rho * (self.D_prop ** 5) * self.KQ_0 * abs(n_rps[i]) * n_rps[i] / prop_scaling
-                
+                KT_fwd, KQ_fwd = self.KT_0, self.KQ_0  # no Va dependence
 
-            F_prop_b = C_T2C @ np.array([X_prop_i, 0, 0])
+            cT = rho * (D**4) * KT_fwd
+            cQ = rho * (D**5) * KQ_fwd
+    
+            X_fwd = cT # thrust ~ n|n|
+            K_fwd = cQ # torque ~ n|n|
+            X_rev = cT / prop_scaling # thrust ~ n|n|
+            K_rev = cQ / prop_scaling # torque ~ n|n|
+
+            X_i = s*X_fwd + (1-s)*X_rev
+            K_i = s*K_fwd + (1-s)*K_rev
+
+            F_prop_i = C_T2C @ np.array([X_i, 0, 0])
             r_prop_i = C_T2C @ self.propellers.r_t_p_sh[i] - self.p_OC_O
-            M_prop_i = np.cross(r_prop_i, F_prop_b) \
-                        + np.array([(-1)**i * K_prop_i, 0, 0])  # the -1 is because we have counter rotating
-                                    # propellers that are supposed to cancel out the propeller induced
-                                    # momentum
 
-            # Rescale the rotation from props
-            M_prop_i[0] *= self.thruster_rot_strength # Yaw
-            M_prop_i[1] *= self.thruster_rot_strength # Pitch
-            M_prop_i[2] *= self.thruster_rot_strength # Roll
+            # counter-rotation torque (+/-), *no* in-place edits
+            M_prop_i = np.cross(r_prop_i, F_prop_i) + np.array([((-1)**i)*K_i, 0, 0])
 
-            # Above equation return yaw, roll, pitch in other order than what the model uses
-            yaw = M_prop_i[0]
-            roll = M_prop_i[2]
-            M_prop_i[2] = yaw
-            M_prop_i[0] = roll
+            # scale & reorder without mutation (your original swap x<->z)
+            M_scaled = self.thruster_rot_strength * M_prop_i
+            yaw, pitch, roll = M_scaled[0], M_scaled[1], M_scaled[2]
+            M_perm = np.array([roll, pitch, yaw])
 
-            tau_prop_i = np.concatenate([F_prop_b, M_prop_i])
-            tau_prop += tau_prop_i
+            tau_prop += np.concatenate([F_prop_i, M_perm])
 
         return tau_prop
 
+    def smooth_switch(self, z, k=100.0):
+        # ~0 for z<0 (reverse), ~1 for z>0 (forward), smooth at 0
+        # keep k around 50–200; larger = sharper switch
+        return 0.5*(1 + np.tanh(k*z))
+
+    def gate_n(self, n, n_ref=5.0, sharp=8.0):
+        z = np.abs(n)/(n_ref + 1e-9)
+        return 0.5*(1 + np.tanh(sharp*(z - 1.0)))
 
     def calculate_vbs_position(self, u):
         """
