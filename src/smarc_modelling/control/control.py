@@ -109,9 +109,9 @@ class NMPC:
 
         # --- position bounds (NED: z positive down) ---
         # Tank limits in meters
-        x_min, x_max = -2.0, 8.0
-        y_min, y_max = -2.0, 2.0
-        z_min, z_max = 0.5, 3.0   
+        x_min, x_max = 0.0, 8.0
+        y_min, y_max = -1.5, 1.5
+        z_min, z_max = -0.5, 3.0   
 
         pos_lbx = np.array([x_min, y_min, z_min])
         pos_ubx = np.array([x_max, y_max, z_max])
