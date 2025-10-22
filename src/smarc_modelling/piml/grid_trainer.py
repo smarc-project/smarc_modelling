@@ -2,7 +2,6 @@
 # -*- coding: utf-8 -*-
 
 from smarc_modelling.piml.pinn import PINN
-from smarc_modelling.piml.bpinn import BPINN
 from smarc_modelling.piml.nn import NN
 from smarc_modelling.piml.naive_nn import NaiveNN
 from smarc_modelling.piml.utils.utility_functions import load_to_trajectory, eta_quat_to_deg
@@ -11,48 +10,60 @@ import torch
 import numpy as np
 import matplotlib.pyplot as plt
 import scienceplots # For fancy plotting
+import random
 
-test_datasets = ["test_1", "test_2", "test_3", "test_4", "test_5", "test_6", "test_7", "test_8"]
+test_datasets = ["rosbag_3", "rosbag_66", "rosbag_73", "rosbag_112", "rosbag_113", "rosbag_114"]
 
-datasets = ["rosbag_16", "rosbag_15", "rosbag_14", "rosbag_13", "rosbag_12", "rosbag_1", "rosbag_2", "rosbag_3", "rosbag_4", "rosbag_5", "rosbag_6", 
-            "rosbag_7", "rosbag_8", "rosbag_9", "rosbag_10", "rosbag_11"]
+datasets = ["rosbag_1", "rosbag_5", "rosbag_9.0", "rosbag_9.5", "rosbag_11", 
+            "rosbag_13", "rosbag_15", "rosbag_16", "rosbag_17", "rosbag_18",
+            "rosbag_19", "rosbag_25", "rosbag_28", "rosbag_31", "rosbag_34", 
+            "rosbag_38", "rosbag_39", "rosbag_41", "rosbag_43", "rosbag_46", 
+            "rosbag_48", "rosbag_49", "rosbag_50", "rosbag_53", "rosbag_55", 
+            "rosbag_58", "rosbag_61", "rosbag_62", "rosbag_67", "rosbag_69", 
+            "rosbag_70", "rosbag_74", "rosbag_75", "rosbag_76", "rosbag_80",
+            "rosbag_82", "rosbag_83", "rosbag_86", "rosbag_88", "rosbag_92", 
+            "rosbag_94", "rosbag_96", "rosbag_97", "rosbag_102", "rosbag_107", 
+            "rosbag_108"]
 
 if __name__ == "__main__":
 
 # %% ## GRID TRAINER OPTIONS ## %% #
     # SELECT MODEL
-    model = PINN()
-    sim_model_name = "pinn"
+    model = NaiveNN()
+    sim_model_name = "naive_nn"
 
     # SAVE NAME
-    save_best_name = "pinn_best_grid.pt"
-    name_model = "pinn.pt"
+    save_best_name = "naive_nn_best_grid.pt"
+    save_model_name = "naive_nn.pt"
 
     # DIVISION FOR TRAIN / VALIDATE SPLIT
+    rng_seed = 0
     train_procent = 0.9
 
     # HYPER - PARAMETERS
-    n_steps = 20
+    h_steps = 3
     dropout_rate = 0.25
 
     # Use best perform here
-    layer_grid = [25, 40]
-    size_grid = [16, 32]
-    factor_grid = [0.9, 0.5, 0.1]
+    layer_grid = [23, 25, 27]
+    size_grid = [128-16, 128, 128+16]
+    factor_grid = [0.7, 0.6, 0.5]
     lr0 = 0.001
     max_norm = 1.0
-    patience = 5000
+    patience = 1000
     epochs = 50000
 
     # INPUT - OUTPUT SHAPES
-    input_shape = 19
-    output_shape = 36
+    input_shape = 12 # 19
+    output_shape = 6 # 36 - 6x6 - D, 6 - nu_dot 
 
 #####################################
 
 # %% # 
 
     # Divide up the datasets into training and validation
+    random.seed(rng_seed)
+    random.shuffle(datasets)
     train_val_split = int(np.shape(datasets)[0] * train_procent)
 
     # Load training data
@@ -60,18 +71,30 @@ if __name__ == "__main__":
 
     # Get normalization constants
     all_x = torch.cat(x_trajectories, dim=0)
-    x_mean = torch.mean(all_x, dim=0)
-    x_std = torch.std(all_x, dim=0) + 1e-8 # Preventing division by 0
-
-    # # Overwrite normalization just to turn it off in an easy way
-    # x_mean = 0
-    # x_std = 1
+    x_min, _ = torch.min(all_x, dim=0)
+    x_max, _ = torch.max(all_x, dim=0)
+    x_range = x_max - x_min
 
     # Load validation data
     x_trajectories_val, y_trajectories_val = load_to_trajectory(datasets[train_val_split:])
 
     # Load test data
     x_trajectories_test, y_trajectories_test = load_to_trajectory(test_datasets)
+    
+    if isinstance(model, NaiveNN):
+        # Normalizing the acceleration for the naive NN
+        acc_list = [traj["acc"] for traj in y_trajectories]
+        all_nu_dot = torch.cat(acc_list, dim=0)
+        nu_dot_min, _ = torch.min(all_nu_dot, dim=0)
+        nu_dot_max, _ = torch.max(all_nu_dot, dim=0)
+        nu_dot_range = nu_dot_max - nu_dot_min
+        for y_traj in y_trajectories:
+            y_traj["acc"] = (y_traj["acc"] - nu_dot_min) / nu_dot_range
+        for y_traj in y_trajectories_val:
+            y_traj["acc"] = (y_traj["acc"] - nu_dot_min) / nu_dot_range
+    else:
+        nu_dot_min = 0
+        nu_dot_range = 0
 
     # For results
     error_grid = np.zeros((len(layer_grid), len(size_grid), len(factor_grid)))
@@ -83,32 +106,29 @@ if __name__ == "__main__":
 
     model_counter = 0
     # Grid params
+    # Swap these out or add extra dependent on what is needed
     for i, layers in enumerate(layer_grid): # Amount of layers
         for j, size in enumerate(size_grid): # Amount of neurons in each layer 
-            for k, factor in enumerate(factor_grid):
+            for k, factor in enumerate(factor_grid): # Learning rate scaling factor
                 
+                # Iterative counter to keep track of progress
                 model_counter += 1
                 print(f" Starting training on model {model_counter} / {len(layer_grid) * len(size_grid) * len(factor_grid)}")
 
+                # For saving the loss over time for loss plots of training
                 loss_history = []
                 val_loss_history = []
 
-                # NN shape
+                # Network shape
                 shape = [size] * layers # Hidden layers
                 shape.insert(0, input_shape) # Input layer
                 shape.append(output_shape) # Output layer
                 
-                # Initialize model
-                if isinstance(model, BPINN):
-                    model.initialize(shape, dropout_rate)
-                else:
-                    model.initialize(shape)
-                
                 # Optimizer and other settings
-                optimizer = torch.optim.Adam(model.parameters(), lr=lr0)
+                optimizer = torch.optim.Adam(model.parameters(), lr=lr0) # weight_decay=1e-5)
 
                 # Adaptive learning rate
-                scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer=optimizer, mode="min", factor=factor, patience=2500, threshold=10, min_lr=1e-8)
+                scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer=optimizer, mode="min", factor=factor, patience=500, threshold=0.01, min_lr=1e-8)
 
                 # Early stopping with validation loss
                 best_val_loss = float("inf")
@@ -126,8 +146,8 @@ if __name__ == "__main__":
                     for x_traj, y_traj in zip(x_trajectories, y_trajectories):
                         
                         # Get PI loss
-                        x_traj_normed = (x_traj - x_mean) / x_std
-                        loss = model.loss_function(model, x_traj_normed, y_traj, n_steps)
+                        x_traj_normed = (x_traj - x_min) / (x_range + 10e-8) # Add small num to avoid div by 0
+                        loss = model.loss_function(model, x_traj_normed, y_traj, h_steps)
                         loss_total += loss
 
                     loss_total.backward()
@@ -141,12 +161,12 @@ if __name__ == "__main__":
                         for x_traj_val, y_traj_val in zip(x_trajectories_val, y_trajectories_val):
 
                             # Get PI validation loss
-                            x_traj_val_normed = (x_traj_val - x_mean) / x_std
-                            val_loss = model.loss_function(model, x_traj_val_normed, y_traj_val, n_steps)
+                            x_traj_val_normed = (x_traj_val - x_min) / (x_range + 10e-8)
+                            val_loss = model.loss_function(model, x_traj_val_normed, y_traj_val, h_steps)
                             val_loss_total += val_loss
                     
                     # Step scheduler
-                    scheduler.step(val_loss_total)
+                    scheduler.step(loss_total)
                     
                     # For plotting the loss
                     loss_history.append(loss_total.item())
@@ -160,7 +180,7 @@ if __name__ == "__main__":
                     else:
                         counter += 1
 
-                    # Print statement to make sure everything is still running
+                    # Print statement to make sure everything is still running & checking in on progress
                     if epoch % 100 == 0:
                         print(f" Still training, epoch {epoch}, loss: {loss_total.item()}, lr: {optimizer.param_groups[0]['lr']},\n validation loss: {val_loss_total.item()}, shape: {layers}, {size}, {factor}, counter: {counter}")
 
@@ -168,17 +188,24 @@ if __name__ == "__main__":
                     if counter >= patience:
                         print(f" Stopping early due to no improvement after {patience} epochs from epoch: {epoch-counter}\n")
                         break
+
+                    if loss_total.item() == float("nan"):
+                        print(f" Stopping due to NaN loss")
+                        break
                 
                 # Calculating the model error
                 model.load_state_dict(best_model_state) # Loading the best model state
                 torch.save({"model_shape": shape, 
                             "state_dict": model.state_dict(),
-                            "x_mean": x_mean,
-                            "x_std": x_std,
-                            "dropout": dropout_rate}, 
-                            "src/smarc_modelling/piml/models/"+name_model) 
+                            "x_min": x_min,
+                            "x_range": x_range,
+                            "dropout": dropout_rate,
+                            "y_min": nu_dot_min,
+                            "y_range": nu_dot_range}, 
+                            "src/smarc_modelling/piml/models/"+save_model_name) 
                 model.eval() # Just to doubly ensure that it is in eval mode
 
+                # Running the model on the test data sets to get model error
                 total_error = 0.0
                 for x_traj_test, y_traj_test in zip(x_trajectories_test, y_trajectories_test):
 
@@ -187,7 +214,7 @@ if __name__ == "__main__":
                     eta_test_degs = np.array([eta_quat_to_deg(eta_vec) for eta_vec in eta_for_error])
 
                     # Getting the state vector in such a way that we can use it in the simulator
-                    states_test = [x_traj_test[0:7][:], x_traj_test[7:13][:], x_traj_test[13:19][:]]
+                    states_test = [y_traj_test["eta"][:], y_traj_test["nu"][:], y_traj_test["u_cmd"][:]]
 
                     try: 
                         # Running the SAM simulator to get predicted validation path
@@ -201,7 +228,9 @@ if __name__ == "__main__":
                         eta_model_degs = np.array([eta_quat_to_deg(eta_vec) for eta_vec in eta_model])
 
                         # Calculated summed error
-                        eta_mse = np.array((eta_model_degs - eta_test_degs)**2)
+                        eta_mse_pos = (eta_model_degs[0:3] - eta_test_degs[0:3])**2
+                        eta_mse_angs = ((eta_model_degs[3:6]- eta_test_degs[3_6]) % 2*np.pi)**2
+                        eta_mse = np.hstack([eta_mse_pos, eta_mse_angs])
                         nu_mse = np.array((nu_model - y_traj_test["nu"])**2)
                         error = np.sum(eta_mse) + np.sum(nu_mse)
 
@@ -223,8 +252,10 @@ if __name__ == "__main__":
                             torch.save({"model_shape": shape, 
                                         "state_dict": model.state_dict(), 
                                         "dropout": dropout_rate,
-                                        "x_mean": x_mean,
-                                        "x_std": x_std},
+                                        "x_min": x_min,
+                                        "x_range": x_range,
+                                        "y_min": nu_dot_min,
+                                        "y_range": nu_dot_range},
                                         "src/smarc_modelling/piml/models/"+save_best_name)
                             best_setup = [layers, size, factor]
 
