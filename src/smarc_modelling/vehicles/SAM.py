@@ -59,6 +59,10 @@ import numpy as np
 import math
 from scipy.linalg import block_diag
 from smarc_modelling.lib.gnc import *
+from smarc_modelling.piml.pinn import init_pinn_model, pinn_predict
+from smarc_modelling.piml.nn import init_nn_model, nn_predict
+from smarc_modelling.piml.naive_nn import init_naive_nn_model, naive_nn_predict
+from smarc_modelling.piml.bpinn import init_bpinn_model, bpinn_predict
 
 
 class SolidStructure:
@@ -180,15 +184,16 @@ class SAM():
             dt=0.02,
             V_current=0,
             beta_current=0,
+            piml_type=None
     ):
         self.dt = dt # Sim time step, necessary for evaluation of the actuator dynamics
         
         # Some factors to make sim agree with real life data, these are eyeballed from sim vs gt data
-        self.vbs_factor = 0.5 # How sensitive the vbs is
-        self.inertia_factor = 10 # Adjust how quickly we can change direction
+        self.vbs_factor = 1 # How sensitive the vbs is # FIXME: This is not used.
+        self.inertia_factor = 2 # Adjust how quickly we can change direction
         self.damping_factor = 60 # Adjust how much the damping affect acceleration high number = move less
-        self.damping_rot = 5 # Adjust how much the damping affects the rotation high number = less rotation should be tuned on bag where we turn without any control inputs
-        self.thruster_rot_strength = 2  # Just making the thruster a bit stronger for rotation
+        self.damping_rot = 10 # Adjust how much the damping affects the rotation high number = less rotation should be tuned on bag where we turn without any control inputs
+        self.thruster_rot_strength = 1  # Just making the thruster a bit stronger for rotation
 
         # Constants
         self.p_OC_O = np.array([-0.75, 0, 0.06], float)  # Measurement frame C in CO (O)
@@ -217,17 +222,25 @@ class SAM():
         self.a = self.L / 2  # semi-axes
         self.b = self.diam / 2
 
-        self.p_OG_O = np.array([0., 0, 0.12], float)  # CG w.r.t. to the CO, we
-                                                        # recalculate that in calculate_cg
-        self.p_OB_O = np.array([0., 0, 0], float)  # CB w.r.t. to the CO
 
         # Rigid-body mass matrix expressed in CO
+        u_init = np.zeros(6)
+        u_init[0] = 50
+        u_init[1] = 50 #45
+        self.x_vbs_init = self.calculate_vbs_position(u_init)
+        # Update actuators
+        self.x_vbs = self.calculate_vbs_position(u_init) 
+        self.p_OLcg_O = self.calculate_lcg_position(u_init)
+        self.vbs.m_vbs = self.rho_w * np.pi * self.vbs.r_vbs ** 2 * self.x_vbs_init
         self.m = self.ss.m_ss + self.vbs.m_vbs + self.lcg.m_lcg
         self.J_total = np.zeros((3,3)) 
         self.MRB = np.zeros((6,6)) 
         self.MA = np.zeros((6,6)) 
         self.M = np.zeros((6,6)) 
         self.Minv = np.zeros((6,6)) 
+
+        self.p_OG_O = np.array([0., 0, 0.12], float)  # CG w.r.t. to the CO, we
+        self.p_OB_O = np.array([0., 0, 0], float)  # CB w.r.t. to the CO
 
         # Added moment of inertia in roll: A44 = r44 * Ix
         self.r44 = 0.3
@@ -242,9 +255,10 @@ class SAM():
         self.k_prime = pow(e, 4) * (beta_0 - alpha_0) / (
                 (2 - e ** 2) * (2 * e ** 2 - (2 - e ** 2) * (beta_0 - alpha_0)))
 
-        # Weight and buoyancy
+        # Weight and buoyancy 
+        # NOTE: SAM is initialized with the VBS half filled alread.
         self.W = self.m * self.g
-        self.B = self.W + self.vbs.m_vbs*0.5
+        self.B = self.W 
 
         # Damping matrix based on Bhat 2021
         # Parameters from smarc_advanced_controllers mpc_inverted_pendulum...
@@ -275,6 +289,30 @@ class SAM():
         self.Ja_max = 0.6632
 
         self.gamma = 100 # Scaling factor for numerical stability of quaternion differentiation
+
+        # PIML related stuff
+        self.piml_type= piml_type
+
+        if self.piml_type == "pinn":
+            print(f" Physics Informed Neural Network model initialized")
+            self.piml_model, self.x_mean, self.x_std = init_pinn_model("pinn.pt")
+
+        if self.piml_type == "nn":
+            print(f" Standard Neural Network model initialized")
+            self.piml_model, self.x_mean, self.x_std = init_nn_model("nn.pt")
+
+        if self.piml_type == "naive_nn":
+            print(f" Naive Neural Network model initialized")
+            self.piml_model, self.x_mean, self.x_std = init_naive_nn_model("naive_nn.pt")
+
+        if self.piml_type == "bpinn":
+            print(f" Bayesian - Physics Informed Neural Network model initialized")
+            self.piml_model, self.x_mean, self.x_std = init_bpinn_model("bpinn.pt")
+
+        # For white-box
+        if piml_type == None:
+            self.piml_type = "None"
+
 
     def init_vehicle(self):
         """
@@ -336,21 +374,35 @@ class SAM():
         self.update_inertias()
         self.calculate_M()
         self.calculate_C()
-        self.calculate_D()
+        self.calculate_D(eta, nu, u)
         self.calculate_g()
-        self.calculate_tau(u_ref)
+        self.calculate_tau(u)
 
-        # Overwrite D to get better results from sim
-        self.D = np.eye(6) * self.damping_factor
-        self.D[3,3] = self.damping_rot
-        self.D[4,4] = self.damping_rot
-        self.D[5,5] = self.damping_rot
+        ## Overwrite D to get better results from sim
+        #self.D = np.eye(6) * self.damping_factor
+        #self.D[3,3] = self.damping_rot
+        #self.D[4,4] = self.damping_rot
+        #self.D[5,5] = self.damping_rot
+
+        np.set_printoptions(precision=3)
 
         nu_dot = self.Minv @ (self.tau - np.matmul(self.C,self.nu_r) - np.matmul(self.D,self.nu_r) - self.g_vec)
         u_dot = self.actuator_dynamics(u, u_ref)
         eta_dot = self.eta_dynamics(eta, nu)
+
+        if self.piml_type == "bpinn":
+            Dv, _ = bpinn_predict(self.piml_model, eta, nu, u, [self.x_mean, self.x_std])
+            nu_dot = self.Minv @ (self.tau - np.matmul(self.C,self.nu_r) - Dv - self.g_vec)
+
         x_dot = np.concatenate([eta_dot, nu_dot, u_dot])
-  
+
+        if self.piml_type == "naive_nn":
+            x_dot = naive_nn_predict(self.piml_model, eta, nu, u, [self.x_mean, self.x_std])
+            x_dot = np.concatenate([x_dot, u_dot])
+
+        # # Type compatibility with C++ extension
+        # x_dot = np.array(x_dot, dtype=np.float32).reshape(1, -1)
+
         return x_dot
 
     def bound_actuators(self, u):
@@ -421,6 +473,8 @@ class SAM():
                     + (self.vbs.m_vbs/self.m) * self.vbs.p_OVbs_O \
                     + (self.lcg.m_lcg/self.m) * self.p_OLcg_O
 
+        #print(f"OG_O: {self.p_OG_O}")
+
     def update_inertias(self):
         """
         Update inertias based on VBS and LCG
@@ -474,6 +528,8 @@ class SAM():
 
         # Rigid-body mass matrix with total inertia in CO
         MRB_CO = block_diag(m_diag, self.J_total)
+        # FIXME: Add the off diagonal elements that come from the difference
+        # between the CO and the CG.
         self.MRB = MRB_CO
 
         # Added moment of inertia in roll: A44 = r44 * Ix
@@ -490,6 +546,10 @@ class SAM():
         # Mass matrix including added mass
         self.M = self.MRB + self.MA
         self.Minv = np.linalg.inv(self.M)
+        #print(f"MRB: {MRB_check}, MA: {self.MA}, M: {self.M}")
+        #print(f"MRB:\n {np.sign(self.MRB)}")
+        #print(f"MA:\n {np.sign(self.MA)}")
+        #print(f"M:\n {np.sign(self.M)}")
 
     def calculate_C(self):
         """
@@ -498,9 +558,21 @@ class SAM():
         CRB = m2c(self.MRB, self.nu_r)
         CA = m2c(self.MA, self.nu_r)
 
+        # Fossen set these to 0 in his remus100 sim.
+        # But they cancel certain influences that maybe should be there for
+        # symmetry.
+        #CA[4, 0] = 0
+        #CA[0, 4] = 0
+        #CA[4, 2] = 0
+        #CA[2, 4] = 0
+        #CA[5, 0] = 0
+        #CA[0, 5] = 0
+        #CA[5, 1] = 0
+        #CA[1, 5] = 0
+
         self.C = CRB + CA
 
-    def calculate_D(self):
+    def calculate_D(self, eta, nu, u):
         """
         Calculate damping
         """
@@ -512,13 +584,44 @@ class SAM():
         self.D[4,4] = self.Mqq * np.abs(self.nu_r[4])
         self.D[5,5] = self.Nrr * np.abs(self.nu_r[5])
 
-        # Cross couplings
-        self.D[4,0] = self.z_cp * self.Xuu * np.abs(self.nu_r[0])
-        self.D[5,0] = -self.y_cp * self.Xuu * np.abs(self.nu_r[0])
-        self.D[3,1] = -self.z_cp * self.Yvv * np.abs(self.nu_r[1])
-        self.D[5,1] = self.x_cp * self.Yvv * np.abs(self.nu_r[1])
-        self.D[3,2] = self.y_cp * self.Zww * np.abs(self.nu_r[2])
-        self.D[4,2] = -self.x_cp * self.Zww * np.abs(self.nu_r[2])
+        if self.piml_type == "None":
+            # Nonlinear damping
+            self.D[0,0] = self.Xuu * np.abs(self.nu_r[0])
+            self.D[1,1] = self.Yvv * np.abs(self.nu_r[1])
+            self.D[2,2] = self.Zww * np.abs(self.nu_r[2])
+            self.D[3,3] = self.Kpp * np.abs(self.nu_r[3])
+            self.D[4,4] = self.Mqq * np.abs(self.nu_r[4])
+            self.D[5,5] = self.Nrr * np.abs(self.nu_r[5])
+
+            # Cross couplings
+            self.D[4,0] = self.z_cp * self.Xuu * np.abs(self.nu_r[0])
+            self.D[5,0] = -self.y_cp * self.Xuu * np.abs(self.nu_r[0])
+            self.D[3,1] = -self.z_cp * self.Yvv * np.abs(self.nu_r[1])
+            self.D[5,1] = self.x_cp * self.Yvv * np.abs(self.nu_r[1])
+            self.D[3,2] = self.y_cp * self.Zww * np.abs(self.nu_r[2])
+            self.D[4,2] = -self.x_cp * self.Zww * np.abs(self.nu_r[2])
+
+            # Overwrite D to get better results from sim
+            self.D = np.eye(6) * self.damping_factor
+            self.D[3,3] = self.damping_rot
+            self.D[4,4] = self.damping_rot
+            self.D[5,5] = self.damping_rot
+
+            ax, ay, az = [self.abs_smooth(self.nu_r[i]) for i in range(3)]
+            ap, aq, ar = [self.abs_smooth(self.nu_r[i]) for i in range(3, 6)]
+            self.D = np.diag([self.Xuu*ax, self.Yvv*ay, self.Zww*az,
+                                self.Kpp*ap, self.Mqq*aq, self.Nrr*ar])
+
+
+        if self.piml_type == "pinn":
+            self.D = pinn_predict(self.piml_model, eta, nu, u, [self.x_mean, self.x_std])
+
+        if self.piml_type == "nn":
+            self.D = nn_predict(self.piml_model, eta, nu, u, [self.x_mean, self.x_std])
+        
+    def abs_smooth(self, x, eps=1e-9):
+        return np.sqrt(x*x + eps)
+        
 
     def calculate_g(self):
         """
@@ -526,6 +629,7 @@ class SAM():
         """
         self.W = self.m * self.g
         self.g_vec = gvect(self.W, self.B, self.theta, self.phi, self.p_OG_O, self.p_OB_O)
+
 
     def calculate_tau(self, u):
         """
@@ -542,62 +646,88 @@ class SAM():
         tau_prop = self.calculate_propeller_force(u)
         self.tau = tau_prop
 
+
     def calculate_propeller_force(self, u):
         """
         Calculate force and torque of the propellers
         u: control inputs as [x_vbs, x_lcg, delta_s, delta_r, rpm1, rpm2]
         Azimuth Thrusters: Fossen 2021, ch.9.4.2
         """
-        delta_s = -u[2]
-        delta_r = -u[3]
+        delta_s = u[2]
+        delta_r = u[3]
         n_rpm = u[4:]
 
         # Compute propeller forces
         C_T2C = calculate_dcm(order=[2, 3], angles=[delta_s, delta_r])
 
         n_rps = n_rpm / 60   
-        Va = self.Va_coef * self.U
+        rho = self.rho
+        D   = self.D_prop
+        prop_scaling = 5    # arbitrary scaling factor when moving backwards
 
         tau_prop = np.zeros(6)
+        Va = self.Va_coef * self.U
+
+        # Relative body velocity & axial inflow
+        v_rel_b = self.nu_r[0:3]
+        t_b     = C_T2C @ np.array([1,0,0])          # thruster axis in body
+        Va_ax   = np.dot(t_b, v_rel_b)               # signed axial inflow
+        Va_abs  = self.Va_coef * np.sqrt(Va_ax*Va_ax + 1e-9)        # smooth |Va|
+        n0_rps=3.0
+        n_ref=5.0
+        sharp=8.0
+
+        use_Va = True
+
         for i in range(len(n_rpm)):
-            if n_rps[i] > 0:
-                X_prop_i = self.rho*(self.D_prop**4)*(
-                        self.KT_0*abs(n_rps[i])*n_rps[i] +
-                        (self.KT_max-self.KT_0)/self.Ja_max * (Va/self.D_prop) * abs(n_rps[i])
-                        )
-                K_prop_i = self.rho * (self.D_prop**5) * (
-                        self.KQ_0 * abs(n_rps[i]) * n_rps[i] +
-                        (self.KQ_max-self.KQ_0)/self.Ja_max * (Va/self.D_prop) * abs(n_rps[i]))
-                dir_flip = 1
+            n = n_rps[i]
+            # cubic-in-n (n*|n| ≈ n*abs_smooth(n) keeps sign, is C^1)
+            nabs = self.abs_smooth(n_rps[i])
+            s = self.smooth_switch(n_rps[i])   # smooth selector forward↔reverse
+            gn = self.gate_n(n, n_ref, sharp)  # fade-in Va by |n|
+
+            # Advance ratio (bounded, smooth)
+            if use_Va:
+                Jb = (Va_abs/self.D_prop) * nabs #self.J_eff(Va_abs, D, n, self.Ja_max, n0_rps=n0_rps) * nabs
+                KT_fwd = self.KT_0 * n_rps[i] * nabs + gn * (self.KT_max - self.KT_0)/self.Ja_max * Jb
+                KQ_fwd = self.KQ_0 * n_rps[i] * nabs + gn * (self.KQ_max - self.KQ_0)/self.Ja_max * Jb
             else:
-                X_prop_i = self.rho * (self.D_prop ** 4) * (
-                        self.KT_0*abs(n_rps[i])*n_rps[i]
-                        )/10
-                K_prop_i = self.rho * (self.D_prop ** 5) * self.KQ_0 * abs(n_rps[i]) * n_rps[i] / 10
-                dir_flip = -1
+                KT_fwd, KQ_fwd = self.KT_0, self.KQ_0  # no Va dependence
 
-            F_prop_b = C_T2C @ np.array([X_prop_i, 0, 0])
+            cT = rho * (D**4) * KT_fwd
+            cQ = rho * (D**5) * KQ_fwd
+    
+            X_fwd = cT # thrust ~ n|n|
+            K_fwd = cQ # torque ~ n|n|
+            X_rev = cT / prop_scaling # thrust ~ n|n|
+            K_rev = cQ / prop_scaling # torque ~ n|n|
+
+            X_i = s*X_fwd + (1-s)*X_rev
+            K_i = s*K_fwd + (1-s)*K_rev
+
+            F_prop_i = C_T2C @ np.array([X_i, 0, 0])
             r_prop_i = C_T2C @ self.propellers.r_t_p_sh[i] - self.p_OC_O
-            M_prop_i = np.cross(r_prop_i, F_prop_b) \
-                        + np.array([(-1)**i * K_prop_i, 0, 0])  # the -1 is because we have counter rotating
-                                    # propellers that are supposed to cancel out the propeller induced
-                                    # momentum
 
-            # Rescale the rotation from props
-            M_prop_i[0] *= self.thruster_rot_strength # Yaw
-            M_prop_i[1] *= self.thruster_rot_strength * dir_flip # Pitch
-            M_prop_i[2] *= self.thruster_rot_strength # Roll
+            # counter-rotation torque (+/-), *no* in-place edits
+            M_prop_i = np.cross(r_prop_i, F_prop_i) + np.array([((-1)**i)*K_i, 0, 0])
 
-            # Above equation return yaw, roll, pitch in other order than what the model uses
-            yaw = M_prop_i[0]
-            roll = M_prop_i[2]
-            M_prop_i[2] = yaw
-            M_prop_i[0] = roll
+            # scale & reorder without mutation (your original swap x<->z)
+            M_scaled = self.thruster_rot_strength * M_prop_i
+            yaw, pitch, roll = M_scaled[0], M_scaled[1], M_scaled[2]
+            M_perm = np.array([roll, pitch, yaw])
 
-            tau_prop_i = np.concatenate([F_prop_b, M_prop_i])
-            tau_prop += tau_prop_i
+            tau_prop += np.concatenate([F_prop_i, M_perm])
 
         return tau_prop
+
+    def smooth_switch(self, z, k=100.0):
+        # ~0 for z<0 (reverse), ~1 for z>0 (forward), smooth at 0
+        # keep k around 50–200; larger = sharper switch
+        return 0.5*(1 + np.tanh(k*z))
+
+    def gate_n(self, n, n_ref=5.0, sharp=8.0):
+        z = np.abs(n)/(n_ref + 1e-9)
+        return 0.5*(1 + np.tanh(sharp*(z - 1.0)))
 
     def calculate_vbs_position(self, u):
         """
@@ -607,6 +737,7 @@ class SAM():
         """
         x_vbs = (u[0]/100) * self.vbs.l_vbs_l
         return x_vbs
+
 
     def calculate_lcg_position(self, u):
         """
@@ -620,6 +751,7 @@ class SAM():
         p_OLcg_O = self.lcg.p_OLcgPos_O + p_LcgPos_LcgO
 
         return p_OLcg_O
+
 
     def eta_dynamics(self, eta, nu):
         """

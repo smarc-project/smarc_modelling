@@ -10,12 +10,12 @@ import os
 # Add the parent directory to the system path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 import numpy as np
-from control import *
+from smarc_modelling.control.control import *
 
 from smarc_modelling.vehicles import *
-from smarc_modelling.lib import *
 from smarc_modelling.lib import plot
 from smarc_modelling.vehicles.SAM_casadi import SAM_casadi
+
 
 def euler_to_quaternion(roll: float, pitch: float, yaw: float):
     """
@@ -63,25 +63,71 @@ def read_csv_to_array(file_path: str):
     
     return np.array(data)
 
+# Plot the trajectory
+def save_csv(trajectory, t):
+    """
+    Saves a NumPy array to a CSV file.
+
+    Parameters:
+    trajectory (np.array): The NumPy array to save.
+    file_path (str): The path to the CSV file.
+    """
+    np.savetxt("/home/admin/smarc_modelling/src/Trajectories/REPORT/q2/predhorizon/trajectory_1Np.csv"
+               , trajectory, delimiter=',', header="X,Y,Z,phi,theta,psi,vx,vy,vz,p,q,r,control", comments='')
+    # np.savetxt("/home/admin/smarc_modelling/src/Trajectories/REPORT/q2/samplingtime/time_07s.csv"
+    #            , t, delimiter=',', header="time (ms)", comments='')
+    print("CSV file saved successfully.")
+
+
+def rmse(true, pred):
+    """
+    Compute Root Mean Square Error.
+
+    Parameters:
+    true (array-like): Actual values.
+    pred (array-like): Predicted values.
+
+    Returns:
+    float: RMSE value.
+    """
+    print(true.shape)
+    norm = np.sqrt(np.mean((np.linalg.norm(true[:,:3] - pred[:,:3],axis=1)) ** 2))
+
+    x_true = np.array(true[:, 0])
+    x_pred = np.array(pred[:, 0])
+    z_true = np.array(true[:, 2])
+    z_pred = np.array(pred[:, 2])
+    y_true = np.array(true[:, 1])
+    y_pred = np.array(pred[:, 1])   
+    
+    xrmse = np.sqrt(np.mean((x_true - x_pred) ** 2))
+    yrmse = np.sqrt(np.mean((y_true - y_pred) ** 2))
+    zrmse = np.sqrt(np.mean((z_true - z_pred) ** 2))
+    print(f"x: {xrmse}\ny: {yrmse}\nz: {zrmse}\nnorm: {norm}\n")
+
 def main():
     # Extract the CasADi model
     sam = SAM_casadi()
 
 
     # create ocp object to formulate the OCP
-    Ts = 0.2            # Sampling time
-    N_horizon = 10      # Prediction horizon
-    nmpc = NMPC_trajectory(sam, Ts, N_horizon)
+    Ts = 0.1           # Sampling time
+    N_horizon = 12      # Prediction horizon
+    nmpc = NMPC(sam, Ts, N_horizon, update_solver_settings=False)
     nx = nmpc.nx        # State vector length + control vector
     nu = nmpc.nu        # Control derivative vector length
-
+    nc = 1
     
     # load trajectory - Replace with your actual file path
-    file_path = "/home/admin/smarc_modelling/src/Trajectories/simonTrajectory.csv"
-    #file_path = "/home/admin/smarc_modelling/src/Trajectories/resolution01.csv"  
-    #file_path = "/home/admin/smarc_modelling/src/Trajectories/straight_trajectory.csv"
-    trajectory = read_csv_to_array(file_path)
+    #file_path = "/home/admin/smarc_modelling/src/Trajectories/trajectoryComplexity3.csv"
+    #file_path = "/home/admin/smarc_modelling/src/Trajectories/Complexity2Trajectory_0.csv"
+    #file_path = "/home/admin/smarc_modelling/src/Trajectories/case_medium_original.csv"
+    #file_path = "/home/admin/smarc_modelling/src/Trajectories/REPORT/medium/case_medium.csv"
+    file_path = "/home/admin/smarc_modelling/src/Trajectories/report_update/easy/trajectories/case_easy0.csv"
 
+
+    #file_path = "/home/admin/smarc_modelling/src/Trajectories/resolution01.csv"  
+    trajectory = read_csv_to_array(file_path)
     # Declare duration of sim. and the x_axis in the plots
     Nsim = (trajectory.shape[0])            # The sim length should be equal to the number of waypoints
     x_axis = np.linspace(0, Ts*Nsim, Nsim)
@@ -99,7 +145,7 @@ def main():
     trajectory = np.concatenate((trajectory, Uref), axis=1) 
 
     # Run the MPC setup
-    ocp_solver, integrator = nmpc.setup(x0)
+    ocp_solver, integrator = nmpc.setup()
 
     # Initialize the state and control vector as David does
     for stage in range(N_horizon + 1):
@@ -112,8 +158,6 @@ def main():
 
     # closed loop - simulation
     for i in range(Nsim):
-        print(f"Nsim: {i}")
-
         # extract the sub-trajectory for the horizon
         if i <= (Nsim - N_horizon):
             ref = trajectory[i:i + N_horizon, :]
@@ -124,7 +168,6 @@ def main():
         # If the end of the trajectory has been reached, (ref.shape < N_horizon)
         # set the following waypoints in the horizon to the last waypoint of the trajectory
         for stage in range(N_horizon):
-            print(ref.shape[0], stage)
             if ref.shape[0] < N_horizon and ref.shape[0] != 0:
                 ocp_solver.set(stage, "p", ref[ref.shape[0]-1,:])
             else:
@@ -138,16 +181,22 @@ def main():
         ocp_solver.set(0, "ubx", simX[i, :])
 
         # solve ocp and get next control input
-        status = ocp_solver.solve()
-        #ocp_solver.print_statistics()
-        if status != 0:
-            print(f" Note: acados_ocp_solver returned status: {status}")
+        if i % nc == 0 and i < Nsim - (nc-1):
+            status = ocp_solver.solve()
+            #ocp_solver.print_statistics()
+            if status != 0:
+                break
+                print(f" Note: acados_ocp_solver returned status: {status}")
 
-        # simulate system
-        t[i] = ocp_solver.get_stats('time_tot')
-        simU[i, :] = ocp_solver.get(0, "u")
-        X_eval = ocp_solver.get(0, "x")
-        simX[i+1, :] = integrator.simulate(x=simX[i, :], u=simU[i, :])
+            # simulate system
+            t[i] = ocp_solver.get_stats('time_tot')
+            for k in range(nc):
+                simU[i+k, :] = ocp_solver.get(k, "u")
+        
+        noise_vector = np.zeros(19)
+        #noise_vector[0:3] = np.array([(np.random.random()-0.5)/10,(np.random.random()-0.5)/10, (np.random.random()-0.5)/10])
+        simX[i+1, :] = integrator.simulate(x=simX[i, :]+noise_vector, u=simU[i, :])
+     
 
     # evaluate timings
     t *= 1000  # scale to milliseconds
@@ -155,17 +204,16 @@ def main():
 
 
     # plot results
-    print(f"x_axis: {x_axis.shape}")
-    print(f"refs: {trajectory.shape}")
-    print(f"simX: {simX.shape}")
-    print(f"simU: {simU.shape}")
+    # print(f"x_axis: {x_axis.shape}")
+    # print(f"refs: {trajectory.shape}")
+    # print(f"simX: {simX.shape}")
+    # print(f"simU: {simU.shape}")
 
     # Extract the optimal control sequence
     optimal_u = simX[:, 13:]
-    
-    # Plot the trajectory
+    #save_csv(simX,t)
+    rmse(simX[:-1], trajectory)
     plot.plot_function(x_axis, trajectory, simX[:-1], simU)
-
     ocp_solver = None
 
 

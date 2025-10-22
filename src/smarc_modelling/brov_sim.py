@@ -1,11 +1,17 @@
 import numpy as np
+
 from smarc_modelling.vehicles import *
 from smarc_modelling.lib import *
+from smarc_modelling.vehicles.BlueROV import BlueROV
 from smarc_modelling.vehicles.SAM import SAM
+
 import matplotlib
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 import mpl_toolkits.mplot3d.axes3d as p3
+
+from scipy.spatial.transform import Rotation as R
+
 matplotlib.use('TkAgg')  # or 'Qt5Agg', depending on what you have installed
 
 # Initial conditions
@@ -13,19 +19,23 @@ eta0 = np.zeros(7)
 eta0[2] = 0
 eta0[3] = 1.0  # Initial quaternion (no rotation) 
 nu0 = np.zeros(6)  # Zero initial velocities
-u0 = np.zeros(6)
-u0[0] = 50
-u0[1] = 50 #45
-x0 = np.concatenate([eta0, nu0, u0])
+x0 = np.concatenate([eta0, nu0])
 
 # Simulation timespan
 dt = 0.01 #0.01 
-t_span = (0, 1)  # 20 seconds simulation
+t_span = (0, 10)  # 20 seconds simulation
 n_sim = int(t_span[1]/dt)
 t_eval = np.linspace(t_span[0], t_span[1], n_sim)
 
+# ENU <-> NED conversion matrix
+T = np.array([
+    [0, 1, 0],
+    [1, 0, 0],
+    [0, 0, -1]
+])
+
 # Create SAM instance
-sam = SAM(dt)
+blueROV = BlueROV(dt)
 
 class Sol():
     """
@@ -46,36 +56,81 @@ def rk4(x, u, dt, fun):
 
     return x_t
 
-def run_simulation(t_span, x0, dt, sam):
+# FIXME: consider removing the dynamics wrapper and just call the dynamics straight away.
+def run_simulation(t_span, x0, dt, blueROV):
     """
-    Run SAM simulation using solve_ivp.
+    Run BlueROV simulation using RK4.
     """
-
     u = np.zeros(6)
-    u[0] = 50#*np.sin((i/(20/0.02))*(3*np.pi/4))        # VBS
-    u[1] = 50 # LCG
-    u[2] = 0 #np.deg2rad(7)    # Vertical (stern)
-    u[3] = 0 #-np.deg2rad(7)   # Horizontal (rudder)
-    u[4] = 1000     # RPM 1
-    u[5] = u[4]     # RPM 2
+    u[0] =  20  # force in x-direction
+    u[1] = 50 # force in y-direction
+    #u[2] = -10 # force in z-direction
+    #u[3] = -1 # torque around x-axis
+    #u[4] = -1 # torque around the y-axis
+    #u[5] = -1 # torque around the z-axis
+
+    nx = len(x0)
+    nu = len(u)
 
     # Run integration
     print(f" Start simulation")
 
-    data = np.empty((len(x0), n_sim))
-    data[:,0] = x0
+    data = np.empty((nx + nu, n_sim))
+    data[:nx,0] = x0
+    data[nx:,0] = u
 
-    # Euler forward integration
-    # NOTE: This integrates eta, nu, u_control in the same time step.
-    #   Depending on the maneuvers, we might want to integrate nu and u_control first
-    #   and use these to compute eta_dot. This needs to be determined based on the 
-    #   performance we see.
+    in_ENU = False
+    frame_message_printed = False
+
     for i in range(n_sim-1):
-        data[:,i+1] = rk4(data[:,i], u, dt, sam.dynamics)
+        if in_ENU is True:
+            if not frame_message_printed:
+                print("You provide x0 and u in ENU")
+                print("You get x and u in ENU")
+                frame_message_printed = True
+
+            pos_ned, quat_ned= enu_to_ned(data[:3,i], data[3:7,i])
+            u_NED = u_enu_to_ned(u)
+
+            x_NED = np.concatenate((pos_ned, quat_ned, data[7:nx,i]))
+
+            x_new_NED = rk4(x_NED, u_NED, dt, blueROV.dynamics)
+            pos_enu, quat_enu = ned_to_enu(x_new_NED[:3], x_new_NED[3:7])
+            data[:3,i+1] = pos_enu
+            data[3:7,i+1] = quat_enu
+            data[7:nx,i+1] = x_new_NED[7:nx]
+            data[nx:,i+1] = u
+        else:
+            if not frame_message_printed:
+                print("You provide x0 and u in NED (default)")
+                print("You get x and u in NED (default)")
+                frame_message_printed = True
+            data[:nx,i+1] = rk4(data[:nx,i], u, dt, blueROV.dynamics)
+            data[nx:,i+1] = u
     sol = Sol(t_eval,data)
     print(f" Simulation complete!")
 
     return sol
+
+
+def ned_to_enu(pos_ned, quat_ned):
+    pos_enu = T @ pos_ned
+    r_ned = R.from_quat(quat_ned)
+    r_enu = T @ r_ned.as_matrix() @ T.T
+    quat_enu = R.from_matrix(r_enu).as_quat()
+    return pos_enu, quat_enu
+
+def enu_to_ned(pos_enu, quat_enu):
+    pos_ned = T @ pos_enu
+    r_enu = R.from_quat(quat_enu)
+    r_ned = T @ r_enu.as_matrix() @ T.T
+    quat_ned = R.from_matrix(r_ned).as_quat()
+    return pos_ned, quat_ned
+
+def u_enu_to_ned(u):
+    T = np.diag([1, -1, -1, 1, -1, -1])
+    u_ned = T @ u
+    return u_ned
 
 
 def plot_results(sol):
@@ -131,19 +186,19 @@ def plot_results(sol):
     axs[3,1].set_ylabel('q (pitch_dot)')
     axs[3,2].set_ylabel('r (yaw_dot)')
 
-    axs[4,0].plot(sol.t, sol.y[13], label='vbs')
-    axs[4,1].plot(sol.t, sol.y[14], label='lcg')
-    axs[4,2].plot(sol.t, sol.y[15], label='ds')
-    axs[4,0].set_ylabel('u_vbs')
-    axs[4,1].set_ylabel('u_lcg')
-    axs[4,2].set_ylabel('u_ds')
+    axs[4,0].plot(sol.t, sol.y[13], label='x')
+    axs[4,1].plot(sol.t, sol.y[14], label='y')
+    axs[4,2].plot(sol.t, sol.y[15], label='z')
+    axs[4,0].set_ylabel('u_x')
+    axs[4,1].set_ylabel('u_y')
+    axs[4,2].set_ylabel('u_z')
 
-    axs[5,0].plot(sol.t, sol.y[16], label='dr')
-    axs[5,1].plot(sol.t, sol.y[17], label='rpm1')
-    axs[5,2].plot(sol.t, sol.y[18], label='rpm2')
-    axs[5,0].set_ylabel('u_dr')
-    axs[5,1].set_ylabel('rpm1')
-    axs[5,2].set_ylabel('rpm2')
+    axs[5,0].plot(sol.t, sol.y[16], label='roll')
+    axs[5,1].plot(sol.t, sol.y[17], label='pitch')
+    axs[5,2].plot(sol.t, sol.y[18], label='yaw')
+    axs[5,0].set_ylabel('u_roll')
+    axs[5,1].set_ylabel('u_pitch')
+    axs[5,2].set_ylabel('u_yaw')
 
     plt.xlabel('Time [s]')
     plt.tight_layout()
@@ -212,9 +267,7 @@ def plot_trajectory(sol, numDataPoints, generate_gif=False, filename="3d.gif", F
 
 
 # Run simulation and plot results
-sol = run_simulation(t_span, x0, dt, sam)
-
+sol = run_simulation(t_span, x0, dt, blueROV)
 plot_results(sol)
 plot_trajectory(sol, 50, False, "3d.gif", 10)
 plt.show()
-

@@ -683,7 +683,8 @@ def double_a_star_search(ax, plt, map_instance, realTimeDraw, typeF_function, de
         
         # Print the iteration number
         flag = flag + 1
-        print(f"iteration {flag:.0f}")
+        #print(f"iteration {flag:.0f}")
+        #print(f"arrived Point{flag:.0f}")
 
         if arrivedPoint:
             print(f"{bcolors.OKCYAN}first arrived{bcolors.ENDC}")

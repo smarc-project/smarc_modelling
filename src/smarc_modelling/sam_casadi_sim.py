@@ -2,6 +2,7 @@ import numpy as np
 from smarc_modelling.vehicles import *
 from smarc_modelling.lib import *
 from smarc_modelling.vehicles.SAM import SAM
+from smarc_modelling.vehicles.SAM_casadi import SAM_casadi
 import matplotlib
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
@@ -20,12 +21,14 @@ x0 = np.concatenate([eta0, nu0, u0])
 
 # Simulation timespan
 dt = 0.01 #0.01 
-t_span = (0, 1)  # 20 seconds simulation
+t_span = (0, 10)  # 20 seconds simulation
 n_sim = int(t_span[1]/dt)
 t_eval = np.linspace(t_span[0], t_span[1], n_sim)
 
 # Create SAM instance
-sam = SAM(dt)
+sam = SAM_casadi()
+dynamics = sam.dynamics()
+
 
 class Sol():
     """
@@ -35,7 +38,6 @@ class Sol():
         self.t = t
         self.y = data
 
-        
 def rk4(x, u, dt, fun):
     k1 = fun(x, u)
     k2 = fun(x+dt/2*k1, u)
@@ -44,7 +46,10 @@ def rk4(x, u, dt, fun):
 
     x_t = x + dt/6 * (k1 + 2*k2 + 2*k3 + k4)
 
-    return x_t
+    np.set_printoptions(precision=3)
+    print(f"vbs: {x_t.full().flatten()[13]}; vbs_dot: {k1.full().flatten()[13]}")
+
+    return x_t.full().flatten()
 
 def run_simulation(t_span, x0, dt, sam):
     """
@@ -52,11 +57,11 @@ def run_simulation(t_span, x0, dt, sam):
     """
 
     u = np.zeros(6)
-    u[0] = 50#*np.sin((i/(20/0.02))*(3*np.pi/4))        # VBS
+    u[0] = 12000#*np.sin((i/(20/0.02))*(3*np.pi/4))        # VBS
     u[1] = 50 # LCG
     u[2] = 0 #np.deg2rad(7)    # Vertical (stern)
     u[3] = 0 #-np.deg2rad(7)   # Horizontal (rudder)
-    u[4] = 1000     # RPM 1
+    u[4] = 0 #1000     # RPM 1
     u[5] = u[4]     # RPM 2
 
     # Run integration
@@ -71,7 +76,7 @@ def run_simulation(t_span, x0, dt, sam):
     #   and use these to compute eta_dot. This needs to be determined based on the 
     #   performance we see.
     for i in range(n_sim-1):
-        data[:,i+1] = rk4(data[:,i], u, dt, sam.dynamics)
+        data[:,i+1] = rk4(data[:,i], u, dt, dynamics)
     sol = Sol(t_eval,data)
     print(f" Simulation complete!")
 
@@ -98,7 +103,7 @@ def plot_results(sol):
 
     psi_vec, theta_vec, phi_vec = quaternion_to_euler_vec(sol)
 
-    _, axs = plt.subplots(6, 3, figsize=(12, 10))
+    _, axs = plt.subplots(8, 3, figsize=(12, 10))
 
     # Position plots
     axs[0,0].plot(sol.t, sol.y[1], label='x')
@@ -131,6 +136,8 @@ def plot_results(sol):
     axs[3,1].set_ylabel('q (pitch_dot)')
     axs[3,2].set_ylabel('r (yaw_dot)')
 
+
+    # Control Input
     axs[4,0].plot(sol.t, sol.y[13], label='vbs')
     axs[4,1].plot(sol.t, sol.y[14], label='lcg')
     axs[4,2].plot(sol.t, sol.y[15], label='ds')
@@ -144,6 +151,21 @@ def plot_results(sol):
     axs[5,0].set_ylabel('u_dr')
     axs[5,1].set_ylabel('rpm1')
     axs[5,2].set_ylabel('rpm2')
+
+    # Control derivatives
+    axs[6,0].plot(sol.t, sol.y[13], label='vbs')
+    axs[6,1].plot(sol.t, sol.y[14], label='lcg')
+    axs[6,2].plot(sol.t, sol.y[15], label='ds')
+    axs[6,0].set_ylabel('u_vbs')
+    axs[6,1].set_ylabel('u_lcg')
+    axs[6,2].set_ylabel('u_ds')
+
+    axs[7,0].plot(sol.t, sol.y[16], label='dr')
+    axs[7,1].plot(sol.t, sol.y[17], label='rpm1')
+    axs[7,2].plot(sol.t, sol.y[18], label='rpm2')
+    axs[7,0].set_ylabel('u_dr')
+    axs[7,1].set_ylabel('rpm1')
+    axs[7,2].set_ylabel('rpm2')
 
     plt.xlabel('Time [s]')
     plt.tight_layout()
