@@ -1,3 +1,14 @@
+# "Install" guide
+For everything to run you are going to need to have Torch installed as well as the base SMaRC modelling libraries (numpy, matplotlib, pytest). If you do not have this then run:
+```pip install torch```
+Note that your hardware has to be CUDA capable if you are having problems with the install check the "Get Started" page for the pyTorch documentation.
+All the code was developed using pyTorch 2.9.0 if you are facing any legacy issues consider downpatching to this version.
+
+All save and load paths are "hardcoded" meaning that if you do not have the right file structure and you aren't running the code from the base directory it will results in an error.
+To fix this either change the directories in the code itself or run it from the initial smarc_modelling folder.
+
+You will also have to ensure that the ROS node "piml_msgs" is included properly in your workpage, this is crucial in order to load any data from the ROS bags.
+
 # Models & Simulator
 
 ## Grid trainer
