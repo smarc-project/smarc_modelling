@@ -28,6 +28,7 @@ def load_rosbag(bag_path: str=""):
     topic_type_map = {topic.name: topic.type for topic in topics}
     msg_class = get_message(topic_type_map.get("/synched_data"))
 
+    # Pre-allocating all data vectors
     # Data for output
     time = []
     # Controls
@@ -112,6 +113,7 @@ def load_rosbag(bag_path: str=""):
     q_dot = np.gradient(q, time)
     r_dot = np.gradient(r, time)
     
+    # Organizing each state into correct formats
     eta = [x, y, z, q0, q1, q2, q3]
     nu = [u, v, w, p, q, r]
     acc = [u_dot, v_dot, w_dot, p_dot, q_dot, r_dot]
@@ -286,3 +288,7 @@ def angular_vel_to_quat_vel(eta, nu):
 def norm_q(quat):
     n = np.linalg.norm(quat)
     return quat / n if n > 0 else np.array([1.0, 0.0, 0.0, 0.0])
+
+def angle_diff(a, b):
+    # Difference of two angles a, b in radians ensuring 2pi and 0 are close
+    return (a - b + np.pi) % (2*np.pi) - np.pi

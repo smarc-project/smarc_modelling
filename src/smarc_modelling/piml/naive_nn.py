@@ -48,23 +48,15 @@ class NaiveNN(nn.Module):
 
 
     def loss_function(self, model, x_traj, y_traj, n_steps=5):
-        """
-        Loss function
-        """
+        """Loss function as the multi-step data loss of the accelerations"""
 
-        # # Get the two accelerations
-        acc = y_traj["acc"]
-        acc_pred = model(x_traj)  # (N, 6)
-        
-        # # Loss as difference
-        loss = torch.mean((acc_pred - acc) ** 2)
-
-        # loss = multi_step_loss_function(model, x_traj, y_traj, n_steps)
+        loss = multi_step_loss_function(model, x_traj, y_traj, n_steps)
 
         return loss 
     
 def multi_step_loss_function(model, x_traj, y_traj, h_steps):
 
+    # Make sure we at least take 1 step
     if h_steps == 0:
         h_steps = 1
 
@@ -84,6 +76,8 @@ def multi_step_loss_function(model, x_traj, y_traj, h_steps):
 
         for step in range(h_steps):
             i = start_index + step
+
+            # Stop if we are indexing outside vector sizes
             if i >= N - 1:
                 break
 
@@ -106,11 +100,17 @@ def multi_step_loss_function(model, x_traj, y_traj, h_steps):
 
 def init_naive_nn_model(file_name: str):
     # For easy initialization of model in other files
+
+    # Load model parameters
     dict_path = "src/smarc_modelling/piml/models/" + file_name
     dict_file = torch.load(dict_path, weights_only=True)
+
+    # Initialize model
     model = NaiveNN()
     model.initialize(dict_file["model_shape"])
     model.load_state_dict(dict_file["state_dict"])
+
+    # Normalization constants
     x_min = dict_file["x_min"]
     x_range = dict_file["x_range"]
     y_min = dict_file["y_min"]

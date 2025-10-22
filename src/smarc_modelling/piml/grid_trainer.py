@@ -2,7 +2,6 @@
 # -*- coding: utf-8 -*-
 
 from smarc_modelling.piml.pinn import PINN
-from smarc_modelling.piml.bpinn import BPINN
 from smarc_modelling.piml.nn import NN
 from smarc_modelling.piml.naive_nn import NaiveNN
 from smarc_modelling.piml.utils.utility_functions import load_to_trajectory, eta_quat_to_deg
@@ -46,9 +45,9 @@ if __name__ == "__main__":
     dropout_rate = 0.25
 
     # Use best perform here
-    layer_grid = [1, 5, 10, 25, 50]
-    size_grid = [4, 8, 16, 32]
-    factor_grid = [0.5, 0.25, 0.1]
+    layer_grid = [23, 25, 27]
+    size_grid = [128-16, 128, 128+16]
+    factor_grid = [0.7, 0.6, 0.5]
     lr0 = 0.001
     max_norm = 1.0
     patience = 1000
@@ -76,24 +75,27 @@ if __name__ == "__main__":
     x_max, _ = torch.max(all_x, dim=0)
     x_range = x_max - x_min
 
-    acc_list = [traj["acc"] for traj in y_trajectories]
-    all_nu_dot = torch.cat(acc_list, dim=0)
-
-    nu_dot_min, _ = torch.min(all_nu_dot, dim=0)
-    nu_dot_max, _ = torch.max(all_nu_dot, dim=0)
-    nu_dot_range = nu_dot_max - nu_dot_min
-
-    for y_traj in y_trajectories:
-        y_traj["acc"] = (y_traj["acc"] - nu_dot_min) / nu_dot_range
-
     # Load validation data
     x_trajectories_val, y_trajectories_val = load_to_trajectory(datasets[train_val_split:])
-    for y_traj in y_trajectories_val:
-        y_traj["acc"] = (y_traj["acc"] - nu_dot_min) / nu_dot_range
 
     # Load test data
     x_trajectories_test, y_trajectories_test = load_to_trajectory(test_datasets)
- 
+    
+    if isinstance(model, NaiveNN):
+        # Normalizing the acceleration for the naive NN
+        acc_list = [traj["acc"] for traj in y_trajectories]
+        all_nu_dot = torch.cat(acc_list, dim=0)
+        nu_dot_min, _ = torch.min(all_nu_dot, dim=0)
+        nu_dot_max, _ = torch.max(all_nu_dot, dim=0)
+        nu_dot_range = nu_dot_max - nu_dot_min
+        for y_traj in y_trajectories:
+            y_traj["acc"] = (y_traj["acc"] - nu_dot_min) / nu_dot_range
+        for y_traj in y_trajectories_val:
+            y_traj["acc"] = (y_traj["acc"] - nu_dot_min) / nu_dot_range
+    else:
+        nu_dot_min = 0
+        nu_dot_range = 0
+
     # For results
     error_grid = np.zeros((len(layer_grid), len(size_grid), len(factor_grid)))
     best_error = float("inf")
@@ -104,32 +106,29 @@ if __name__ == "__main__":
 
     model_counter = 0
     # Grid params
+    # Swap these out or add extra dependent on what is needed
     for i, layers in enumerate(layer_grid): # Amount of layers
         for j, size in enumerate(size_grid): # Amount of neurons in each layer 
-            for k, factor in enumerate(factor_grid):
+            for k, factor in enumerate(factor_grid): # Learning rate scaling factor
                 
+                # Iterative counter to keep track of progress
                 model_counter += 1
                 print(f" Starting training on model {model_counter} / {len(layer_grid) * len(size_grid) * len(factor_grid)}")
 
+                # For saving the loss over time for loss plots of training
                 loss_history = []
                 val_loss_history = []
 
-                # NN shape
+                # Network shape
                 shape = [size] * layers # Hidden layers
                 shape.insert(0, input_shape) # Input layer
                 shape.append(output_shape) # Output layer
-                
-                # Initialize model
-                if isinstance(model, BPINN):
-                    model.initialize(shape, dropout_rate)
-                else:
-                    model.initialize(shape)
                 
                 # Optimizer and other settings
                 optimizer = torch.optim.Adam(model.parameters(), lr=lr0) # weight_decay=1e-5)
 
                 # Adaptive learning rate
-                scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer=optimizer, mode="min", factor=factor, patience=2500, min_lr=1e-8)
+                scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer=optimizer, mode="min", factor=factor, patience=500, threshold=0.01, min_lr=1e-8)
 
                 # Early stopping with validation loss
                 best_val_loss = float("inf")
@@ -152,7 +151,7 @@ if __name__ == "__main__":
                         loss_total += loss
 
                     loss_total.backward()
-                    # torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=max_norm) # Clipping to help with stability
+                    torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=max_norm) # Clipping to help with stability
                     optimizer.step()
 
                     # Evaluate model on validation data
@@ -181,19 +180,9 @@ if __name__ == "__main__":
                     else:
                         counter += 1
 
-                    # Print statement to make sure everything is still running
+                    # Print statement to make sure everything is still running & checking in on progress
                     if epoch % 100 == 0:
                         print(f" Still training, epoch {epoch}, loss: {loss_total.item()}, lr: {optimizer.param_groups[0]['lr']},\n validation loss: {val_loss_total.item()}, shape: {layers}, {size}, {factor}, counter: {counter}")
-                        # Saving model as we run to check how it evolves
-                        running_save = "running_save_" + str(epoch)
-                        torch.save({"model_shape": shape, 
-                            "state_dict": model.state_dict(),
-                            "x_min": x_min,
-                            "x_range": x_range,
-                            "dropout": dropout_rate,
-                            "y_min": nu_dot_min,
-                            "y_range": nu_dot_range}, 
-                            "src/smarc_modelling/piml/models/"+running_save)
 
                     # Break condition for early stopping
                     if counter >= patience:
@@ -216,6 +205,7 @@ if __name__ == "__main__":
                             "src/smarc_modelling/piml/models/"+save_model_name) 
                 model.eval() # Just to doubly ensure that it is in eval mode
 
+                # Running the model on the test data sets to get model error
                 total_error = 0.0
                 for x_traj_test, y_traj_test in zip(x_trajectories_test, y_trajectories_test):
 

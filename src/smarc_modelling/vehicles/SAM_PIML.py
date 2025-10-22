@@ -62,8 +62,7 @@ from smarc_modelling.lib.gnc import *
 from smarc_modelling.piml.pinn import init_pinn_model, pinn_predict
 from smarc_modelling.piml.nn import init_nn_model, nn_predict
 from smarc_modelling.piml.naive_nn import init_naive_nn_model, naive_nn_predict
-from smarc_modelling.piml.bpinn import init_bpinn_model, bpinn_predict
-from smarc_modelling.piml.utils.utility_functions import angular_vel_to_quat_vel, eta_quat_to_rad, norm_q
+from smarc_modelling.piml.utils.utility_functions import norm_q
 
 
 class SolidStructure:
@@ -289,10 +288,6 @@ class SAM_PIML():
             print(f" Physics Informed Neural Network model initialized")
             self.piml_model, self.x_min, self.x_range = init_pinn_model("pinn.pt")
 
-        if self.piml_type == "bpinn":
-            print(f" Bayesian - Physics Informed Neural Network model initialized")
-            self.piml_model, self.x_min, self.x_range = init_bpinn_model("bpinn.pt")
-
         if self.piml_type == "nn":
             print(f" Standard Neural Network model initialized")
             self.piml_model, self.x_min, self.x_range = init_nn_model("nn.pt")
@@ -300,7 +295,6 @@ class SAM_PIML():
         if self.piml_type == "naive_nn":
             print(f" Naive Neural Network model initialized")
             self.piml_model, self.x_min, self.x_range, self.y_min, self.y_range = init_naive_nn_model("naive_nn.pt")
-
 
         # For white-box
         if piml_type == None:
@@ -375,12 +369,8 @@ class SAM_PIML():
         u_dot = self.actuator_dynamics(u, u_ref)
         eta_dot = self.eta_dynamics(eta, nu)
 
-        if self.piml_type == "bpinn":
-            Dv, _ = bpinn_predict(self.piml_model, eta, nu, u, [self.x_min, self.x_range])
-            nu_dot = self.Minv @ (self.tau - np.matmul(self.C,self.nu_r) - Dv - self.g_vec)
-
         x_dot = np.concatenate([eta_dot, nu_dot, u_dot])
-
+            
         if self.piml_type == "naive_nn":
             # Predicted acceleration
             nu_dot = naive_nn_predict(self.piml_model, eta, nu, u, [self.x_min, self.x_range, self.y_min, self.y_range])
@@ -573,10 +563,10 @@ class SAM_PIML():
             self.D[5,5] = self.damping_rot
 
         if self.piml_type == "pinn":
-            self.D = pinn_predict(self.piml_model, eta, nu, u, [self.x_mean, self.x_std])
+            self.D = pinn_predict(self.piml_model, eta, nu, u, [self.x_min, self.x_range])
 
         if self.piml_type == "nn":
-            self.D = nn_predict(self.piml_model, eta, nu, u, [self.x_mean, self.x_std])
+            self.D = nn_predict(self.piml_model, eta, nu, u, [self.x_min, self.x_range])
         
         
 

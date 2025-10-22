@@ -58,16 +58,12 @@ class PINN(nn.Module):
         Custom loss function that implements the physics loss.
         """
 
-        # Unpacking inputs
-        nu = x_traj[:, 4:10]
-
         # Output values
         Mv_dot = y_traj["Mv_dot"]
         Cv = y_traj["Cv"]
         g_eta = y_traj["g_eta"]
         tau = y_traj["tau"]
-        nu_dot = y_traj["acc"]
-        M = y_traj["M"]
+        nu = y_traj["nu"]
 
         # Getting predicted D
         D_pred = model(x_traj)
@@ -87,9 +83,6 @@ class PINN(nn.Module):
         beta = 0.5
         gamma = 0.001
 
-        # rhs = (tau - Cv - torch.matmul(D_pred, nu.unsqueeze(-1)).squeeze(-1) - g_eta)
-        # nu_dot_pred = torch.bmm(torch.linalg.inv(M), rhs.unsqueeze(-1)).squeeze(-1)
-        # loss = torch.mean((nu_dot_pred - nu_dot)**2)
 
         # Final loss is just the sum
         return physics_loss*alpha + data_loss*beta + damping_penalty*gamma
@@ -114,7 +107,6 @@ def multi_step_loss_function(model, x_traj, y_traj, h_steps):
     Cv = y_traj["Cv"]
     g_eta = y_traj["g_eta"]
     tau = y_traj["tau"]
-    t = y_traj["t"]
     M = y_traj["M"]
 
     N = len(eta)
@@ -125,6 +117,8 @@ def multi_step_loss_function(model, x_traj, y_traj, h_steps):
 
         for step in range(h_steps):
             i = start_index + step
+
+            # Stop if we are indexing outside vector sizes
             if i >= N - 1:
                 break
 
@@ -163,15 +157,22 @@ def additional_damping_penalty(D_pred):
 
 def init_pinn_model(file_name: str):
     # For easy initialization of model in other files
+
+    # Load model parameters
     dict_path = "src/smarc_modelling/piml/models/" + file_name
     dict_file = torch.load(dict_path, weights_only=True)
+
+    # Initalize model
     model = PINN()
     model.initialize(dict_file["model_shape"])
     model.load_state_dict(dict_file["state_dict"])
-    x_mean = dict_file["x_mean"]
-    x_std = dict_file["x_std"]
+
+    # Normalization constants
+    x_min = dict_file["x_min"]
+    x_range = dict_file["x_range"]
+    
     model.eval()
-    return model, x_mean, x_std
+    return model, x_min, x_range
 
 
 def pinn_predict(model, eta, nu, u, norm):
@@ -183,7 +184,7 @@ def pinn_predict(model, eta, nu, u, norm):
     u = np.array(u, dtype=np.float32).flatten()
 
     # Make state vector
-    x = np.concatenate([eta, nu, u], axis=0)
+    x = np.concatenate([nu, u], axis=0)
     x = torch.tensor(x, dtype=torch.float32).unsqueeze(0)
     x_normed = (x - norm[0]) / norm[1]
 
