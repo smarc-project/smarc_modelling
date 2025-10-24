@@ -286,7 +286,7 @@ class SAM_casadi():
         # Damping coefficients
         self.Xuu = 1e-0 * 50 # default: 3 #100     # x-damping
         self.Yvv = 1e-1 * 50 # default: 50    # y-damping
-        self.Zww = 1e1 * 250 # default: 50    # z-damping
+        self.Zww = 1e1 * 150 # default: 50    # z-damping
         self.Kpp = 1e-1 * 40 # default: 40    # Roll damping
         self.Mqq = 1e-2 * 150 # default: 200    # Pitch damping
         self.Nrr = 1e1 * 150 # default: 10    # Yaw damping
