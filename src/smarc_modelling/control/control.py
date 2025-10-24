@@ -68,7 +68,7 @@ class NMPC:
         Q_diag[14] = 1e-5            # LCG:      Standard: 1e-4
         Q_diag[ 15  ] = 5e2             # stern_angle:   Standard: 100
         Q_diag[ 16  ] = 1e3             # rudder_angle:  Standard: 100
-        Q_diag[17:  ] = 1e-5            # RPM1 And RPM2: Standard: 1e-6
+        Q_diag[17:  ] = 1e-6            # RPM1 And RPM2: Standard: 1e-6
         Q_diag[13:  ] = Q_diag[13:  ]   # Adjustment to all control weights
         Q = np.diag(Q_diag)
 

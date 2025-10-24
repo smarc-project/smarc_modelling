@@ -264,12 +264,19 @@ class SAM_casadi():
 
         # NOTE: These need to be identified properly
         # Damping coefficients
-        self.Xuu = 3 #100     # x-damping
-        self.Yvv = 50    # y-damping
-        self.Zww = 50    # z-damping
-        self.Kpp = 40    # Roll damping
-        self.Mqq = 200    # Pitch damping
-        self.Nrr = 10    # Yaw damping
+        self.Xuu = 1e-0 * 50 # default: 3 #100     # x-damping
+        self.Yvv = 1e-1 * 50 # default: 50    # y-damping
+        self.Zww = 1e1 * 150 # default: 50    # z-damping
+        self.Kpp = 1e-1 * 40 # default: 40    # Roll damping
+        self.Mqq = 1e-2 * 150 # default: 200    # Pitch damping
+        self.Nrr = 1e1 * 150 # default: 10    # Yaw dampin
+
+        #self.Xuu = 3 #100     # x-damping
+        #self.Yvv = 50    # y-damping
+        #self.Zww = 50    # z-damping
+        #self.Kpp = 40    # Roll damping
+        #self.Mqq = 200    # Pitch damping
+        #self.Nrr = 10    # Yaw damping
 
         # Center of effort -> where the thrust force acts?
         self.x_cp = 0.1
@@ -667,7 +674,8 @@ class SAM_casadi():
             M_prop_i = ca.cross(r_prop_i, F_prop_b) + ca.vertcat(((-1)**i)*K_i, 0, 0)
 
             # scale & reorder without mutation (your original swap x<->z)
-            M_scaled = self.thruster_rot_strength * M_prop_i
+            M_scaled = M_prop_i
+            #M_scaled = self.thruster_rot_strength * M_prop_i
             yaw, pitch, roll = M_scaled[0], M_scaled[1], M_scaled[2]
             M_perm = ca.vertcat(roll, pitch, yaw)
 
