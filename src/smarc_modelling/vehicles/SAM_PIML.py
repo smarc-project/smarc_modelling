@@ -62,7 +62,7 @@ from smarc_modelling.lib.gnc import *
 from smarc_modelling.piml.pinn import init_pinn_model, pinn_predict
 from smarc_modelling.piml.nn import init_nn_model, nn_predict
 from smarc_modelling.piml.naive_nn import init_naive_nn_model, naive_nn_predict
-from smarc_modelling.piml.bpinn import init_bpinn_model, bpinn_predict
+from smarc_modelling.piml.utils.utility_functions import norm_q
 
 
 class SolidStructure:
@@ -286,19 +286,15 @@ class SAM_PIML():
 
         if self.piml_type == "pinn":
             print(f" Physics Informed Neural Network model initialized")
-            self.piml_model, self.x_mean, self.x_std = init_pinn_model("pinn.pt")
+            self.piml_model, self.x_min, self.x_range = init_pinn_model("pinn.pt")
 
         if self.piml_type == "nn":
             print(f" Standard Neural Network model initialized")
-            self.piml_model, self.x_mean, self.x_std = init_nn_model("nn.pt")
+            self.piml_model, self.x_min, self.x_range = init_nn_model("nn.pt")
 
         if self.piml_type == "naive_nn":
             print(f" Naive Neural Network model initialized")
-            self.piml_model, self.x_mean, self.x_std = init_naive_nn_model("naive_nn.pt")
-
-        if self.piml_type == "bpinn":
-            print(f" Bayesian - Physics Informed Neural Network model initialized")
-            self.piml_model, self.x_mean, self.x_std = init_bpinn_model("bpinn.pt")
+            self.piml_model, self.x_min, self.x_range, self.y_min, self.y_range = init_naive_nn_model("naive_nn.pt")
 
         # For white-box
         if piml_type == None:
@@ -373,15 +369,18 @@ class SAM_PIML():
         u_dot = self.actuator_dynamics(u, u_ref)
         eta_dot = self.eta_dynamics(eta, nu)
 
-        if self.piml_type == "bpinn":
-            Dv, _ = bpinn_predict(self.piml_model, eta, nu, u, [self.x_mean, self.x_std])
-            nu_dot = self.Minv @ (self.tau - np.matmul(self.C,self.nu_r) - Dv - self.g_vec)
-
         x_dot = np.concatenate([eta_dot, nu_dot, u_dot])
-
+            
         if self.piml_type == "naive_nn":
-            x_dot = naive_nn_predict(self.piml_model, eta, nu, u, [self.x_mean, self.x_std])
-            x_dot = np.concatenate([x_dot, u_dot])
+            # Predicted acceleration
+            nu_dot = naive_nn_predict(self.piml_model, eta, nu, u, [self.x_min, self.x_range, self.y_min, self.y_range])
+            
+            # Body frame speed and pose in angles
+            eta_dot_body = nu + nu_dot * self.dt
+            eta_dot = self.eta_dynamics(eta, eta_dot_body)
+
+            x_dot = np.concatenate([eta_dot, nu_dot, u_dot])
+            x_dot[3:7] = norm_q(x_dot[3:7])
 
         # # Type compatibility with C++ extension
         # x_dot = np.array(x_dot, dtype=np.float32).reshape(1, -1)
@@ -564,10 +563,10 @@ class SAM_PIML():
             self.D[5,5] = self.damping_rot
 
         if self.piml_type == "pinn":
-            self.D = pinn_predict(self.piml_model, eta, nu, u, [self.x_mean, self.x_std])
+            self.D = pinn_predict(self.piml_model, eta, nu, u, [self.x_min, self.x_range])
 
         if self.piml_type == "nn":
-            self.D = nn_predict(self.piml_model, eta, nu, u, [self.x_mean, self.x_std])
+            self.D = nn_predict(self.piml_model, eta, nu, u, [self.x_min, self.x_range])
         
         
 
@@ -578,8 +577,6 @@ class SAM_PIML():
         self.W = self.m * self.g
         self.g_vec = gvect(self.W, self.B, self.theta, self.phi, self.p_OG_O, self.p_OB_O)
 
-
-        self.g_vec[5] = 0
 
     def calculate_tau(self, u):
         """
@@ -630,10 +627,20 @@ class SAM_PIML():
                         self.KT_0*abs(n_rps[i])*n_rps[i]
                         ) / prop_scaling
                 K_prop_i = self.rho * (self.D_prop ** 5) * self.KQ_0 * abs(n_rps[i]) * n_rps[i] / prop_scaling
+
+                # X_prop_i = self.rho*(self.D_prop**4)*(
+                #         self.KT_0*abs(n_rps[i])*n_rps[i] +
+                #         (self.KT_max-self.KT_0)/self.Ja_max * (Va/self.D_prop) * abs(n_rps[i])
+                #         ) / prop_scaling
+                # K_prop_i = self.rho * (self.D_prop**5) * (
+                #         self.KQ_0 * abs(n_rps[i]) * n_rps[i] +
+                #         (self.KQ_max-self.KQ_0)/self.Ja_max * (Va/self.D_prop) * abs(n_rps[i])) / prop_scaling
                 
 
             F_prop_b = C_T2C @ np.array([X_prop_i, 0, 0])
-            r_prop_i = C_T2C @ self.propellers.r_t_p_sh[i] - self.p_OC_O
+            var = self.p_OC_O
+            var[2] = 0
+            r_prop_i = C_T2C @ self.propellers.r_t_p_sh[i] - var
             M_prop_i = np.cross(r_prop_i, F_prop_b) \
                         + np.array([(-1)**i * K_prop_i, 0, 0])  # the -1 is because we have counter rotating
                                     # propellers that are supposed to cancel out the propeller induced

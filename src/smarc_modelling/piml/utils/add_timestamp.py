@@ -43,10 +43,10 @@ class AddTimestamp(Node):
         self.vbs_fb_sub = self.create_subscription(PercentStamped, "/sam/core/vbs_fb", self.add_stamp_vbs_fb, 1) # Has data in stamp but need to reassign
         # Odom
         # 1970 is /mocap/sam_mocap/odom and 2025 is (typically) /mocap/sam_mocap2/odom
-        self.odom_sub = self.create_subscription(Odometry, "/mocap/sam_mocap2/odom", self.add_stamp_odom, 1) # Has data in stamp but need to reassign
+        self.odom_sub = self.create_subscription(Odometry, "/mocap/sam_mocap/odom", self.add_stamp_odom, 1) # Has data in stamp but need to reassign
         # Velocity 
         # Same as with odom about mocap vs mocap2
-        self.velocity_sub = self.create_subscription(TwistStamped, "/mocap/sam_mocap2/velocity", self.add_stamp_velo, 1) # Has data in stamp but need to reassign
+        self.velocity_sub = self.create_subscription(TwistStamped, "/mocap/sam_mocap/velocity", self.add_stamp_velo, 1) # Has data in stamp but need to reassign
 
         # --< Publishers >-- #
         # Thrusters
@@ -122,7 +122,7 @@ class AddTimestamp(Node):
     def add_stamp_velo(self, msg):
         msg_stamped = TwistStamped()
         # The lookup frame is either sam_mocap/base_link or sam_mocap2/base_link dependent on the bag
-        transform = self.tf_buffer.lookup_transform("sam_mocap2/base_link", "mocap", rclpy.time.Time(), timeout=rclpy.duration.Duration(seconds=0.5))
+        transform = self.tf_buffer.lookup_transform("sam_mocap/base_link", "mocap", rclpy.time.Time(), timeout=rclpy.duration.Duration(seconds=0.5))
         msg_twist = msg.twist
         msg_stamped.twist = do_transform_twist(msg_twist, transform)
         msg_stamped.header.stamp = self.get_clock().now().to_msg()
