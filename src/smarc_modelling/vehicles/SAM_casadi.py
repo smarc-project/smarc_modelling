@@ -4,21 +4,33 @@
 """
 SAM.py:
 
-   Class for the SAM (Small and Affordable Maritime) cylinder-shaped autonomous underwater vehicle (AUV),
-   designed for agile hydrobatic maneuvers, including obstacle avoidance, inspections, docking, and under-ice operations.
-   The SAM AUV is controlled using counter-rotating propellers, a thrust vectoring system, a variable buoyancy system (VBS),
-   and adjustable battery packs for center of gravity (c.g.) control. It is equipped with sensors such as IMU, DVL, GPS, and sonar.
+   Class for the SAM (Small and Affordable Maritime) cylinder-shaped autonomous
+   underwater vehicle (AUV), designed for agile hydrobatic maneuvers, including
+   obstacle avoidance, inspections, docking, and under-ice operations. The SAM
+   AUV is controlled using counter-rotating propellers, a thrust vectoring
+   system, a variable buoyancy system (VBS), and adjustable battery packs for
+   center of gravity (c.g.) control. It is equipped with sensors such as IMU,
+   DVL, GPS, and sonar.
 
-   The length of the AUV is 1.5 m, the cylinder diameter is 19 cm, and the mass of the vehicle is 17 kg.
-   It has a maximum speed of 2.5 m/s, which is obtained when the propellers run at 1525 rpm in zero currents.
-   SAM was developed by the Swedish Maritime Robotics Center and is underactuated, meaning it has fewer control inputs than
-   degrees of freedom. The control system uses both static and dynamic actuation for different maneuvers.
+   The length of the AUV is 1.5 m, the cylinder diameter is 19 cm, and the mass
+   of the vehicle is 17 kg. It has a maximum speed of 2.5 m/s, which is
+   obtained when the propellers run at 1525 rpm in zero currents. SAM was
+   developed by the Swedish Maritime Robotics Center and is underactuated,
+   meaning it has fewer control inputs than degrees of freedom. The control
+   system uses both static and dynamic actuation for different maneuvers.
 
    Actuator systems:
-   1. **Counter-Rotating Propellers**: Two propellers used for propulsion, rotating in opposite directions to balance the roll and provide forward thrust.
-   2. **Thrust Vectoring System**: Propellers can be deflected horizontally (rudder-like) and vertically (stern-plane-like) with angles up to ±7°, enabling agile maneuvers.
-   3. **Variable Buoyancy System (VBS)**: Allows for depth control by altering buoyancy through water intake and release.
-   4. **Adjustable Center of Gravity (c.g.) Control**: Movable battery packs adjust the longitudinal and transversal c.g. positions, allowing for pitch and roll control.
+   1. **Counter-Rotating Propellers**: Two propellers used for propulsion,
+   rotating in opposite directions to balance the roll and provide forward
+   thrust.
+   2. **Thrust Vectoring System**: Propellers can be deflected horizontally
+   (rudder-like) and vertically (stern-plane-like) with angles up to ±7°,
+   enabling agile maneuvers.
+   3. **Variable Buoyancy System (VBS)**: Allows for depth control by altering
+   buoyancy through water intake and release.
+   4. **Adjustable Center of Gravity (c.g.) Control**: Movable battery packs
+   adjust the longitudinal and transversal c.g. positions, allowing for pitch
+   and roll control.
 
    Sensor systems:
    - **IMU**: Inertial Measurement Unit for attitude and acceleration.
@@ -35,20 +47,28 @@ Methods:
 
     u_ref: control inputs as [x_vbs, x_lcg, delta_s, delta_r, rpm1, rpm2]
 
-        - **vbs**: Variable buoyancy system control, which adjusts buoyancy to control depth.
-        - **lcg**: Longitudinal center of gravity adjustment by moving the battery pack to control pitch.
-        - **delta_s**: Stern plane angle for vertical thrust vectoring, used to control pitch (nose up/down).
-        - **delta_r**: Rudder angle for horizontal thrust vectoring, used to control yaw (turning left/right).
-        - **rpm_1**: Propeller RPM for the first (counter-rotating) propeller, controlling forward thrust.
-        - **rpm_2**: Propeller RPM for the second (counter-rotating) propeller, also controlling forward thrust and balancing roll.
+        - **vbs**: Variable buoyancy system control, which adjusts buoyancy to
+          control depth.
+        - **lcg**: Longitudinal center of gravity adjustment by moving the
+          battery pack to control pitch.
+        - **delta_s**: Stern plane angle for vertical thrust vectoring, used to
+          control pitch (nose up/down).
+        - **delta_r**: Rudder angle for horizontal thrust vectoring, used to
+          control yaw (turning left/right).
+        - **rpm_1**: Propeller RPM for the first (counter-rotating) propeller,
+          controlling forward thrust.
+        - **rpm_2**: Propeller RPM for the second (counter-rotating) propeller,
+          also controlling forward thrust and balancing roll.
 
 References:
 
-    Bhat, S., Panteli, C., Stenius, I., & Dimarogonas, D. V. (2023). Nonlinear model predictive control for hydrobatic AUVs:
-        Experiments with the SAM vehicle. Journal of Field Robotics, 40(7), 1840-1859. doi:10.1002/rob.22218.
+    Bhat, S., Panteli, C., Stenius, I., & Dimarogonas, D. V. (2023). Nonlinear
+    model predictive control for hydrobatic AUVs: Experiments with the SAM
+    vehicle. Journal of Field Robotics, 40(7), 1840-1859.
+    doi:10.1002/rob.22218.
 
-    T. I. Fossen (2021). Handbook of Marine Craft Hydrodynamics and Motion Control. 2nd Edition, Wiley.
-        URL: www.fossen.biz/wiley
+    T. I. Fossen (2021). Handbook of Marine Craft Hydrodynamics and Motion
+    Control. 2nd Edition, Wiley. URL: www.fossen.biz/wiley
 
 Author:     Omid Mirzaeedodangeh
 
@@ -183,14 +203,13 @@ class SAM_casadi():
     ):
         self.dt = dt # Sim time step, necessary for evaluation of the actuator dynamics
 
-        self.debug_sym = ca.Function()
         
         # Some factors to make sim agree with real life data, these are eyeballed from sim vs gt data
         #self.vbs_factor = 0.5 # How sensitive the vbs is
-        self.inertia_factor = 10 # Adjust how quickly we can change direction
-        self.damping_factor = 60 # Adjust how much the damping affect acceleration high number = move less
-        self.damping_rot = 5 # Adjust how much the damping affects the rotation high number = less rotation should be tuned on bag where we turn without any control inputs
-        self.thruster_rot_strength = 2  # Just making the thruster a bit stronger for rotation
+        #self.inertia_factor = 10 # Adjust how quickly we can change direction
+        #self.damping_factor = 60 # Adjust how much the damping affect acceleration high number = move less
+        #self.damping_rot = 5 # Adjust how much the damping affects the rotation high number = less rotation should be tuned on bag where we turn without any control inputs
+        #self.thruster_rot_strength = 2  # Just making the thruster a bit stronger for rotation
 
         # Constants
         self.p_OC_O = ca.MX(np.array([-0.75, 0, 0.06], float))  # Measurement frame C in CO (O)
@@ -264,12 +283,12 @@ class SAM_casadi():
 
         # NOTE: These need to be identified properly
         # Damping coefficients
-        self.Xuu = 3 #100     # x-damping
-        self.Yvv = 50    # y-damping
-        self.Zww = 50    # z-damping
-        self.Kpp = 40    # Roll damping
-        self.Mqq = 200    # Pitch damping
-        self.Nrr = 10    # Yaw damping
+        self.Xuu = 1e-0 * 50 # default: 3 #100     # x-damping
+        self.Yvv = 1e-1 * 50 # default: 50    # y-damping
+        self.Zww = 1e1 * 150 # default: 50    # z-damping
+        self.Kpp = 1e-1 * 40 # default: 40    # Roll damping
+        self.Mqq = 1e-2 * 150 # default: 200    # Pitch damping
+        self.Nrr = 1e1 * 150 # default: 10    # Yaw damping
 
         # Center of effort -> where the thrust force acts?
         self.x_cp = 0.1
@@ -294,8 +313,11 @@ class SAM_casadi():
         self.ss = SolidStructure(
             l_ss=1.5,
             d_ss=0.19,
-            m_ss=14.9,
-            p_CSsg_O = np.array([0.74, 0, 0.06]),
+            #m_ss=12.225-1,
+            #p_CSsg_O = np.array([0.74+0.05, 0, 0.06]),
+            p_CSsg_O = np.array([0.74+0.0175, 0, 0.0]),
+            m_ss=14.9-1,
+            #p_CSsg_O = np.array([0.74, 0, 0.06]),
             p_OC_O=self.p_OC_O
         )
 
@@ -309,8 +331,9 @@ class SAM_casadi():
 
         self.lcg = LongitudinalCenterOfGravityControl(
             l_lcg_l=0.223,
-            l_lcg_r=0.06,
-            m_lcg=2.6,
+            l_lcg_r=0.1,
+            #l_lcg_r=0.06,
+            m_lcg=2.6+1,
             h_lcg_dim=0.08,
             p_OC_O=self.p_OC_O
         )
@@ -496,7 +519,8 @@ class SAM_casadi():
         J_lcg_co = J_lcg_cg - self.lcg.m_lcg * S2_r_lcg_cg
 
         self.J_total = J_ss_co + J_vbs_co + J_lcg_co
-        self.J_total[0, 0] *= self.inertia_factor
+        #self.J_total[0, 0] *= self.inertia_factor
+        self.J_total[1,1] *= 100
 
 
     def calculate_M(self):
@@ -521,7 +545,7 @@ class SAM_casadi():
                                         self.m * self.k2,
                                         MA_44,
                                         self.k_prime * self.J_total[1,1],
-                                        self.k_prime * self.J_total[1,1])
+                                        self.k_prime * self.J_total[2,2])
         self.MA = ca.diag(diagonal_added_mass)
 
         # Mass matrix including added mass
@@ -619,7 +643,8 @@ class SAM_casadi():
         n_rps = n_rpm / 60.0
         rho = self.rho
         D   = self.D_prop
-        prop_scaling = 5    # arbitrary scaling factor when moving backwards
+        rev_prop_scaling = 10    # arbitrary scaling factor when moving backwards
+        fwd_prop_scaling = 5    # arbitrary scaling factor when moving backwards
 
         tau_prop = ca.MX.zeros(6)
 
@@ -652,10 +677,10 @@ class SAM_casadi():
             cT = rho * (D**4) * KT_fwd
             cQ = rho * (D**5) * KQ_fwd
     
-            X_fwd = cT # thrust ~ n|n|
-            K_fwd = cQ # torque ~ n|n|
-            X_rev = cT / prop_scaling # thrust ~ n|n|
-            K_rev = cQ / prop_scaling # torque ~ n|n|
+            X_fwd = cT / fwd_prop_scaling # thrust ~ n|n|
+            K_fwd = cQ / fwd_prop_scaling # torque ~ n|n|
+            X_rev = cT / rev_prop_scaling # thrust ~ n|n|
+            K_rev = cQ / rev_prop_scaling # torque ~ n|n|
 
             X_i = s*X_fwd + (1-s)*X_rev
             K_i = s*K_fwd + (1-s)*K_rev
@@ -667,7 +692,8 @@ class SAM_casadi():
             M_prop_i = ca.cross(r_prop_i, F_prop_b) + ca.vertcat(((-1)**i)*K_i, 0, 0)
 
             # scale & reorder without mutation (your original swap x<->z)
-            M_scaled = self.thruster_rot_strength * M_prop_i
+            M_scaled = M_prop_i
+            #M_scaled = self.thruster_rot_strength * M_prop_i
             yaw, pitch, roll = M_scaled[0], M_scaled[1], M_scaled[2]
             M_perm = ca.vertcat(roll, pitch, yaw)
 
@@ -698,7 +724,7 @@ class SAM_casadi():
         input is scaled between 0 and 100. This function converts it to the
         actual physical location.
         """
-        index0 = ca.mtimes(u[1]/100, self.lcg.l_lcg_l)
+        index0 = ca.mtimes(u[1]/100, self.lcg.l_lcg_r)
         index1 = 0
         index2 = 0
 
