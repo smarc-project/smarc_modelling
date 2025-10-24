@@ -136,11 +136,13 @@ class NMPC:
         self.ocp.constraints.idxsbx = idxsbx
 
         # penalty weights (size must equal len(idxsbx))
+        Z_weight = 1e4
+        z_weight = 1e1
         n_sb = idxsbx.size
-        self.ocp.cost.Zl = 50*np.ones(n_sb)
-        self.ocp.cost.Zu = 50*np.ones(n_sb)
-        self.ocp.cost.zl =  5*np.ones(n_sb)
-        self.ocp.cost.zu =  5*np.ones(n_sb)
+        self.ocp.cost.Zl = Z_weight*np.ones(n_sb)
+        self.ocp.cost.Zu = Z_weight*np.ones(n_sb)
+        self.ocp.cost.zl = z_weight*np.ones(n_sb)
+        self.ocp.cost.zu = z_weight*np.ones(n_sb)
 
         # ----------------------- Solver Setup --------------------------
         # set prediction horizon
@@ -150,7 +152,7 @@ class NMPC:
         self.ocp.solver_options.qp_solver = 'PARTIAL_CONDENSING_HPIPM'
         self.ocp.solver_options.hpipm_mode = 'ROBUST'
         self.ocp.solver_options.hessian_approx = 'GAUSS_NEWTON'
-        self.ocp.solver_options.integrator_type = 'IRK'
+        self.ocp.solver_options.integrator_type = 'ERK'
         self.ocp.solver_options.sim_method_newton_iter = 2 #3 default
 
         self.ocp.solver_options.nlp_solver_type = 'SQP_RTI'
@@ -159,7 +161,9 @@ class NMPC:
         self.ocp.solver_options.qp_tol = 1e-6       # QP tolerance
 
         self.ocp.solver_options.globalization = 'MERIT_BACKTRACKING'
-        self.ocp.solver_options.regularize_method = 'NO_REGULARIZE'
+        #self.ocp.solver_options.regularize_method = 'NO_REGULARIZE'
+        self.ocp.solver_options.levenberg_marquardt = 1e-2
+        self.ocp.solver_options.regularize_method = 'PROJECT'
 
         # Define the folder path for the .json and c_generated code inside the home directory
         home_dir = os.path.expanduser("~")
@@ -180,7 +184,7 @@ class NMPC:
         sim.parameter_values = np.zeros(25)
 
         sim.solver_options.T = 0.1
-        sim.solver_options.integrator_type = 'IRK'
+        sim.solver_options.integrator_type = 'ERK'
 
         sim_json = os.path.join(save_dir, 'acados_sim_' + self.model.name + '.json')
 

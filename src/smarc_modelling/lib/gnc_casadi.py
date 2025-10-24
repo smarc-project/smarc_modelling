@@ -161,6 +161,12 @@ def quaternion_to_dcm_ca(q):
     return dcm
 
 def quaternion_to_angles_ca(quat):
+        """
+        Parameters:
+            q (list or casadi.MX): Quaternion [q0, q1, q2, q3]
+        Returns:
+            tuple: Euler angles (psi, theta, phi) in radians, that is phi=roll, theta=pitch, psi=yaw)
+        """
         # Assuming quat is a CasADi SX or MX variable
         q0, q1, q2, q3 = quat[0], quat[1], quat[2], quat[3]
     
