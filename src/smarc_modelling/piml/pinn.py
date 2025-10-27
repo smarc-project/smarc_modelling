@@ -33,7 +33,7 @@ class PINN(nn.Module):
             self.layers.append(nn.Linear(layer_sizes[i], layer_sizes[i+1]))
         
         # Activation function
-        self.activation = nn.Tanh()
+        self.activation = nn.ReLU()
 
         # Creating output layer
         self.output_layer = nn.Linear(layer_sizes[-2], layer_sizes[-1])
@@ -53,95 +53,93 @@ class PINN(nn.Module):
         return D
 
 
-    def loss_function(self, model, x_traj, y_traj, n_steps=10):
+    def loss_function(self, model, x_traj, y_traj, h_steps=5):
         """
         Custom loss function that implements the physics loss.
         """
-
-        # Unpacking inputs
-        nu = x_traj[:, 6:12]
 
         # Output values
         Mv_dot = y_traj["Mv_dot"]
         Cv = y_traj["Cv"]
         g_eta = y_traj["g_eta"]
         tau = y_traj["tau"]
-        nu_dot = y_traj["acc"]
-        M = y_traj["M"]
+        nu = y_traj["nu"]
 
         # Getting predicted D
         D_pred = model(x_traj)
 
-        # # Calculate MSE physics loss using Fossen Dynamics Model
-        # # Physics loss predicted D matrix here should sum all the forces to 0
-        # physics_loss = torch.mean((Mv_dot + Cv + (torch.bmm(D_pred, nu.unsqueeze(2)).squeeze(2)) + g_eta - tau)**2)
+        # Calculate MSE physics loss using Fossen Dynamics Model
+        # Physics loss predicted D matrix here should sum all the forces to 0
+        physics_loss = torch.mean((Mv_dot + Cv + (torch.bmm(D_pred, nu.unsqueeze(2)).squeeze(2)) + g_eta - tau)**2)
 
-        # # Multi-step loss
-        # data_loss = multi_step_loss_function(model, x_traj, y_traj, n_steps)
+        # Multi-step loss
+        data_loss = multi_step_loss_function(model, x_traj, y_traj, h_steps)
 
-        # # Encourage high damping in roll and y directions by returning high values when corresponding damping terms are low
-        # damping_penalty = additional_damping_penalty(D_pred)
+        # Encourage high damping in roll and y directions by returning high values when corresponding damping terms are low
+        damping_penalty = additional_damping_penalty(D_pred)
 
-        # # Scaling to ensure losses have approximately same scale
-        # alpha = 0.05
-        # beta = 0.5
-        # gamma = 0.001
+        # Scaling to ensure losses have approximately same scale
+        alpha = 0.05
+        beta = 0.5
+        gamma = 0.001
 
-        rhs = (tau - Cv - torch.matmul(D_pred, nu.unsqueeze(-1)).squeeze(-1) - g_eta)
-        nu_dot_pred = torch.bmm(torch.linalg.inv(M), rhs.unsqueeze(-1)).squeeze(-1)
-        loss = torch.mean((nu_dot_pred - nu_dot)**2)
 
         # Final loss is just the sum
-        return loss #physics_loss*alpha + data_loss*beta + damping_penalty*gamma
+        return physics_loss*alpha + data_loss*beta + damping_penalty*gamma
 
 
-def multi_step_loss_function(model, x_traj, y_traj, n_steps=10):
+def multi_step_loss_function(model, x_traj, y_traj, h_steps):
     """
     Computes a multi-step integration loss based on nu over multiple steps
     """
 
-    if n_steps == 0:
-        print(f" n_steps was set to 0, changing it to 1!")
-        n_steps = 1
+    if h_steps == 0:
+        h_steps = 1
 
-    # Unpacking inputs
-    eta = x_traj[:, :6]
-    nu = x_traj[:, 6:12]
-    u = x_traj[:, 12:]
+    # 
+    dt = torch.diff(y_traj["t"])
+    loss = 0.0
+    runs = 0
 
-    # Output values
+    eta = y_traj["eta"]
+    nu = y_traj["nu"]
+    u = y_traj["u"]
     Cv = y_traj["Cv"]
     g_eta = y_traj["g_eta"]
     tau = y_traj["tau"]
-    t = y_traj["t"]
     M = y_traj["M"]
 
-    # Get the dt vector
-    dt_np = np.diff(t.numpy())
-    dt = torch.tensor(dt_np, dtype=torch.float32)
-    
-    loss = 0.0
-    nu_pred = nu[0].unsqueeze(0) # x0
+    N = len(eta)
 
-    for i in range(n_steps):
-        if i >= len(eta) - 1:
-            # Making sure we have values to compare to
-            break
+    for start_index in range(N - 1):
+        nu_pred = nu[start_index].unsqueeze(0) # x0
+        run_loss = 0.0
 
-        # Prep inputs for model
-        x_input = torch.cat([eta[i].unsqueeze(0), nu_pred, u[i].unsqueeze(0)], dim=1)
-        D_pred = model(x_input) 
+        for step in range(h_steps):
+            i = start_index + step
 
-        # Euler forward integration
-        rhs = tau[i].unsqueeze(0) - Cv[i].unsqueeze(0) - g_eta[i].unsqueeze(0) - torch.bmm(D_pred, nu_pred.unsqueeze(2)).squeeze(2)
-        rhs = rhs.squeeze()
-        nu_dot = torch.linalg.solve(M[i], rhs) # Solve for the acceleration
-        nu_pred = nu_pred + dt[i] * nu_dot # Euler forward with variable dt to get model difference to real value one step ahead
+            # Stop if we are indexing outside vector sizes
+            if i >= N - 1:
+                break
 
-        # Loss as difference between real velocity and collected for the next step
-        loss += torch.mean((nu_pred.clone() - nu[i+1].unsqueeze(0))**2)
+            # Pred input for model
+            x_input = torch.cat([eta[i, 3:], nu_pred.squeeze(0), u[i, :]])
+            D_pred = model(x_input)
 
-    return loss / n_steps
+            # Loss as difference between real velocity and collected for the next step
+            run_loss += torch.mean((nu_pred - nu[i].unsqueeze(0))**2) 
+            
+            # Euler forward integration
+            rhs = tau[i].unsqueeze(0) - Cv[i].unsqueeze(0) - g_eta[i].unsqueeze(0) - torch.bmm(D_pred, nu_pred.unsqueeze(2)).squeeze(2)
+            rhs = rhs.squeeze()
+            nu_dot = torch.linalg.solve(M[i], rhs) # Solve for the acceleration
+            nu_pred = nu_pred + dt[i] * nu_dot # Euler forward with variable dt to get model difference to real value one step ahead
+
+        # Loss
+        runs += 1
+        loss += run_loss / h_steps
+
+    return loss / runs
 
 
 def additional_damping_penalty(D_pred):
@@ -159,15 +157,22 @@ def additional_damping_penalty(D_pred):
 
 def init_pinn_model(file_name: str):
     # For easy initialization of model in other files
+
+    # Load model parameters
     dict_path = "src/smarc_modelling/piml/models/" + file_name
     dict_file = torch.load(dict_path, weights_only=True)
+
+    # Initalize model
     model = PINN()
     model.initialize(dict_file["model_shape"])
     model.load_state_dict(dict_file["state_dict"])
-    x_mean = dict_file["x_mean"]
-    x_std = dict_file["x_std"]
+
+    # Normalization constants
+    x_min = dict_file["x_min"]
+    x_range = dict_file["x_range"]
+    
     model.eval()
-    return model, x_mean, x_std
+    return model, x_min, x_range
 
 
 def pinn_predict(model, eta, nu, u, norm):
@@ -179,7 +184,7 @@ def pinn_predict(model, eta, nu, u, norm):
     u = np.array(u, dtype=np.float32).flatten()
 
     # Make state vector
-    x = np.concatenate([eta, nu, u], axis=0)
+    x = np.concatenate([nu, u], axis=0)
     x = torch.tensor(x, dtype=torch.float32).unsqueeze(0)
     x_normed = (x - norm[0]) / norm[1]
 

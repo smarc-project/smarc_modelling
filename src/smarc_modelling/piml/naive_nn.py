@@ -5,7 +5,7 @@
 import torch
 import torch.nn as nn
 import numpy as np
-
+from smarc_modelling.piml.utils.utility_functions import angular_vel_to_quat_vel, eta_quat_to_rad
 
 class NaiveNN(nn.Module):
 
@@ -28,13 +28,13 @@ class NaiveNN(nn.Module):
             self.layers.append(nn.Linear(layer_sizes[i], layer_sizes[i+1]))
         
         # Activation function
-        self.activation = nn.Tanh()
+        self.activation = nn.ReLU()
 
         # Creating output layer
         self.output_layer = nn.Linear(layer_sizes[-2], layer_sizes[-1])
 
         # Dropout for aiding with reduced overfitting
-        self.dropout = nn.Dropout(p=0.25)
+        self.dropout = nn.Dropout(p=0.1)
 
 
     def forward(self, x):
@@ -47,76 +47,81 @@ class NaiveNN(nn.Module):
         return x_dot
 
 
-    def loss_function(self, model, x_traj, y_traj, n_steps=10):
-        """
-        Custom loss function that implements the physics loss.
-        """
-        tau = y_traj["tau"]
-        N = len(tau) # Amount of datapoints
+    def loss_function(self, model, x_traj, y_traj, n_steps=5):
+        """Loss function as the multi-step data loss of the accelerations"""
 
-        # Multi-step loss
-        data_loss = (1/N) * multi_step_loss_function(model, x_traj, y_traj, n_steps)
-        
-        # Final loss is just the sum
-        return data_loss
+        loss = multi_step_loss_function(model, x_traj, y_traj, n_steps)
 
-
-def multi_step_loss_function(model, x_traj, y_traj, n_steps=10):
-    """
-    Computes a multi-step integration loss based on nu over multiple steps
-    """
-
-    if n_steps == 0:
-        print(f" n_steps was set to 0, changing it to 1!")
-        n_steps = 1
-
-    # Unpacking inputs
-    eta = x_traj[:, :6]
-    nu = x_traj[:, 6:12]
-    u = x_traj[:, 12:]
-
-    # Output values
-    t = y_traj["t"]
-
-    # Get the dt vector
-    dt_np = np.diff(t.numpy())
-    dt = torch.tensor(dt_np, dtype=torch.float32)
+        return loss 
     
+def multi_step_loss_function(model, x_traj, y_traj, h_steps):
+
+    # Make sure we at least take 1 step
+    if h_steps == 0:
+        h_steps = 1
+
+    dt = torch.diff(y_traj["t"])
     loss = 0.0
-    nu_pred = nu[0].unsqueeze(0) # x0
+    runs = 0
+    
+    nu = x_traj[:, :6]
+    u = x_traj[:, 6:]
+    nu_dot = y_traj["acc"]
 
-    for i in range(n_steps):
-        if i >= len(eta) - 1:
-            # Making sure we have values to compare to
-            break
+    N = len(nu)
 
-        # Prep inputs for model
-        x_input = torch.cat([eta[i].unsqueeze(0), nu_pred, u[i].unsqueeze(0)], dim=1)
-        x_dot = model(x_input) 
-        nu_dot = x_dot[0, 7:13].unsqueeze(0)
-        nu_pred = nu_pred + dt[i] * nu_dot
+    for start_index in range(N - 1):
+        nu_pred = nu[start_index]
+        run_loss = 0.0
 
-        # Loss as difference between real velocity and collected for the next step
-        loss += torch.mean((nu_pred.clone() - nu[i+1].unsqueeze(0))**2)
+        for step in range(h_steps):
+            i = start_index + step
 
-    return loss / n_steps
+            # Stop if we are indexing outside vector sizes
+            if i >= N - 1:
+                break
+
+            # Input vector
+            x_input = torch.cat([nu_pred, u[i]])
+            nu_dot_pred = model(x_input)
+
+            # Loss
+            run_loss += torch.mean((nu_dot_pred - nu_dot[i])**2)
+
+            # EF integration for next step
+            nu_pred = nu_pred + nu_dot_pred * dt[i]
+
+        # Loss
+        runs += 1
+        loss += run_loss / h_steps
+
+    return loss / runs
 
 
 def init_naive_nn_model(file_name: str):
     # For easy initialization of model in other files
+
+    # Load model parameters
     dict_path = "src/smarc_modelling/piml/models/" + file_name
     dict_file = torch.load(dict_path, weights_only=True)
+
+    # Initialize model
     model = NaiveNN()
     model.initialize(dict_file["model_shape"])
     model.load_state_dict(dict_file["state_dict"])
-    x_mean = dict_file["x_mean"]
-    x_std = dict_file["x_std"]
+
+    # Normalization constants
+    x_min = dict_file["x_min"]
+    x_range = dict_file["x_range"]
+    y_min = dict_file["y_min"]
+    y_range = dict_file["y_range"]
     model.eval()
-    return model, x_mean, x_std
+    return model, x_min, x_range, y_min, y_range
 
 
 def naive_nn_predict(model, eta, nu, u, norm):
     # For easy prediction in other files
+    # norm = [x_min, x_range, y_min, y_range]
 
     # Flatten input
     eta = np.array(eta, dtype=np.float32).flatten()
@@ -124,10 +129,11 @@ def naive_nn_predict(model, eta, nu, u, norm):
     u = np.array(u, dtype=np.float32).flatten()
 
     # Make state vector
-    x = np.concatenate([eta, nu, u], axis=0)
+    x = np.concatenate([nu, u], axis=0)
     x = torch.tensor(x, dtype=torch.float32).unsqueeze(0)
-    x_normed = (x - norm[0]) / norm[1]
+    x_normed = (x - norm[0]) / (norm[1] + 10e-8) # add small number to avoid div by 0
 
     # Get prediction
-    x_dot = model(x_normed).detach().numpy()
-    return x_dot.squeeze()
+    nu_dot = model(x_normed).detach().numpy()
+    nu_dot =  nu_dot * norm[3].numpy() + norm[2].numpy()
+    return nu_dot.squeeze()

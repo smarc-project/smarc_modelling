@@ -163,7 +163,7 @@ class NMPC:
         self.ocp.solver_options.globalization = 'MERIT_BACKTRACKING'
         #self.ocp.solver_options.regularize_method = 'NO_REGULARIZE'
         self.ocp.solver_options.levenberg_marquardt = 1e-2
-        self.ocp.solver_options.regularize_method = 'PROJECT'
+        #self.ocp.solver_options.regularize_method = 'PROJECT'
 
         # Define the folder path for the .json and c_generated code inside the home directory
         home_dir = os.path.expanduser("~")

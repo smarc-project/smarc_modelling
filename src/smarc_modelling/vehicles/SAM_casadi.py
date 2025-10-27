@@ -210,7 +210,7 @@ class SAM_casadi():
         #self.inertia_factor = 2 # Adjust how quickly we can change direction
         #self.damping_factor = 60 # Adjust how much the damping affect acceleration high number = move less
         #self.damping_rot = 5 # Adjust how much the damping affects the rotation high number = less rotation should be tuned on bag where we turn without any control inputs
-        self.thruster_rot_strength = 1  # Just making the thruster a bit stronger for rotation
+        #self.thruster_rot_strength = 1  # Just making the thruster a bit stronger for rotation
 
         # Constants
         self.p_OC_O = ca.MX(np.array([-0.75, 0, 0.06], float))  # Measurement frame C in CO (O)
@@ -316,9 +316,11 @@ class SAM_casadi():
         self.ss = SolidStructure(
             l_ss=1.5,
             d_ss=0.19,
-            m_ss=12.225-1,
-            p_CSsg_O = np.array([0.74+0.05, 0, 0.06]),
-            #p_CSsg_O = np.array([0.74+0.0175, 0, 0.0]),
+            #m_ss=12.225-1,
+            #p_CSsg_O = np.array([0.74+0.05, 0, 0.06]),
+            p_CSsg_O = np.array([0.74+0.0175, 0, 0.0]),
+            m_ss=14.9-1,
+            #p_CSsg_O = np.array([0.74, 0, 0.06]),
             p_OC_O=self.p_OC_O
         )
 
@@ -334,7 +336,7 @@ class SAM_casadi():
             l_lcg_l=0.223,
             l_lcg_r=0.1,
             #l_lcg_r=0.06,
-            m_lcg=3.450+1,
+            m_lcg=2.6+1,
             h_lcg_dim=0.08,
             p_OC_O=self.p_OC_O
         )
@@ -524,7 +526,7 @@ class SAM_casadi():
         # adjust the inertias to match the tank experiments until we actually
         # measured them.
         #self.J_total[0, 0] *= self.inertia_factor
-        self.J_total[1, 1] *= 150
+        self.J_total[1,1] *= 100
 
 
     def calculate_M(self):
@@ -647,7 +649,8 @@ class SAM_casadi():
         n_rps = n_rpm / 60.0
         rho = self.rho
         D   = self.D_prop
-        prop_scaling = 10    # arbitrary scaling factor when moving backwards
+        rev_prop_scaling = 10    # arbitrary scaling factor when moving backwards
+        fwd_prop_scaling = 5    # arbitrary scaling factor when moving backwards
 
         tau_prop = ca.MX.zeros(6)
 
@@ -680,10 +683,10 @@ class SAM_casadi():
             cT = rho * (D**4) * KT_fwd
             cQ = rho * (D**5) * KQ_fwd
     
-            X_fwd = cT/5 # thrust ~ n|n|
-            K_fwd = cQ/5 # torque ~ n|n|
-            X_rev = cT / prop_scaling # thrust ~ n|n|
-            K_rev = cQ / prop_scaling # torque ~ n|n|
+            X_fwd = cT / fwd_prop_scaling # thrust ~ n|n|
+            K_fwd = cQ / fwd_prop_scaling # torque ~ n|n|
+            X_rev = cT / rev_prop_scaling # thrust ~ n|n|
+            K_rev = cQ / rev_prop_scaling # torque ~ n|n|
 
             X_i = s*X_fwd + (1-s)*X_rev
             K_i = s*K_fwd + (1-s)*K_rev
@@ -697,6 +700,7 @@ class SAM_casadi():
             # scale & reorder without mutation
             #M_scaled = self.thruster_rot_strength * M_prop_i
             M_scaled = M_prop_i
+
             yaw, pitch, roll = M_scaled[0], M_scaled[1], M_scaled[2]
             M_perm = ca.vertcat(roll, pitch, yaw)
 
