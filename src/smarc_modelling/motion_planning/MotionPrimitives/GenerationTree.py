@@ -16,7 +16,6 @@ from smarc_modelling.motion_planning.MotionPrimitives.ObstacleChecker import cal
 from smarc_modelling.motion_planning.MotionPrimitives.OptimizationAcados_doubleTree import optimization_acados_doubleTree
 from smarc_modelling.motion_planning.MotionPrimitives.OptimizationAcados_singleTree import optimization_acados_singleTree
 from smarc_modelling.motion_planning.MotionPrimitives.Optimizer.acados_trajectory_simulator import main
-from smarc_modelling.motion_planning.MotionPrimitives.PlotResults import plot_waypoints
 from smarc_modelling.motion_planning.MotionPrimitives.trm_colors import *
 import smarc_modelling.motion_planning.MotionPrimitives.GlobalVariables as glbv
 import matplotlib.pyplot as plt
@@ -563,6 +562,7 @@ def double_a_star_search(ax, plt, map_instance, realTimeDraw, typeF_function, de
     list_connection_states = []  #[(node1, node2), ...]
     algorithm_start_time = time.time()
     current_algorithm_time = algorithm_start_time
+    print(f"{bcolors.HEADER}>> Starting trajectory search{bcolors.ENDC}")
     while (current_algorithm_time - algorithm_start_time < maxTime):   ###Change this in the future
         # Are there intersections?
         if flag > 0:
@@ -683,7 +683,7 @@ def double_a_star_search(ax, plt, map_instance, realTimeDraw, typeF_function, de
         
         # Print the iteration number
         flag = flag + 1
-        #print(f"iteration {flag:.0f}")
+        print(f"iteration {flag:.0f}")
         #print(f"arrived Point{flag:.0f}")
 
         if arrivedPoint:

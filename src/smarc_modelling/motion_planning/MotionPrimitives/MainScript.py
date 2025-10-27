@@ -1,4 +1,4 @@
-import smarc_modelling.motion_planning.MotionPrimitives.MapGeneration as MapGen
+# import smarc_modelling.motion_planning.MotionPrimitives.MapGeneration as MapGen
 import numpy as np
 from smarc_modelling.vehicles import *
 from smarc_modelling.lib import *
@@ -31,7 +31,7 @@ def MotionPlanningAlgorithm(realTimeDraw, map_instance):
     print(f"{bcolors.OKGREEN}[ OK ]{bcolors.ENDC}")
     
     # Which cost function you want to use (1-Astar 2-AdaptiveAstar 3-HeadingConstraint) 
-    typeFunction = 3
+    typeFunction = 1
 
     # The tuning parameter in the algorithm (if using typeFunction=3)
     dec = 0.1

@@ -9,7 +9,6 @@ from mpl_toolkits.mplot3d import Axes3D
 from smarc_modelling.motion_planning.MotionPrimitives.ObstacleChecker import *
 import math
 
-
 class SAM_PRIMITIVES():
     def __init__(self):
 
@@ -164,15 +163,15 @@ class SAM_PRIMITIVES():
 
         return data, cost   
     
-    def changeLengthOfPrimitive(self, lengthTime):
-        """
-        Modify the length of each primitive if necessary
-        """
+    # def changeLengthOfPrimitive(self, lengthTime):
+    #     """
+    #     Modify the length of each primitive if necessary
+    #     """
 
-        self.t_span = (0, lengthTime)
-        self.n_sim = int(self.t_span[1]/self.dt)
-        self.t_eval = np.linspace(self.t_span[0], self.t_span[1], self.n_sim)
-        self.sam = SAM(self.dt)
+    #     self.t_span = (0, lengthTime)
+    #     self.n_sim = int(self.t_span[1]/self.dt)
+    #     self.t_eval = np.linspace(self.t_span[0], self.t_span[1], self.n_sim)
+    #     self.sam = SAM_casadi(self.dt)
 
 
 if __name__ == "__main__":
