@@ -192,34 +192,35 @@ class NMPC:
 
         return acados_ocp_solver, acados_integrator
     
-    def setup_path_planner(self, x0, map_instance, Q):
+    def setup_path_planner(self, x0, map_instance):
         nx = self.model.x.rows()
         nu = self.model.u.rows()
 
         # --------------------------- Cost setup ---------------------------------
         # State weight matrix
-        '''
         Q_diag = np.ones(nx)
-        Q_diag[ 0:3 ] = 15e1         # Position
-        Q_diag[ 3:7 ] = 15e2         # Quaternion
-        Q_diag[ 7:10] = 13e1        # linear velocity
-        Q_diag[10:13] = 10e1         # Angular velocity
+        Q_diag[ 0:2 ] = 100     # Position:         standard 10
+        Q_diag[ 2 ] = 500       # z-Position:         standard 10
+        Q_diag[ 3:7 ] = 10       # Quaternion:       standard 10
+        Q_diag[ 7:10] = 1       # linear velocity:  standard 1
+        Q_diag[10:13] = 1       # Angular velocity: standard 1
 
-        # Control weight matrix - Costs set according to Bryson's rule (MPC course)
-        Q_diag[13:15] = 0        # VBS, LCG
-        Q_diag[15:17] = 0        # stern_angle, rudder_angle
-        Q_diag[17:  ] = 0        # RPM1 And RPM2
-        Q_diag[13:  ] = Q_diag[13:  ]
+        # Control weight matrix - Costs set according to Bryson's rule
+        Q_diag[13] = 1e-5            # VBS:      Standard: 1e-4
+        Q_diag[14] = 1e-5            # LCG:      Standard: 1e-4
+        Q_diag[ 15  ] = 5e2             # stern_angle:   Standard: 100
+        Q_diag[ 16  ] = 1e3             # rudder_angle:  Standard: 100
+        Q_diag[17:  ] = 1e-6            # RPM1 And RPM2: Standard: 1e-6
+        Q_diag[13:  ] = Q_diag[13:  ]   # Adjustment to all control weights
         Q = np.diag(Q_diag)
-        '''
-        # Q = self.Q  ##CHANGE
 
         # Control rate of change weight matrix - control inputs as [x_vbs, x_lcg, delta_s, delta_r, rpm1, rpm2]
         R_diag = np.ones(nu)
-        R_diag[ :2] = 1e-3
-        R_diag[2:4] = 1e0
+        R_diag[0] = 1e-1        # VBS
+        R_diag[1] = 1e-1        # LCG
+        R_diag[2:4] = 1e2
         R_diag[4: ] = 1e-5
-        R = np.diag(R_diag)
+        R = np.diag(R_diag)*1e-3
 
         # Stage costs
         self.model.p = ca.MX.sym('ref_param', nx+nu,1)
@@ -232,31 +233,37 @@ class NMPC:
         
         # Terminal cost
         self.ocp.cost.cost_type_e = 'NONLINEAR_LS'
-        # Q_e = np.zeros(nx)
-        # Q_e[ :3] = 100
-        # Q_e[3:7] = 100
-        # Q_e[7:10]= 100
-        # Q_e[10:13]= 0
-        # Q_e[13:] = 0
-        # Q_e = np.diag(Q_e)
-        self.ocp.cost.W_e = Q #np.zeros(np.shape(Q))
+        self.ocp.cost.W_e = Q 
         self.ocp.model.cost_y_expr_e = self.x_error(self.model.x, self.model.u, self.ocp.model.p, terminal=True)
         self.ocp.cost.yref_e = np.zeros((nx,))
 
         # --------------------- Constraint Setup --------------------------
-        vbs_dot = 10    # Maximum rate of change for the VBS
-        lcg_dot = 15    # Maximum rate of change for the LCG
-        ds_dot  = 7     # Maximum rate of change for stern angle
-        dr_dot  = 7     # Maximum rate of change for rudder angle
-        rpm_dot = 1000  # Maximum rate of change for rpm
+        vbs_dot = 200   # Maximum rate of change for the VBS
+        lcg_dot = 50    # Maximum rate of change for the LCG
 
         # Declare initial state
-        self.ocp.constraints.x0 = x0
+        self.ocp.constraints.x0 = np.zeros((nx,)) # Initial state is zero. This is set in the sim. for-loop
 
         # Set constraints on the control rate of change
-        self.ocp.constraints.lbu = np.array([-vbs_dot,-lcg_dot, -ds_dot, -dr_dot, -rpm_dot, -rpm_dot])
-        self.ocp.constraints.ubu = np.array([ vbs_dot, lcg_dot,  ds_dot,  dr_dot,  rpm_dot,  rpm_dot])
-        self.ocp.constraints.idxbu = np.arange(nu)
+        self.ocp.constraints.lbu = np.array([-vbs_dot,-lcg_dot])
+        self.ocp.constraints.ubu = np.array([ vbs_dot, lcg_dot])
+        self.ocp.constraints.idxbu = np.arange(2)
+
+
+        ## --------------------- Constraint Setup --------------------------
+        #vbs_dot = 10    # Maximum rate of change for the VBS
+        #lcg_dot = 15    # Maximum rate of change for the LCG
+        #ds_dot  = 7     # Maximum rate of change for stern angle
+        #dr_dot  = 7     # Maximum rate of change for rudder angle
+        #rpm_dot = 1000  # Maximum rate of change for rpm
+
+        ## Declare initial state
+        #self.ocp.constraints.x0 = x0
+
+        ## Set constraints on the control rate of change
+        #self.ocp.constraints.lbu = np.array([-vbs_dot,-lcg_dot, -ds_dot, -dr_dot, -rpm_dot, -rpm_dot])
+        #self.ocp.constraints.ubu = np.array([ vbs_dot, lcg_dot,  ds_dot,  dr_dot,  rpm_dot,  rpm_dot])
+        #self.ocp.constraints.idxbu = np.arange(nu)
 
         # Set constraint x in XFREE
         pointA = self.compute_trajectory_ends(self.model.x, forward=True)    ## CHANGE
@@ -279,6 +286,7 @@ class NMPC:
         yMin = map_instance["y_min"] + bound
         zMin = map_instance["z_min"] + bound
         self.ocp.model.con_h_expr = ca.vertcat(goal_constraints_pointA, constraints_point_B)
+
         self.ocp.constraints.lh = np.array([
             xMin, yMin, zMin, 
             xMin, yMin, zMin 
@@ -288,24 +296,61 @@ class NMPC:
             xMax, yMax, zMax
         ])
 
-        # Set constraints on the states
-        x_ubx = np.ones(nx)
-        x_ubx[  :13] = 400
+        # --- position bounds (NED: z positive down) ---
+        # Tank limits in meters
+        x_min, x_max = 0.0, 8.0
+        y_min, y_max = -1.5, 1.5
+        z_min, z_max = -0.5, 3.0   
 
-        # Set constraints on the control
-        x_ubx[13:15] = 100 
-        x_ubx[15:17] = np.deg2rad(7)
-        x_ubx[17:  ] = 400
+        pos_lbx = np.array([x_min, y_min, z_min])
+        pos_ubx = np.array([x_max, y_max, z_max])
 
-        x_lbx = -x_ubx
-        x_lbx[13:15] = 0
+        # --- actuator state bounds for x[13:19] = [x_vbs, x_lcg, δs, δr, rpm1, rpm2] ---
+        act_lbx = np.array([  0.0,   0.0, -np.deg2rad(7), -np.deg2rad(7),  -400.0,  -400.0])
+        act_ubx = np.array([100.0, 100.0,  np.deg2rad(7),  np.deg2rad(7),   400.0,   400.0])
 
-        self.ocp.constraints.lbx = x_lbx
-        self.ocp.constraints.ubx = x_ubx
-        self.ocp.constraints.idxbx = np.arange(nx)
-        self.ocp.constraints.lbx_e = x_lbx
-        self.ocp.constraints.ubx_e = x_ubx
-        self.ocp.constraints.idxbx_e = np.arange(nx)
+        ## Hard Constraints
+        idxbx = np.r_[ [0,1,2], [13,14,15,16,17,18] ]     # 9 indices total
+        lbx   = np.r_[ pos_lbx, act_lbx ]                 # length 9
+        ubx   = np.r_[ pos_ubx, act_ubx ]                 # length 9
+
+        self.ocp.constraints.idxbx = idxbx
+        self.ocp.constraints.lbx   = lbx
+        self.ocp.constraints.ubx   = ubx
+
+        ## Soft Constraints
+        idxsbx = np.array([0, 1, 2])    # Index of constraints we want to slacken
+
+        # soften exactly those same state bounds:
+        self.ocp.constraints.idxsbx = idxsbx
+
+        # penalty weights (size must equal len(idxsbx))
+        Z_weight = 1e4
+        z_weight = 1e1
+        n_sb = idxsbx.size
+        self.ocp.cost.Zl = Z_weight*np.ones(n_sb)
+        self.ocp.cost.Zu = Z_weight*np.ones(n_sb)
+        self.ocp.cost.zl = z_weight*np.ones(n_sb)
+        self.ocp.cost.zu = z_weight*np.ones(n_sb)
+
+        ## Set constraints on the states
+        #x_ubx = np.ones(nx)
+        #x_ubx[  :13] = 400
+
+        ## Set constraints on the control
+        #x_ubx[13:15] = 100 
+        #x_ubx[15:17] = np.deg2rad(7)
+        #x_ubx[17:  ] = 400
+
+        #x_lbx = -x_ubx
+        #x_lbx[13:15] = 0
+
+        #self.ocp.constraints.lbx = x_lbx
+        #self.ocp.constraints.ubx = x_ubx
+        #self.ocp.constraints.idxbx = np.arange(nx)
+        #self.ocp.constraints.lbx_e = x_lbx
+        #self.ocp.constraints.ubx_e = x_ubx
+        #self.ocp.constraints.idxbx_e = np.arange(nx)
 
         # ----------------------- Solver Setup --------------------------
         # set prediction horizon
@@ -315,39 +360,87 @@ class NMPC:
         self.ocp.solver_options.qp_solver = 'PARTIAL_CONDENSING_HPIPM'
         self.ocp.solver_options.hpipm_mode = 'ROBUST'
         self.ocp.solver_options.hessian_approx = 'GAUSS_NEWTON'
-        self.ocp.solver_options.integrator_type = 'IRK'
-        self.ocp.solver_options.sim_method_newton_iter = 3 #3 default
+        self.ocp.solver_options.integrator_type = 'ERK'
+        self.ocp.solver_options.sim_method_newton_iter = 2 #3 default
 
         self.ocp.solver_options.nlp_solver_type = 'SQP_RTI'
-        self.ocp.solver_options.nlp_solver_max_iter = 80
+        self.ocp.solver_options.nlp_solver_max_iter = 1 #80
         self.ocp.solver_options.tol    = 1e-6       # NLP tolerance. 1e-6 is default for tolerances
         self.ocp.solver_options.qp_tol = 1e-6       # QP tolerance
 
         self.ocp.solver_options.globalization = 'MERIT_BACKTRACKING'
-        self.ocp.solver_options.regularize_method = 'NO_REGULARIZE'
+        #self.ocp.solver_options.regularize_method = 'NO_REGULARIZE'
+        self.ocp.solver_options.levenberg_marquardt = 1e-2
+        #self.ocp.solver_options.regularize_method = 'PROJECT'
 
-        solver_json = 'acados_ocp_' + self.model.name + '.json'
+        # Define the folder path for the .json and c_generated code inside the home directory
+        home_dir = os.path.expanduser("~")
+        save_dir = os.path.join(home_dir, "acados_generated_code")
+        self.ocp.code_export_directory = save_dir
 
-        # Set directory for code generation
-        this_file_dir = os.path.dirname(os.path.abspath(__file__))
-        #root_files_dir = '/home/parallels/Desktop/smarc_modelling-master/src/smarc_modelling/motion_planning/MotionPrimitives'
-        #package_root = os.path.abspath(os.path.join(this_file_dir, '..'))
-        package_root = os.path.abspath(this_file_dir)
-        codegen_dir = os.path.join(package_root, 'optimization_double_mpc')
-        ocp_dir = os.path.join(codegen_dir, 'acados_ocp_')
-        os.makedirs(codegen_dir, exist_ok=True)
-        self.ocp.code_export_directory = codegen_dir
-        print(f"ext package acados dir: {codegen_dir}") 
+        # Make sure the directory exists
+        os.makedirs(save_dir, exist_ok=True)
 
-        #acados_ocp_solver = AcadosOcpSolver(self.ocp, json_file = solver_json, generate=False, build=False)
-        acados_ocp_solver = AcadosOcpSolver(self.ocp, json_file = ocp_dir + self.model.name + '.json', generate=True, build=True)
+        # Setup the solver
+        solver_json = os.path.join(save_dir, 'acados_path_ocp_' + self.model.name + '.json')
 
-        # create an integrator with the same settings as used in the OCP solver.
-        #acados_integrator = AcadosSimSolver(self.ocp, json_file = solver_json)
-        acados_integrator = AcadosSimSolver(self.ocp, json_file = ocp_dir + self.model.name + '.json')
+        acados_ocp_solver = AcadosOcpSolver(self.ocp, json_file = solver_json, generate=self.update_solver, build=self.update_solver)
 
+        # Simulation object based on OCP model.
+        sim = AcadosSim()
+        sim.model = self.model
+        sim.parameter_values = np.zeros(25)
+
+        sim.solver_options.T = 0.1
+        sim.solver_options.integrator_type = 'ERK'
+
+        sim_json = os.path.join(save_dir, 'acados_path_sim_' + self.model.name + '.json')
+
+        acados_integrator = AcadosSimSolver(sim, json_file = sim_json, generate=self.update_solver, build=self.update_solver)
 
         return acados_ocp_solver, acados_integrator
+
+        # ----------------------- Solver Setup --------------------------
+        # set prediction horizon
+        #self.ocp.solver_options.N_horizon = self.N_horizon
+        #self.ocp.solver_options.tf = self.Tf
+
+        #self.ocp.solver_options.qp_solver = 'PARTIAL_CONDENSING_HPIPM'
+        #self.ocp.solver_options.hpipm_mode = 'ROBUST'
+        #self.ocp.solver_options.hessian_approx = 'GAUSS_NEWTON'
+        #self.ocp.solver_options.integrator_type = 'IRK'
+        #self.ocp.solver_options.sim_method_newton_iter = 3 #3 default
+
+        #self.ocp.solver_options.nlp_solver_type = 'SQP_RTI'
+        #self.ocp.solver_options.nlp_solver_max_iter = 80
+        #self.ocp.solver_options.tol    = 1e-6       # NLP tolerance. 1e-6 is default for tolerances
+        #self.ocp.solver_options.qp_tol = 1e-6       # QP tolerance
+
+        #self.ocp.solver_options.globalization = 'MERIT_BACKTRACKING'
+        #self.ocp.solver_options.regularize_method = 'NO_REGULARIZE'
+
+        #solver_json = 'acados_ocp_' + self.model.name + '.json'
+
+        ## Set directory for code generation
+        #this_file_dir = os.path.dirname(os.path.abspath(__file__))
+        ##root_files_dir = '/home/parallels/Desktop/smarc_modelling-master/src/smarc_modelling/motion_planning/MotionPrimitives'
+        ##package_root = os.path.abspath(os.path.join(this_file_dir, '..'))
+        #package_root = os.path.abspath(this_file_dir)
+        #codegen_dir = os.path.join(package_root, 'optimization_double_mpc')
+        #ocp_dir = os.path.join(codegen_dir, 'acados_ocp_')
+        #os.makedirs(codegen_dir, exist_ok=True)
+        #self.ocp.code_export_directory = codegen_dir
+        #print(f"ext package acados dir: {codegen_dir}") 
+
+        ##acados_ocp_solver = AcadosOcpSolver(self.ocp, json_file = solver_json, generate=False, build=False)
+        #acados_ocp_solver = AcadosOcpSolver(self.ocp, json_file = ocp_dir + self.model.name + '.json', generate=True, build=True)
+
+        ## create an integrator with the same settings as used in the OCP solver.
+        ##acados_integrator = AcadosSimSolver(self.ocp, json_file = solver_json)
+        #acados_integrator = AcadosSimSolver(self.ocp, json_file = ocp_dir + self.model.name + '.json')
+
+
+        #return acados_ocp_solver, acados_integrator
     
 
     def compute_trajectory_ends(self, state, distance=0.655, forward: Optional[bool]= True):
