@@ -70,19 +70,13 @@ def main(trajectory, Q, N_hor, T_s, map_instance):       ##CHANGE: input traject
     # create ocp object to formulate the OCP
     Ts = T_s            # Sampling time ##CHANGE: from 0.2
     N_horizon = N_hor     # Prediction horizon
-    build = False
+    build = True
     nmpc = NMPC(sam, Ts, N_horizon, update_solver_settings=build)
     # nmpc = NMPC_trajectory(sam, Ts, N_horizon, Q)   ## CHANGE
     nx = nmpc.nx        # State vector length + control vector
     nu = nmpc.nu        # Control derivative vector length
 
     
-    # load trajectory - Replace with your actual file path
-    #file_path = "/home/admin/smarc_modelling/src/smarc_modelling/Trajectories/simonTrajectory.csv"
-    #file_path = "/home/admin/smarc_modelling/src/smarc_modelling/Trajectories/resolution01.csv"  
-    #file_path = "/home/admin/smarc_modelling/src/smarc_modelling/Trajectories/straight_trajectory.csv"
-    #trajectory = read_csv_to_array(file_path)  ##CHANGE: trajectory form file
-
     # Declare duration of sim. and the x_axis in the plots
     Nsim = (trajectory.shape[0])            # The sim length should be equal to the number of waypoints
     x_axis = np.linspace(0, Ts*Nsim, Nsim)
@@ -100,7 +94,7 @@ def main(trajectory, Q, N_hor, T_s, map_instance):       ##CHANGE: input traject
     trajectory = np.concatenate((trajectory, Uref), axis=1) 
 
     # Run the MPC setup
-    ocp_solver, integrator = nmpc.setup_path_planner(x0, map_instance, Q)
+    ocp_solver, integrator = nmpc.setup_path_planner(x0, map_instance)
     # ocp_solver, integrator = nmpc.setup(x0, map_instance)
 
     # Initialize the state and control vector as David does
@@ -113,6 +107,7 @@ def main(trajectory, Q, N_hor, T_s, map_instance):       ##CHANGE: input traject
     t = np.zeros((Nsim))
 
     # closed loop - simulation
+    print(f"Starting Planner MPC SIM Loop")
     for i in range(Nsim):
         #print(f"Nsim: {i}")
 
