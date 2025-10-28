@@ -112,8 +112,8 @@ def main():
 
     # create ocp object to formulate the OCP
     Ts = 0.1           # Sampling time
-    N_horizon = 12      # Prediction horizon
-    nmpc = NMPC(sam, Ts, N_horizon, update_solver_settings=False)
+    N_horizon = 30 #12      # Prediction horizon
+    nmpc = NMPC(sam, Ts, N_horizon, update_solver_settings=True)
     nx = nmpc.nx        # State vector length + control vector
     nu = nmpc.nu        # Control derivative vector length
     nc = 1
@@ -123,7 +123,9 @@ def main():
     #file_path = "/home/admin/smarc_modelling/src/Trajectories/Complexity2Trajectory_0.csv"
     #file_path = "/home/admin/smarc_modelling/src/Trajectories/case_medium_original.csv"
     #file_path = "/home/admin/smarc_modelling/src/Trajectories/REPORT/medium/case_medium.csv"
-    file_path = "/home/admin/smarc_modelling/src/Trajectories/report_update/easy/trajectories/case_easy0.csv"
+    #file_path = "/home/admin/smarc_modelling/src/Trajectories/report_update/easy/trajectories/case_easy0.csv"
+    #file_path = "/home/parallels/ros2_ws/src/smarc2/behaviours/sam/sam_diving_controller/sam_diving_controller/trajectoryComplexity3.csv"
+    file_path = "/home/parallels/ros2_ws/src/smarc2/behaviours/sam/sam_diving_controller/sam_diving_controller/simple_path_complexity_1_3.csv"
 
 
     #file_path = "/home/admin/smarc_modelling/src/Trajectories/resolution01.csv"  
