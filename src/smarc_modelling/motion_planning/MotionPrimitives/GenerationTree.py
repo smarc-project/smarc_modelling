@@ -272,7 +272,7 @@ def get_neighbors(current, sim, map_instance, numberTree):
     stern_inputs = np.array([-7, 0, 7])
     vbs_inputs = np.array([10, 50, 90])
     lcg_inputs = np.array([0, 50, 100])
-    rpm_inputs = np.arange(-1000, 1000, 200)
+    rpm_inputs = np.arange(-400, 400, 200)
 
     # 2 # Add the name of the input into np.meshgrid(), and change the second value of .reshape(., THIS)
     input_pairs = np.array(np.meshgrid(rudder_inputs, rpm_inputs, vbs_inputs, lcg_inputs, stern_inputs)).T.reshape(-1,5)
@@ -291,6 +291,11 @@ def get_neighbors(current, sim, map_instance, numberTree):
     results = Parallel(n_jobs=multiprocessing.cpu_count())(
         delayed(process_input_pair)(inputs, current.state, sim, map_instance, numberTree) for inputs in full_input_pairs
     ) 
+
+    # results = []
+    # for inputs in full_input_pairs:
+    #     result = process_input_pair(inputs, current.state, sim, map_instance, numberTree)
+    #     results.append(result)
 
     # Save the generated primitives
     arrived_atLeast_one = False
