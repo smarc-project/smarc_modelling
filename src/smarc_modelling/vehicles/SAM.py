@@ -59,11 +59,6 @@ import numpy as np
 import math
 from scipy.linalg import block_diag
 from smarc_modelling.lib.gnc import *
-from smarc_modelling.piml.pinn import init_pinn_model, pinn_predict
-from smarc_modelling.piml.nn import init_nn_model, nn_predict
-from smarc_modelling.piml.naive_nn import init_naive_nn_model, naive_nn_predict
-from smarc_modelling.piml.bpinn import init_bpinn_model, bpinn_predict
-
 
 class SolidStructure:
     """
@@ -294,19 +289,23 @@ class SAM():
         self.piml_type= piml_type
 
         if self.piml_type == "pinn":
+            from smarc_modelling.piml.pinn import init_pinn_model
             print(f" Physics Informed Neural Network model initialized")
             self.piml_model, self.x_mean, self.x_std = init_pinn_model("pinn.pt")
 
         if self.piml_type == "nn":
             print(f" Standard Neural Network model initialized")
+            from smarc_modelling.piml.nn import init_nn_model
             self.piml_model, self.x_mean, self.x_std = init_nn_model("nn.pt")
 
         if self.piml_type == "naive_nn":
             print(f" Naive Neural Network model initialized")
+            from smarc_modelling.piml.naive_nn import init_naive_nn_model
             self.piml_model, self.x_mean, self.x_std = init_naive_nn_model("naive_nn.pt")
 
         if self.piml_type == "bpinn":
             print(f" Bayesian - Physics Informed Neural Network model initialized")
+            from smarc_modelling.piml.bpinn import init_bpinn_model
             self.piml_model, self.x_mean, self.x_std = init_bpinn_model("bpinn.pt")
 
         # For white-box
@@ -391,12 +390,14 @@ class SAM():
         eta_dot = self.eta_dynamics(eta, nu)
 
         if self.piml_type == "bpinn":
+            from smarc_modelling.piml.bpinn import bpinn_predict
             Dv, _ = bpinn_predict(self.piml_model, eta, nu, u, [self.x_mean, self.x_std])
             nu_dot = self.Minv @ (self.tau - np.matmul(self.C,self.nu_r) - Dv - self.g_vec)
 
         x_dot = np.concatenate([eta_dot, nu_dot, u_dot])
 
         if self.piml_type == "naive_nn":
+            from smarc_modelling.piml.naive_nn import naive_nn_predict
             x_dot = naive_nn_predict(self.piml_model, eta, nu, u, [self.x_mean, self.x_std])
             x_dot = np.concatenate([x_dot, u_dot])
 
@@ -614,9 +615,11 @@ class SAM():
 
 
         if self.piml_type == "pinn":
+            from smarc_modelling.piml.pinn import pinn_predict
             self.D = pinn_predict(self.piml_model, eta, nu, u, [self.x_mean, self.x_std])
 
         if self.piml_type == "nn":
+            from smarc_modelling.piml.nn import nn_predict
             self.D = nn_predict(self.piml_model, eta, nu, u, [self.x_mean, self.x_std])
         
     def abs_smooth(self, x, eps=1e-9):

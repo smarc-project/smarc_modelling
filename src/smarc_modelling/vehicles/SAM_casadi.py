@@ -402,7 +402,7 @@ class SAM_casadi():
             #forces = ca.vertcat(self.W, self.B)
 
             x_dot = ca.vertcat(eta_dot, nu_dot, u_dot)
-            self.x_dot_sym = ca.Function('x_dot', [x_sym, u_ref_sym], [x_dot, self.g_vec])
+            self.x_dot_sym = ca.Function('x_dot', [x_sym, u_ref_sym], [x_dot]) # self.g_vec
             self.create_model = False
 
         elif export == True:

@@ -241,7 +241,7 @@ def optimization_acados_singleTree(waypoints, map_instance):
     dt = glbv.RESOLUTION_DT
     N = len(waypoints)
     sam = SAM_casadi(dt)
-    nmpc = NMPC(sam, dt, N, True)
+    nmpc = NMPC(sam, dt, N, False)
     model = nmpc.export_dynamics_model(sam)
 
     # Create ocp
@@ -255,7 +255,7 @@ def optimization_acados_singleTree(waypoints, map_instance):
     os.makedirs(codegen_dir, exist_ok=True)
     ocp.code_export_directory = codegen_dir
     print(f"ext package acados dir: {codegen_dir}")        
-    ocp_solver = AcadosOcpSolver(ocp, json_file='acados_ocp.json', generate=True, build=True)
+    ocp_solver = AcadosOcpSolver(ocp, json_file='acados_ocp.json', generate=False, build=False)
 
     # Set initial guess from waypoints
     '''

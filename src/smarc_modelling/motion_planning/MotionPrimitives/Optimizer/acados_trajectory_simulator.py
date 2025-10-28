@@ -10,11 +10,11 @@ import os
 # Add the parent directory to the system path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 import numpy as np
-from smarc_modelling.motion_planning.MotionPrimitives.Optimizer.control import *
+# from smarc_modelling.motion_planning.MotionPrimitives.Optimizer.control import *
+from smarc_modelling.control.control import *
 
 from smarc_modelling.vehicles import *
 from smarc_modelling.lib import *
-from smarc_modelling.lib import plot
 from smarc_modelling.vehicles.SAM_casadi import SAM_casadi
 
 def euler_to_quaternion(roll: float, pitch: float, yaw: float):
@@ -67,11 +67,12 @@ def main(trajectory, Q, N_hor, T_s, map_instance):       ##CHANGE: input traject
     # Extract the CasADi model
     sam = SAM_casadi()
 
-
     # create ocp object to formulate the OCP
     Ts = T_s            # Sampling time ##CHANGE: from 0.2
     N_horizon = N_hor     # Prediction horizon
-    nmpc = NMPC_trajectory(sam, Ts, N_horizon, Q)   ## CHANGE
+    build = False
+    nmpc = NMPC(sam, Ts, N_horizon, update_solver_settings=build)
+    # nmpc = NMPC_trajectory(sam, Ts, N_horizon, Q)   ## CHANGE
     nx = nmpc.nx        # State vector length + control vector
     nu = nmpc.nu        # Control derivative vector length
 
@@ -99,7 +100,8 @@ def main(trajectory, Q, N_hor, T_s, map_instance):       ##CHANGE: input traject
     trajectory = np.concatenate((trajectory, Uref), axis=1) 
 
     # Run the MPC setup
-    ocp_solver, integrator = nmpc.setup(x0, map_instance)
+    ocp_solver, integrator = nmpc.setup_path_planner(x0, map_instance, Q)
+    # ocp_solver, integrator = nmpc.setup(x0, map_instance)
 
     # Initialize the state and control vector as David does
     for stage in range(N_horizon + 1):
