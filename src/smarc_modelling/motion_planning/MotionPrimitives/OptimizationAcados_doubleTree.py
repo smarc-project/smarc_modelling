@@ -211,49 +211,56 @@ def create_ocp(model, x0, x_last, N, map_instance):
     # Return ocp
     return ocp
 
-def optimization_acados_doubleTree(waypoints, map_instance):
+def optimization_acados_doubleTree(waypoints, map_instance, update_solver_settings=False):
     # Define class and model
     dt = glbv.RESOLUTION_DT
-    N = len(waypoints)
+    N_horizon = len(waypoints)
     sam = SAM_casadi(dt)
-    nmpc = NMPC(sam, dt, N, False)
-    model = nmpc.export_dynamics_model(sam)
+    nmpc = NMPC(sam, dt, N_horizon, update_solver_settings=False)
+    nx = nmpc.nx        # State vector length + control vector
+    nu = nmpc.nu        # Control derivative vector length
+    #ocp_solver = nmpc.setup_double_tree_ocp(map_instance)
+    ocp_solver, integrator = nmpc.setup_path_planner(map_instance)
+    #model = nmpc.export_dynamics_model(sam)
 
-    # Create ocp
-    #ocp = create_ocp(model, waypoints[0], waypoints[-1], len(waypoints), map_instance)
-    ocp = create_ocp(model, waypoints[0], waypoints[-1], len(waypoints), map_instance)   # give waypoints[0] as the last for debugging!
+    ## Create ocp
+    ##ocp = create_ocp(model, waypoints[0], waypoints[-1], len(waypoints), map_instance)
+    #ocp = create_ocp(model, waypoints[0], waypoints[-1], len(waypoints), map_instance)   # give waypoints[0] as the last for debugging!
 
-    # Solver setup
-    # Set directory for code generation
-    this_file_dir = os.path.dirname(os.path.abspath(__file__))
-    #root_files_dir = '/home/parallels/Desktop/smarc_modelling-master/src/smarc_modelling/motion_planning/MotionPrimitives'
-    #package_root = os.path.abspath(os.path.join(this_file_dir, '..'))
-    package_root = os.path.abspath(this_file_dir)
-    codegen_dir = os.path.join(package_root, 'optimization_double_connection')
-    ocp_dir = os.path.join(codegen_dir, 'acados_ocp.json')
-    os.makedirs(codegen_dir, exist_ok=True)
-    ocp.code_export_directory = codegen_dir
-    print(f"ext package acados dir: {codegen_dir}")        
+    ## Solver setup
+    ## Set directory for code generation
+    #this_file_dir = os.path.dirname(os.path.abspath(__file__))
+    ##root_files_dir = '/home/parallels/Desktop/smarc_modelling-master/src/smarc_modelling/motion_planning/MotionPrimitives'
+    ##package_root = os.path.abspath(os.path.join(this_file_dir, '..'))
+    #package_root = os.path.abspath(this_file_dir)
+    #codegen_dir = os.path.join(package_root, 'optimization_double_connection')
+    #ocp_dir = os.path.join(codegen_dir, 'acados_ocp.json')
+    #os.makedirs(codegen_dir, exist_ok=True)
+    #ocp.code_export_directory = codegen_dir
+    #print(f"ext package acados dir: {codegen_dir}")        
 
-    # Solve Acados (For compiling, change both flags to true)
-    ocp_solver = AcadosOcpSolver(ocp, json_file=ocp_dir, generate=False, build=False)
+    ## Solve Acados (For compiling, change both flags to true)
+    #ocp_solver = AcadosOcpSolver(ocp, json_file=ocp_dir, generate=False, build=False)
+
+    np.set_printoptions(precision=3)
+    print(f"double tree: {len(waypoints)}")
+
+    np.append(waypoints, waypoints[-1])
+
+    for stage in range(N_horizon+1):
+        ocp_solver.set(stage, "x", waypoints[stage])
+    for stage in range(N_horizon):
+        ocp_solver.set(stage, "u", np.zeros(nu,))
+
+    #ocp_solver.set(N_horizon+1, "x", waypoints[-1])
+
 
     # Change y_ref of last point
-    ocp_solver.set(N, "y_ref", waypoints[-1])
+    ocp_solver.set(N_horizon, "y_ref", waypoints[-1])
 
     # Change x0 
     ocp_solver.set(0, "lbx", waypoints[0])
     ocp_solver.set(0, "ubx", waypoints[0]) 
-
-
-
-    # Set initial guess from waypoints
-    '''
-    for i, waypoint in enumerate(waypoints):
-        if i > ocp.dims.N:
-            break
-        ocp_solver.set(i, "x", np.array(waypoint))
-    '''
 
     # Solve the problem
     status = ocp_solver.solve()
@@ -263,7 +270,7 @@ def optimization_acados_doubleTree(waypoints, map_instance):
         print("Optimization successful!")
     # Extract the optimized waypoints and save them
     optimized_waypoints = []
-    for i in range(ocp.dims.N + 1):
+    for i in range(N_horizon + 1):
         x_opt = ocp_solver.get(i, "x")
         optimized_waypoints.append(x_opt)
 

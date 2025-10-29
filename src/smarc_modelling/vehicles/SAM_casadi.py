@@ -289,7 +289,14 @@ class SAM_casadi():
         self.Zww = 1e1 * 150 # default: 50    # z-damping
         self.Kpp = 1e-1 * 40 # default: 40    # Roll damping
         self.Mqq = 1e-2 * 150 # default: 200    # Pitch damping
-        self.Nrr = 1e1 * 150 # default: 10    # Yaw damping
+        self.Nrr = 1e1 * 150 # default: 10    # Yaw dampin
+
+        #self.Xuu = 3 #100     # x-damping
+        #self.Yvv = 50    # y-damping
+        #self.Zww = 50    # z-damping
+        #self.Kpp = 40    # Roll damping
+        #self.Mqq = 200    # Pitch damping
+        #self.Nrr = 10    # Yaw damping
 
         # Center of effort -> where the thrust force acts?
         self.x_cp = 0.1

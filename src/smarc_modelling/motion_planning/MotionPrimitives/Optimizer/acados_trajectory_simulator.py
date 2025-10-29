@@ -17,51 +17,6 @@ from smarc_modelling.vehicles import *
 from smarc_modelling.lib import *
 from smarc_modelling.vehicles.SAM_casadi import SAM_casadi
 
-def euler_to_quaternion(roll: float, pitch: float, yaw: float):
-    """
-    Converts Euler angles (roll, pitch, yaw) to a quaternion (x, y, z, w).
-
-    Args:
-        roll: Rotation around the X-axis (in degreees)
-        pitch: Rotation around the Y-axis (in degreees)
-        yaw: Rotation around the Z-axis (in degreees)
-
-    Returns:
-        A tuple (q_x, q_y, q_z, q_w) representing the quaternion.
-    """
-    cr = np.cos(np.deg2rad(roll) / 2)
-    sr = np.sin(np.deg2rad(roll) / 2)
-    cp = np.cos(np.deg2rad(pitch) / 2)
-    sp = np.sin(np.deg2rad(pitch) / 2)
-    cy = np.cos(np.deg2rad(yaw) / 2)
-    sy = np.sin(np.deg2rad(yaw) / 2)
-
-    q_w = cr * cp * cy + sr * sp * sy
-    q_x = sr * cp * cy - cr * sp * sy
-    q_y = cr * sp * cy + sr * cp * sy
-    q_z = cr * cp * sy - sr * sp * cy
-
-    return (q_w, q_x, q_y, q_z)
-
-def read_csv_to_array(file_path: str):
-    """
-    Reads a CSV file and converts the elements to a NumPy array.
-
-    Parameters:
-    file_path (str): The path to the CSV file.
-
-    Returns:
-    np.array: A NumPy array containing the CSV data.
-    """
-    data = []
-    with open(file_path, 'r') as csvfile:
-        csvreader = csv.reader(csvfile)
-        next(csvreader)
-        for row in csvreader:
-            data.append([float(element) for element in row])
-
-    
-    return np.array(data)
 
 def main(trajectory, Q, N_hor, T_s, map_instance):       ##CHANGE: input trajectory
     # Extract the CasADi model
@@ -70,19 +25,13 @@ def main(trajectory, Q, N_hor, T_s, map_instance):       ##CHANGE: input traject
     # create ocp object to formulate the OCP
     Ts = T_s            # Sampling time ##CHANGE: from 0.2
     N_horizon = N_hor     # Prediction horizon
-    build = False
+    build = True
     nmpc = NMPC(sam, Ts, N_horizon, update_solver_settings=build)
     # nmpc = NMPC_trajectory(sam, Ts, N_horizon, Q)   ## CHANGE
     nx = nmpc.nx        # State vector length + control vector
     nu = nmpc.nu        # Control derivative vector length
 
     
-    # load trajectory - Replace with your actual file path
-    #file_path = "/home/admin/smarc_modelling/src/smarc_modelling/Trajectories/simonTrajectory.csv"
-    #file_path = "/home/admin/smarc_modelling/src/smarc_modelling/Trajectories/resolution01.csv"  
-    #file_path = "/home/admin/smarc_modelling/src/smarc_modelling/Trajectories/straight_trajectory.csv"
-    #trajectory = read_csv_to_array(file_path)  ##CHANGE: trajectory form file
-
     # Declare duration of sim. and the x_axis in the plots
     Nsim = (trajectory.shape[0])            # The sim length should be equal to the number of waypoints
     x_axis = np.linspace(0, Ts*Nsim, Nsim)
@@ -100,7 +49,7 @@ def main(trajectory, Q, N_hor, T_s, map_instance):       ##CHANGE: input traject
     trajectory = np.concatenate((trajectory, Uref), axis=1) 
 
     # Run the MPC setup
-    ocp_solver, integrator = nmpc.setup_path_planner(x0, map_instance, Q)
+    ocp_solver, integrator = nmpc.setup_path_planner(x0, map_instance)
     # ocp_solver, integrator = nmpc.setup(x0, map_instance)
 
     # Initialize the state and control vector as David does
@@ -113,6 +62,7 @@ def main(trajectory, Q, N_hor, T_s, map_instance):       ##CHANGE: input traject
     t = np.zeros((Nsim))
 
     # closed loop - simulation
+    print(f"Starting Planner MPC SIM Loop")
     for i in range(Nsim):
         #print(f"Nsim: {i}")
 
@@ -153,23 +103,3 @@ def main(trajectory, Q, N_hor, T_s, map_instance):       ##CHANGE: input traject
     list_waypoints = simX.tolist()
     return list_waypoints, status
 
-    '''
-    # evaluate timings
-    t *= 1000  # scale to milliseconds
-    print(f'Computation time in ms:\n min: {np.min(t):.3f}\nmax: {np.max(t):.3f}\navg: {np.average(t):.3f}\nstdev: {np.std(t)}\nmedian: {np.median(t):.3f}')
-
-
-    # plot results
-    print(f"x_axis: {x_axis.shape}")
-    print(f"refs: {trajectory.shape}")
-    print(f"simX: {simX.shape}")
-    print(f"simU: {simU.shape}")
-
-    # Extract the optimal control sequence
-    optimal_u = simX[:, 13:]
-    
-    # Plot the trajectory
-    plot.plot_function(x_axis, trajectory, simX[:-1], simU)
-
-    ocp_solver = None
-    '''

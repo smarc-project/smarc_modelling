@@ -120,7 +120,7 @@ def main():
     # create ocp object to formulate the OCP
     Ts = 0.1           # Sampling time
     N_horizon = 16      # Prediction horizon
-    nmpc = NMPC_trajectory(sam, Ts, N_horizon, update_solver_settings=False)
+    nmpc = NMPC(sam, Ts, N_horizon, update_solver_settings=True)
     nx = nmpc.nx        # State vector length + control vector
     nu = nmpc.nu        # Control derivative vector length
     nc = 1
@@ -128,12 +128,13 @@ def main():
 
     # Run the MPC setup
     x0= np.zeros(19,)
-    ocp_solver, integrator = nmpc.setup(x0)
+    ocp_solver, integrator = nmpc.setup()
 
     case = "medium"
     setting ="np28_"
     for j in range(1):
         file_path = "/home/admin/smarc_modelling/src/Trajectories/report_update/"+ case + "/trajectories/case_" + case + str(j) +".csv"
+        file_path = "/home/parallels/ros2_ws/src/smarc2/behaviours/sam/sam_diving_controller/sam_diving_controller/trajectoryComplexity3.csv"
         trajectory = read_csv_to_array(file_path)
         print(file_path)
 
