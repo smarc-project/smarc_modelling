@@ -83,7 +83,9 @@ def compute_A_point_forward(state, distance=0.655):
     x, y, z, q0, q1, q2, q3 = state[:7]
 
     # Create a rotation object from the quaternion
-    rotation = R.from_quat([q1, q2, q3, q0])  # Note: scipy expects [x, y, z, w] order
+    q = np.array([q0, q1, q2, q3])  
+    q = q / (np.linalg.norm(q) + 1e-12)  # Normalize quaternion 
+    rotation = R.from_quat([q[1], q[2], q[3], q[0]])  # Note: scipy expects [x, y, z, w] order
 
     # Forward direction in body frame (longitudinal axis)
     forward_body = np.array([1, 0, 0])  # X-axis in body frame
@@ -106,7 +108,9 @@ def compute_B_point_backward(state, distance=0.655):
     x, y, z, q0, q1, q2, q3 = state[:7]
 
     # Create a rotation object from the quaternion
-    rotation = R.from_quat([q1, q2, q3, q0])  # Note: scipy expects [x, y, z, w] order
+    q = np.array([q0, q1, q2, q3])  
+    q = q / (np.linalg.norm(q) + 1e-12)  # Normalize quaternion 
+    rotation = R.from_quat([q[1], q[2], q[3], q[0]])  # Note: scipy expects [x, y, z, w] order
 
     # Forward direction in body frame (longitudinal axis)
     forward_body = np.array([1, 0, 0])  # X-axis in body frame

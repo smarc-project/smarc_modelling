@@ -5,6 +5,7 @@ import smarc_modelling.motion_planning.MotionPrimitives.GlobalVariables as glbv
 import sys
 sys.path.append('~/Desktop/smarc_modelling-master')
 from smarc_modelling.vehicles.SAM import SAM
+from smarc_modelling.vehicles.SAM_casadi import SAM_casadi
 from mpl_toolkits.mplot3d import Axes3D
 from smarc_modelling.motion_planning.MotionPrimitives.ObstacleChecker import *
 import math
@@ -23,7 +24,11 @@ class SAM_PRIMITIVES():
         self.t_eval = np.linspace(self.t_span[0], self.t_span[1], self.n_sim)
 
         # Create SAM instance
-        self.sam = SAM(self.dt)
+        # self.sam = SAM(self.dt)
+
+        self.sam = SAM_casadi(dt = self.dt)
+        self.dynamics = self.sam.dynamics()
+
 
     def dynamics_wrapper(self, x, ds_inputs, indexes):
         """
@@ -50,7 +55,8 @@ class SAM_PRIMITIVES():
             else:
                 u[int(indexes[ii])] = ds_inputs[ii]
 
-        return self.sam.dynamics(x, u)
+        # return self.sam.dynamics(x, u)
+        return self.dynamics(x, u)
 
     def curvePrimitives_singleStep(self, x, ds_inputs, indexes):
         '''
@@ -58,7 +64,7 @@ class SAM_PRIMITIVES():
         '''
 
         data = np.empty(len(x)) 
-        data[:] = x + self.dynamics_wrapper(x, ds_inputs, indexes) * self.dt 
+        data[:] = x + np.asarray(self.dynamics_wrapper(x, ds_inputs, indexes) * self.dt).ravel() 
         cost = self.computeCost(x, data[:])
 
         return data, cost

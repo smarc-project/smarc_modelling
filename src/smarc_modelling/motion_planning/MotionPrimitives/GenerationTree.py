@@ -151,11 +151,12 @@ def reconstruct_path_doubleTree(current, parents_dict, resolution_dict, map_inst
     # Return reversed path
     return final_path[::-1] 
 
-def process_input_pair(inputs, current_state, sim, map_instance, numberTree):
+def process_input_pair(inputs, current_state, map_instance, numberTree):
     '''This is the function that is parallelized'''
 
     # Initialize variables
     inputLen = len(inputs)
+    sim = SAM_PRIMITIVES()
 
     # If number of inputs is != from number of indices there is something wrong
     if inputLen % 2 != 0:
@@ -240,7 +241,8 @@ def compute_current_velocity_pointA(vertex):
 
     return v_fwd_inertial
 
-def get_neighbors(current, sim, map_instance, numberTree):
+
+def get_neighbors(current, map_instance, numberTree):
     """
     This function is used to compute the motion primitives for the current state.
 
@@ -289,9 +291,11 @@ def get_neighbors(current, sim, map_instance, numberTree):
     # Parallelize the creation of primitives
     arrived = False
     results = Parallel(n_jobs=multiprocessing.cpu_count())(
-        delayed(process_input_pair)(inputs, current.state, sim, map_instance, numberTree) for inputs in full_input_pairs
+        delayed(process_input_pair)(inputs, current.state, map_instance, numberTree) 
+          for inputs in full_input_pairs
     ) 
 
+    # Sequential version for testing
     # results = []
     # for inputs in full_input_pairs:
     #     result = process_input_pair(inputs, current.state, sim, map_instance, numberTree)
@@ -461,7 +465,7 @@ def find_tree_intersection(g_cost_tree1, g_cost_tree2, list_connection_states, m
     for idx2, coord2 in enumerate(coords_tree2):
 
         distance, index = tree1_kdtree.query(coord2)
-        if distance < minimumDistance:
+        if 1. < distance < minimumDistance:
             node1 = list(g_cost_tree1.keys())[index]
             node2 = list(g_cost_tree2.keys())[idx2]
             angle_deg = computeAngleDeg(node1.state, node2.state)
@@ -534,11 +538,11 @@ def double_a_star_search(ax, plt, map_instance, realTimeDraw, typeF_function, de
 
     # Initialise general variables (valid for both trees)
     random.seed()
-    sim = SAM_PRIMITIVES()
+    # sim = SAM_PRIMITIVES()
     dt_resolution = glbv.RESOLUTION_DT
     flag = 0    # for number of iterations
     nMaxIterations = 300
-    maxTime = 60 #300   # seconds
+    maxTime = 300 #300   # seconds
 
     # OCP settings
     update_solver_settings = True
@@ -576,7 +580,7 @@ def double_a_star_search(ax, plt, map_instance, realTimeDraw, typeF_function, de
         if flag > 0:
             status = 1
 
-            list_connection_states, moreThanMinimum = find_tree_intersection(g_cost, g_cost_secondTree, list_connection_states, 1, 50)
+            list_connection_states, moreThanMinimum = find_tree_intersection(g_cost, g_cost_secondTree, list_connection_states, 2, 50)
             if arrivedPoint and arrivedPoint_secondTree and not moreThanMinimum:
                 
                 distance = 0
@@ -608,7 +612,6 @@ def double_a_star_search(ax, plt, map_instance, realTimeDraw, typeF_function, de
                     list_connection = findBestConnectionNodes(list_connection_states)  
 
                     # Reconstruct the second path and invert v, w, rpm
-                    waypoints = []
                     first_path = reconstruct_path_doubleTree(Node(list_connection[0]), parents_dictionary,resolution_dictionary, map_instance, ax, plt)
                     second_path = reconstruct_path_doubleTree(Node(list_connection[-1]), parents_dictionary_secondTree, resolution_dictionary_secondTree, map_instance, ax, plt)
 
@@ -616,6 +619,7 @@ def double_a_star_search(ax, plt, map_instance, realTimeDraw, typeF_function, de
                     for _ in range(50):
                         second_path.insert(0, second_path[0])
                     
+                    waypoints = []
                     for waypoint in second_path:
                         reverted_waypoint = waypoint.copy()
                         reverted_waypoint[7:10] = -reverted_waypoint[7:10]
@@ -624,27 +628,27 @@ def double_a_star_search(ax, plt, map_instance, realTimeDraw, typeF_function, de
                         waypoints.append(reverted_waypoint)
 
                     # Create the list containing the two nodes to be connected
-                    list_connection_full = []
-                    for _ in range(10): # If you change it, you have to recompile Acados!
-                        list_connection_full.append(list_connection[0])
-                    list_connection_full.append(second_path[-1])
+                    # list_connection_full = []
+                    # for _ in range(10): # If you change it, you have to recompile Acados!
+                    #     list_connection_full.append(list_connection[0])
+                    # list_connection_full.append(second_path[-1])
                     
-                    # Optimizing the connection
-                    print(f"{bcolors.OKBLUE}Optimizing path for connection{bcolors.ENDC}")
+                    # # Optimizing the connection
+                    # print(f"{bcolors.OKBLUE}Optimizing path for connection{bcolors.ENDC}")
 
-                    connection_list_optimized, status = optimization_acados_doubleTree(list_connection_full, map_instance, update_solver_settings)
+                    # connection_list_optimized, status = optimization_acados_doubleTree(list_connection_full, map_instance, update_solver_settings)
                     
-                    if status != 0:
-                        print(f"{bcolors.FAIL}OPTIMIZATION FAILED! trying new connection points!{bcolors.ENDC}")
-                        update_solver_settings = False
-                        continue
+                    # if status != 0:
+                    #     print(f"{bcolors.FAIL}OPTIMIZATION FAILED! trying new connection points!{bcolors.ENDC}")
+                    #     update_solver_settings = False
+                    #     continue
                     
-                    print("real x0: ",list_connection_full[0])
-                    print("---------------")
-                    print("optimized x0: ", connection_list_optimized[0])
-                    print(f"{bcolors.OKGREEN}OPTIMIZATION SUCCEEDED!{bcolors.ENDC}")
+                    # print("real x0: ",list_connection_full[0])
+                    # print("---------------")
+                    # print("optimized x0: ", connection_list_optimized[0])
+                    # print(f"{bcolors.OKGREEN}OPTIMIZATION SUCCEEDED!{bcolors.ENDC}")
 
-                    # Define Q for reverting the second path
+                    # # Define Q for reverting the second path
                     Q_diag = np.ones(19)
                     Q_diag[ 0:3 ] = 15e1         # Position
                     Q_diag[ 3:7 ] = 15e2         # Quaternion
@@ -656,12 +660,13 @@ def double_a_star_search(ax, plt, map_instance, realTimeDraw, typeF_function, de
                     Q_diag[13:  ] = Q_diag[13:  ]
                     Q = np.diag(Q_diag)
 
-                    # Change the last vertex of the second path with the newly found from the optimization of the connection
-                    waypoints[-1] = connection_list_optimized[-1]
+                    # # Change the last vertex of the second path with the newly found from the optimization of the connection
+                    # waypoints[-1] = connection_list_optimized[-1]
                     
 
-                    # Optimize the second path
+                    # # Optimize the second path
                     
+                    waypoints.append(list_connection[0])
                     array_waypoints = np.asarray(waypoints[::-1])
                     #N_hor = array_waypoints.shape[0] // 2
                     N_hor = 25
@@ -670,15 +675,15 @@ def double_a_star_search(ax, plt, map_instance, realTimeDraw, typeF_function, de
                     if status != 0:
                         print(f"{bcolors.FAIL}Optimization failed - change connection points{bcolors.ENDC}")
                         continue
-                    print("real first second path: ", connection_list_optimized[-1])
-                    print("--------")
+                    # print("real first second path: ", connection_list_optimized[-1])
+                    # print("--------")
                     print("After MPC first second path: ", optimized_waypoints[0])
 
                     # Create the entire path
                     full_path_waypoints = []
                     for ii in range(len(first_path) - 1):
                         full_path_waypoints.append(first_path[ii])
-                    full_path_waypoints = full_path_waypoints + connection_list_optimized
+                    # full_path_waypoints = full_path_waypoints + connection_list_optimized
                     for ii in np.arange(1, len(optimized_waypoints)):
                         full_path_waypoints.append(optimized_waypoints[ii])
 
@@ -712,13 +717,13 @@ def double_a_star_search(ax, plt, map_instance, realTimeDraw, typeF_function, de
 
         # Find new neighbors (last point of the primitives) using the motion primitives
         if not arrivedPoint:
-            reached_states, last_states, neighbor_arrived, final = get_neighbors(current_node, sim, map_instance, 1)
+            reached_states, last_states, neighbor_arrived, final = get_neighbors(current_node, map_instance, 1)
             finalLast = final[0] # in case we arrived
             finalCost = final[1] # in case we arrived 
 
         # Find new neighbors for second tree (last point of the primitives) using the motion primitives
         if not arrivedPoint_secondTree:
-            reached_states_secondTree, last_states_secondTree, neighbor_arrived_secondTree, final_secondTree = get_neighbors(current_node_secondTree, sim, map_instance, 2)
+            reached_states_secondTree, last_states_secondTree, neighbor_arrived_secondTree, final_secondTree = get_neighbors(current_node_secondTree, map_instance, 2)
             finalLast_secondTree = final_secondTree[0] # in case we arrived
             finalCost_secondTree = final_secondTree[1] # in case we arrived 
 
@@ -833,7 +838,7 @@ def a_star_search(ax, plt, map_instance, realTimeDraw, typeF_function, dec):
 
     # Initialise general variables (valid for both trees)
     random.seed()
-    sim = SAM_PRIMITIVES()
+    # sim = SAM_PRIMITIVES()
     dt_resolution = glbv.RESOLUTION_DT
     flag = 0    # for number of iterations
     nMaxIterations = 300
@@ -877,7 +882,7 @@ def a_star_search(ax, plt, map_instance, realTimeDraw, typeF_function, dec):
             break
 
         # Find new neighbors (last point of the primitives) using the motion primitives
-        reached_states, last_states, arrivedPoint, final = get_neighbors(current_node, sim, map_instance, 1)
+        reached_states, last_states, arrivedPoint, final = get_neighbors(current_node, map_instance, 1)
         finalLast = final[0] # in case we arrived
         finalCost = final[1] # in case we arrived 
 
