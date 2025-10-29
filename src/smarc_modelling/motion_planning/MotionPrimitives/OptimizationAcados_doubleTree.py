@@ -216,7 +216,7 @@ def optimization_acados_doubleTree(waypoints, map_instance, update_solver_settin
     dt = glbv.RESOLUTION_DT
     N_horizon = len(waypoints)
     sam = SAM_casadi(dt)
-    nmpc = NMPC(sam, dt, N_horizon, update_solver_settings=False)
+    nmpc = NMPC(sam, dt, N_horizon, update_solver_settings=update_solver_settings)
     nx = nmpc.nx        # State vector length + control vector
     nu = nmpc.nu        # Control derivative vector length
     #ocp_solver = nmpc.setup_double_tree_ocp(map_instance)
@@ -247,7 +247,7 @@ def optimization_acados_doubleTree(waypoints, map_instance, update_solver_settin
 
     np.append(waypoints, waypoints[-1])
 
-    for stage in range(N_horizon+1):
+    for stage in range(N_horizon):
         ocp_solver.set(stage, "x", waypoints[stage])
     for stage in range(N_horizon):
         ocp_solver.set(stage, "u", np.zeros(nu,))

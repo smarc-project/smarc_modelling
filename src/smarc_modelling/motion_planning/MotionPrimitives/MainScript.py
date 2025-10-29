@@ -181,8 +181,8 @@ def MotionPlanningROS(start_state, goal_state, map_boundaries, map_resolution):
 
     # Save the trajectory into saved_trajectory.csv file
     print(f"{bcolors.HEADER}>> Save the trajectory >> saved_trajectory.csv{bcolors.ENDC}")
-    df = pd.DataFrame(trajectory, columns=["x", "y", "z", "q0", "q1", "q2", "q3", "u", "v", "w", "q", "p", "r", "V_bs", "l_cg", "ds", "dr", "rpm_1", "rpm_2"])
-    df.to_csv("saved_trajectory.csv", index=False)
+    # df = pd.DataFrame(trajectory, columns=["x", "y", "z", "q0", "q1", "q2", "q3", "u", "v", "w", "q", "p", "r", "V_bs", "l_cg", "ds", "dr", "rpm_1", "rpm_2"])
+    # df.to_csv("saved_trajectory.csv", index=False)
     print(f"{bcolors.OKGREEN}[ OK ]{bcolors.ENDC}")
     
     print(f"{bcolors.OKGREEN}THE END{bcolors.ENDC}")

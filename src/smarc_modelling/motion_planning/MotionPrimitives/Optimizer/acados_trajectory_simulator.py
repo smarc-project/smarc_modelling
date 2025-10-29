@@ -49,8 +49,8 @@ def main(trajectory, Q, N_hor, T_s, map_instance):       ##CHANGE: input traject
     trajectory = np.concatenate((trajectory, Uref), axis=1) 
 
     # Run the MPC setup
-    ocp_solver, integrator = nmpc.setup_path_planner(x0, map_instance)
-    # ocp_solver, integrator = nmpc.setup(x0, map_instance)
+    # ocp_solver, integrator = nmpc.setup_path_planner(x0, map_instance)
+    ocp_solver, integrator = nmpc.setup()
 
     # Initialize the state and control vector as David does
     for stage in range(N_horizon + 1):
