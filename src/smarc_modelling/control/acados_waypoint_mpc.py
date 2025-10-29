@@ -40,7 +40,7 @@ def run_simulation():
     # create ocp object to formulate the OCP
     Ts = 0.1           # Sampling time
     N_horizon = 10      # Prediction horizon
-    nmpc = NMPC(sam, Ts, N_horizon, update_solver_settings=True)
+    nmpc = NMPC(sam, Ts, N_horizon, update_solver_settings=False)
     nx = nmpc.nx        # State vector length + control vector
     nu = nmpc.nu        # Control derivative vector length
     
@@ -59,17 +59,48 @@ def run_simulation():
                    0.000e+00,  5.100e+01,  0.000e+00,  0.000e+00,  1.000e-06, 1.000e-06])           # control
 
     wp = np.array([6.613, -0.046, 0.656, 1.000, 0.000, 0.000, 0.000])
-    ref = np.zeros((N_horizon, (nx+nu)))
-    ref[:,:7] = wp
 
-    simX[0,:] = x0
+
+    #x1 = np.array([5.99753407e+00, -4.06226386e-01,  3.23957708e-01,  
+    #               9.42908026e-01, -1.46756791e-02, -8.69794573e-02, -3.29557911e-01,
+    #               8.50632486e-01, 2.72976806e-01, -8.55847578e-02,
+    #               -9.17501979e-02, -3.29360091e-02, -5.40336869e-01,
+    #               4.57000000e+01,  8.90000000e+01,  1.22173048e-01,
+    #               -1.22173048e-01,  2.00000000e+02,  2.00000000e+02])
+    #wp1 = np.array([ 6.45819326e+00,  8.81481501e-03,  6.45330350e-01,
+    #                9.87445887e-01, 7.62374772e-03,  1.98414515e-03, -1.60086317e-01,
+    #                1.20185214e-01, -2.16300081e-03,  8.24705091e-03,
+    #                1.41938657e-02,  8.86158953e-03, -7.84799751e-04,
+    #                5.00000000e+01,  5.00000000e+01,  1.22173048e-01,
+    #                3.49065850e-02,  2.00000000e+02,  2.00000000e+02])
+    x1 = np.array([5.99753407e+00, -4.06226386e-01,  3.23957708e-01,  
+                   9.42908026e-01, -1.46756791e-02, -8.69794573e-02, -3.29557911e-01,
+                   1.20185214e-01, -2.16300081e-03,  8.24705091e-03,
+                   1.41938657e-02,  8.86158953e-03, -7.84799751e-04,
+                   5.00000000e+01,  5.00000000e+01,  1.22173048e-01,
+                   3.49065850e-02,  2.00000000e+02,  2.00000000e+02])
+    wp1 = np.array([ 6.45819326e+00,  8.81481501e-03,  6.45330350e-01,  
+                    9.87445887e-01, 7.62374772e-03,  1.98414515e-03, -1.60086317e-01,
+                    1.20185214e-01, -2.16300081e-03,  8.24705091e-03,
+                    1.41938657e-02,  8.86158953e-03, -7.84799751e-04,
+                    5.00000000e+01,  5.00000000e+01,  1.22173048e-01,
+                    3.49065850e-02,  2.00000000e+02,  2.00000000e+02])
+
+    ref = np.zeros((N_horizon, (nx+nu)))
+    #ref[:,:7] = wp
+    ref[:,:19] = wp1
+
+    #print(f"x0: {type(x0)}, simX: {simX[0,:].shape}")
+    print(f"x0: {type(x1)}, wp: {type(wp)}")
+
+    simX[0,:] = x1
 
     # Run the MPC setup
     ocp_solver, integrator = nmpc.setup()
 
     # Initialize the state and control vector as David does
     for stage in range(N_horizon + 1):
-        ocp_solver.set(stage, "x", x0)
+        ocp_solver.set(stage, "x", x1)
     for stage in range(N_horizon):
         ocp_solver.set(stage, "u", np.zeros(nu,))
 
@@ -106,6 +137,7 @@ def run_simulation():
         simU[i, :] = ocp_solver.get(0, "u")
         
         simX[i+1, :] = integrator.simulate(x=simX[i, :], u=simU[i, :])
+        #print(f"i: {i}, simX: {simU[i,:]}")
 
     data = np.concatenate([simX.T, simU.T])
 
