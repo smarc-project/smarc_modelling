@@ -214,13 +214,14 @@ def create_ocp(model, x0, x_last, N, map_instance):
 def optimization_acados_doubleTree(waypoints, map_instance, update_solver_settings=False):
     # Define class and model
     dt = glbv.RESOLUTION_DT
-    N_horizon = len(waypoints)
+    N_horizon = 30 #len(waypoints)
     sam = SAM_casadi(dt)
-    nmpc = NMPC(sam, dt, N_horizon, update_solver_settings=False)
+    nmpc = NMPC(sam, dt, N_horizon, update_solver_settings=update_solver_settings)
     nx = nmpc.nx        # State vector length + control vector
     nu = nmpc.nu        # Control derivative vector length
     #ocp_solver = nmpc.setup_double_tree_ocp(map_instance)
-    ocp_solver, integrator = nmpc.setup_path_planner(map_instance)
+    #ocp_solver, integrator = nmpc.setup_path_planner(map_instance)
+    ocp_solver, integrator = nmpc.setup()
     #model = nmpc.export_dynamics_model(sam)
 
     ## Create ocp
@@ -242,20 +243,17 @@ def optimization_acados_doubleTree(waypoints, map_instance, update_solver_settin
     ## Solve Acados (For compiling, change both flags to true)
     #ocp_solver = AcadosOcpSolver(ocp, json_file=ocp_dir, generate=False, build=False)
 
-    np.set_printoptions(precision=3)
-    print(f"double tree: {len(waypoints)}")
 
-    np.append(waypoints, waypoints[-1])
+    np.printoptions(precision=3)
+    print(f"waypoints: {waypoints}")
 
+    # Warmstart with all
     for stage in range(N_horizon+1):
-        ocp_solver.set(stage, "x", waypoints[stage])
+        ocp_solver.set(stage, "x", waypoints[0])
     for stage in range(N_horizon):
         ocp_solver.set(stage, "u", np.zeros(nu,))
 
-    #ocp_solver.set(N_horizon+1, "x", waypoints[-1])
-
-
-    # Change y_ref of last point
+    # Terminal Constraint
     ocp_solver.set(N_horizon, "y_ref", waypoints[-1])
 
     # Change x0 
