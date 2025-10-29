@@ -538,7 +538,10 @@ def double_a_star_search(ax, plt, map_instance, realTimeDraw, typeF_function, de
     dt_resolution = glbv.RESOLUTION_DT
     flag = 0    # for number of iterations
     nMaxIterations = 300
-    maxTime = 300   # seconds
+    maxTime = 60 #300   # seconds
+
+    # OCP settings
+    update_solver_settings = True
 
     # First tree variables
     x0 = map_instance["initial_state"]
@@ -629,10 +632,11 @@ def double_a_star_search(ax, plt, map_instance, realTimeDraw, typeF_function, de
                     # Optimizing the connection
                     print(f"{bcolors.OKBLUE}Optimizing path for connection{bcolors.ENDC}")
 
-                    connection_list_optimized, status = optimization_acados_doubleTree(list_connection_full, map_instance)
+                    connection_list_optimized, status = optimization_acados_doubleTree(list_connection_full, map_instance, update_solver_settings)
                     
                     if status != 0:
                         print(f"{bcolors.FAIL}OPTIMIZATION FAILED! trying new connection points!{bcolors.ENDC}")
+                        update_solver_settings = False
                         continue
                     
                     print("real x0: ",list_connection_full[0])
