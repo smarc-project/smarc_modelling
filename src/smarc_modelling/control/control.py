@@ -30,15 +30,15 @@ class NMPC:
         Q_diag[ 0:2 ] = 100     # Position:         standard 10
         Q_diag[ 2 ] = 500       # z-Position:         standard 10
         Q_diag[ 3:7 ] = 10       # Quaternion:       standard 10
-        Q_diag[ 7:10] = 1       # linear velocity:  standard 1
+        Q_diag[ 7:10] = 10       # linear velocity:  standard 1
         Q_diag[10:13] = 1       # Angular velocity: standard 1
 
         # Control weight matrix - Costs set according to Bryson's rule
         Q_diag[13] = 1e-5            # VBS:      Standard: 1e-4
         Q_diag[14] = 1e-5            # LCG:      Standard: 1e-4
         Q_diag[ 15  ] = 5e2             # stern_angle:   Standard: 100
-        Q_diag[ 16  ] = 1e3             # rudder_angle:  Standard: 100
-        Q_diag[17:  ] = 1e-6            # RPM1 And RPM2: Standard: 1e-6
+        Q_diag[ 16  ] = 1e2             # rudder_angle:  Standard: 100
+        Q_diag[17:  ] = 1e-3            # RPM1 And RPM2: Standard: 1e-6
         Q_diag[13:  ] = Q_diag[13:  ]   # Adjustment to all control weights
         Q = np.diag(Q_diag)
 
@@ -46,7 +46,8 @@ class NMPC:
         R_diag = np.ones(self.nu)
         R_diag[0] = 1e-1        # VBS
         R_diag[1] = 1e-1        # LCG
-        R_diag[2:4] = 1e2
+        R_diag[2] = 1e2
+        R_diag[3] = 1e3
         R_diag[4: ] = 1e-5
         R = np.diag(R_diag)*1e-3
 
@@ -86,6 +87,15 @@ class NMPC:
         pos_lbx = np.array([x_min, y_min, z_min])
         pos_ubx = np.array([x_max, y_max, z_max])
 
+        # --- velocity constraints
+        # Note, these are arbitrary guesses...
+        x_dot_min, x_dot_max = -5.0, 5.0
+        y_dot_min, y_dot_max = -2.0, 2.0
+        z_dot_min, z_dot_max = -2.0, 2.0
+
+        vel_lbx = np.array([x_dot_min, y_dot_min, z_dot_min])
+        vel_ubx = np.array([x_dot_max, y_dot_max, z_dot_max])
+
         # --- actuator state bounds for x[13:19] = [x_vbs, x_lcg, δs, δr, rpm1, rpm2] ---
         act_lbx = np.array([  0.0,   0.0, -np.deg2rad(7), -np.deg2rad(7),  -400.0,  -400.0])
         act_ubx = np.array([100.0, 100.0,  np.deg2rad(7),  np.deg2rad(7),   400.0,   400.0])
@@ -101,6 +111,8 @@ class NMPC:
 
         ## Soft Constraints
         idxsbx = np.array([0, 1, 2])    # Index of constraints we want to slacken
+        #n_soft_constraints = len(idxbx)
+        #idxsbx = np.linspace(0, n_soft_constraints-1, n_soft_constraints, dtype=int)    # Index of constraints we want to slacken
 
         # soften exactly those same state bounds:
         self.ocp.constraints.idxsbx = idxsbx
@@ -126,6 +138,9 @@ class NMPC:
         self.ocp.solver_options.sim_method_newton_iter = 2 #3 default
 
         self.ocp.solver_options.nlp_solver_type = 'SQP_RTI'
+        #self.ocp.solver_options.nlp_solver_type = 'SQP_WITH_FEASIBLE_QP'
+        #self.ocp.solver_options.search_direction_mode = 'BYRD_OMOJOKUN'
+        #self.ocp.solver_options.allow_direction_mode_switch_to_nominal = False
         self.ocp.solver_options.nlp_solver_max_iter = 1 #80
         self.ocp.solver_options.tol    = 1e-6       # NLP tolerance. 1e-6 is default for tolerances
         self.ocp.solver_options.qp_tol = 1e-6       # QP tolerance

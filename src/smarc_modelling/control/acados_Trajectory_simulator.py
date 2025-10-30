@@ -113,7 +113,8 @@ def main():
     # create ocp object to formulate the OCP
     Ts = 0.1           # Sampling time
     N_horizon = 30 #12      # Prediction horizon
-    nmpc = NMPC(sam, Ts, N_horizon, update_solver_settings=True)
+    build = True
+    nmpc = NMPC(sam, Ts, N_horizon, update_solver_settings=build)
     nx = nmpc.nx        # State vector length + control vector
     nu = nmpc.nu        # Control derivative vector length
     nc = 1
@@ -125,13 +126,15 @@ def main():
     #file_path = "/home/admin/smarc_modelling/src/Trajectories/REPORT/medium/case_medium.csv"
     #file_path = "/home/admin/smarc_modelling/src/Trajectories/report_update/easy/trajectories/case_easy0.csv"
     #file_path = "/home/parallels/ros2_ws/src/smarc2/behaviours/sam/sam_diving_controller/sam_diving_controller/trajectoryComplexity3.csv"
-    file_path = "/home/parallels/ros2_ws/src/smarc2/behaviours/sam/sam_diving_controller/sam_diving_controller/simple_path_complexity_1_3.csv"
+    #file_path = "/home/parallels/ros2_ws/src/smarc2/behaviours/sam/sam_diving_controller/sam_diving_controller/trajectories/good_trajectory2.csv"
+    file_path = "/home/parallels/ros2_ws/src/smarc2/behaviours/sam/sam_diving_controller/sam_diving_controller/trajectories/straight_trajectory_1.csv"
 
 
     #file_path = "/home/admin/smarc_modelling/src/Trajectories/resolution01.csv"  
     trajectory = read_csv_to_array(file_path)
     # Declare duration of sim. and the x_axis in the plots
-    Nsim = (trajectory.shape[0])            # The sim length should be equal to the number of waypoints
+    Tsim = 50
+    Nsim = int(Tsim/Ts) #(trajectory.shape[0])            # The sim length should be equal to the number of waypoints
     x_axis = np.linspace(0, Ts*Nsim, Nsim)
 
     simU = np.zeros((Nsim, nu))     # Matrix to store the optimal control derivative
@@ -158,13 +161,60 @@ def main():
     # Array to store the time values
     t = np.zeros((Nsim))
 
+
+    ref = np.zeros((N_horizon,trajectory.shape[1]))
+    print(f"ref: {ref.shape}")
+
+    traj_index = 0
+    traj_len = trajectory.shape[0]
+
+    print(f"traj len: {traj_len}")
+
+    ref_0 = np.zeros((Nsim,trajectory.shape[1]))
+
     # closed loop - simulation
     for i in range(Nsim):
         # extract the sub-trajectory for the horizon
-        if i <= (Nsim - N_horizon):
+        # NOTE: This is only based on the euclidean distance between two points
+        # and doesn't consider the orientation. Ideally, we would have the
+        # proper pose difference in SO(3) for that.
+
+        # Get current position
+        x_current = simX[i,0]
+        y_current = simX[i,1]
+        z_current = simX[i,2]
+
+
+        # Check if we have enough trajectory left for the prediction horizon
+        if traj_index + N_horizon < traj_len:
+            # Get distance to current waypoint
+            d_current = np.sqrt((x_current - trajectory[traj_index,0])**2 + 
+                                (y_current - trajectory[traj_index,1])**2 +
+                                (z_current - trajectory[traj_index,2])**2)
+
+            # Get distance to next waypoint
+            d_next = np.sqrt((x_current - trajectory[traj_index+1,0])**2 + 
+                            (y_current - trajectory[traj_index+1,1])**2 +
+                            (z_current - trajectory[traj_index+1,2])**2)
+
+            # Set trajectory index accordingly
+            if d_next < d_current:
+                traj_index += 1
+
+        # Get subtrajectory starting at closest waypoint
+        #ref = trajectory[traj_index:traj_index + N_horizon, :]
+        #ref_0[i,:] = ref[0,:]
+
+        #if i <= (Nsim - N_horizon):
+        if i + N_horizon <= traj_len:
             ref = trajectory[i:i + N_horizon, :]
+        #elif i >= traj_len:
+        #    ref = trajectory[-1,:]
         else:
-            ref = trajectory[i:, :]
+            ref = np.zeros((N_horizon,trajectory.shape[1]))
+            ref[:,:] = trajectory[-1, :]
+        #ref[:,:] = trajectory[-1, :]
+        ref_0[i,:] = ref[0,:]
 
         # Update reference vector
         # If the end of the trajectory has been reached, (ref.shape < N_horizon)
@@ -187,8 +237,8 @@ def main():
             status = ocp_solver.solve()
             #ocp_solver.print_statistics()
             if status != 0:
-                break
-                print(f" Note: acados_ocp_solver returned status: {status}")
+                #break
+                print(f" i: {i}, Note: acados_ocp_solver returned status: {status}")
 
             # simulate system
             t[i] = ocp_solver.get_stats('time_tot')
@@ -198,6 +248,10 @@ def main():
         noise_vector = np.zeros(19)
         #noise_vector[0:3] = np.array([(np.random.random()-0.5)/10,(np.random.random()-0.5)/10, (np.random.random()-0.5)/10])
         simX[i+1, :] = integrator.simulate(x=simX[i, :]+noise_vector, u=simU[i, :])
+        np.set_printoptions(precision=3)
+        #print(f"simX: {simX[i,:]}")
+        #print(f"simU: {simU[i,:]}")
+        #print(f"i: {i}, traj_index: {traj_index}")
      
 
     # evaluate timings
@@ -214,8 +268,13 @@ def main():
     # Extract the optimal control sequence
     optimal_u = simX[:, 13:]
     #save_csv(simX,t)
-    rmse(simX[:-1], trajectory)
-    plot.plot_function(x_axis, trajectory, simX[:-1], simU)
+    #rmse(simX[:-1], trajectory)
+
+    zero_values = np.zeros((Nsim, nx))
+    zero_values[:,3] = 1.
+    #plot.plot_function(x_axis, trajectory, zero_values, simU)
+    #plot.plot_function(x_axis, trajectory, simX[:-1], simU)
+    plot.plot_function(x_axis, ref_0, simX[:-1], simU)
     ocp_solver = None
 
 
