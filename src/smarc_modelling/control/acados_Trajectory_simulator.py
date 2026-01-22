@@ -127,7 +127,7 @@ def main():
     #file_path = "/home/admin/smarc_modelling/src/Trajectories/report_update/easy/trajectories/case_easy0.csv"
     #file_path = "/home/parallels/ros2_ws/src/smarc2/behaviours/sam/sam_diving_controller/sam_diving_controller/trajectoryComplexity3.csv"
     #file_path = "/home/parallels/ros2_ws/src/smarc2/behaviours/sam/sam_diving_controller/sam_diving_controller/trajectories/good_trajectory2.csv"
-    file_path = "/home/parallels/ros2_ws/src/smarc2/behaviours/sam/sam_diving_controller/sam_diving_controller/trajectories/straight_trajectory_1.csv"
+    file_path = "/home/orin/colcon_ws/src/smarc2/behaviours/sam/sam_diving_controller/sam_diving_controller/trajectories/straight_trajectory_1.csv"
 
 
     #file_path = "/home/admin/smarc_modelling/src/Trajectories/resolution01.csv"  
@@ -274,7 +274,7 @@ def main():
     zero_values[:,3] = 1.
     #plot.plot_function(x_axis, trajectory, zero_values, simU)
     #plot.plot_function(x_axis, trajectory, simX[:-1], simU)
-    plot.plot_function(x_axis, ref_0, simX[:-1], simU)
+    #plot.plot_function(x_axis, ref_0, simX[:-1], simU)
     ocp_solver = None
 
 

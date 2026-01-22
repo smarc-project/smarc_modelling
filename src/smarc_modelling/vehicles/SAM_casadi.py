@@ -207,7 +207,7 @@ class SAM_casadi():
         
         # Some factors to make sim agree with real life data, these are eyeballed from sim vs gt data
         #self.vbs_factor = 0.5 # How sensitive the vbs is
-        #self.inertia_factor = 2 # Adjust how quickly we can change direction
+        self.inertia_factor = 10 # Adjust how quickly we can change direction
         #self.damping_factor = 60 # Adjust how much the damping affect acceleration high number = move less
         #self.damping_rot = 5 # Adjust how much the damping affects the rotation high number = less rotation should be tuned on bag where we turn without any control inputs
         #self.thruster_rot_strength = 1  # Just making the thruster a bit stronger for rotation
@@ -245,8 +245,8 @@ class SAM_casadi():
 
         # Rigid-body mass matrix expressed in CO
         u_init = np.zeros(6)
-        u_init[0] = 72 
-        u_init[1] = 75 #45
+        u_init[0] = 50 #72 
+        u_init[1] = 50 #75 #45
         self.x_vbs_init = self.calculate_vbs_position(u_init)
         # Update actuators
         self.x_vbs = self.calculate_vbs_position(u_init) 
@@ -284,19 +284,19 @@ class SAM_casadi():
 
         # NOTE: These need to be identified properly
         # Damping coefficients
-        self.Xuu = 1e-0 * 50 # default: 3 #100     # x-damping
-        self.Yvv = 1e-1 * 50 # default: 50    # y-damping
-        self.Zww = 1e1 * 150 # default: 50    # z-damping
-        self.Kpp = 1e-1 * 40 # default: 40    # Roll damping
-        self.Mqq = 1e-2 * 150 # default: 200    # Pitch damping
-        self.Nrr = 1e1 * 150 # default: 10    # Yaw dampin
+        #self.Xuu = 1e-0 * 50 # default: 3 #100     # x-damping
+        #self.Yvv = 1e-1 * 50 # default: 50    # y-damping
+        #self.Zww = 1e1 * 150 # default: 50    # z-damping
+        #self.Kpp = 1e-1 * 40 # default: 40    # Roll damping
+        #self.Mqq = 1e-2 * 150 # default: 200    # Pitch damping
+        #self.Nrr = 1e1 * 150 # default: 10    # Yaw dampin
 
-        #self.Xuu = 3 #100     # x-damping
-        #self.Yvv = 50    # y-damping
-        #self.Zww = 50    # z-damping
-        #self.Kpp = 40    # Roll damping
-        #self.Mqq = 200    # Pitch damping
-        #self.Nrr = 10    # Yaw damping
+        self.Xuu = 3 #100     # x-damping
+        self.Yvv = 50    # y-damping
+        self.Zww = 50    # z-damping
+        self.Kpp = 40    # Roll damping
+        self.Mqq = 200    # Pitch damping
+        self.Nrr = 10    # Yaw damping
 
         # Center of effort -> where the thrust force acts?
         self.x_cp = 0.1
@@ -325,8 +325,9 @@ class SAM_casadi():
             d_ss=0.19,
             #m_ss=12.225-1,
             #p_CSsg_O = np.array([0.74+0.05, 0, 0.06]),
-            p_CSsg_O = np.array([0.74+0.0175, 0, 0.0]),
-            m_ss=14.9-1,
+            #p_CSsg_O = np.array([0.74+0.0175, 0, 0.0]),
+            p_CSsg_O = np.array([0.74, 0, 0.0]),
+            m_ss=14.9,
             #p_CSsg_O = np.array([0.74, 0, 0.06]),
             p_OC_O=self.p_OC_O
         )
@@ -341,9 +342,9 @@ class SAM_casadi():
 
         self.lcg = LongitudinalCenterOfGravityControl(
             l_lcg_l=0.223,
-            l_lcg_r=0.1,
-            #l_lcg_r=0.06,
-            m_lcg=2.6+1,
+            #l_lcg_r=0.1,
+            l_lcg_r=0.06,
+            m_lcg=2.6,
             h_lcg_dim=0.08,
             p_OC_O=self.p_OC_O
         )
@@ -532,8 +533,8 @@ class SAM_casadi():
         # everythign is more or less symmetric etc. That's not true. Hence, we
         # adjust the inertias to match the tank experiments until we actually
         # measured them.
-        #self.J_total[0, 0] *= self.inertia_factor
-        self.J_total[1,1] *= 100
+        self.J_total[0, 0] *= self.inertia_factor
+        #self.J_total[1,1] *= 100
 
 
     def calculate_M(self):

@@ -21,7 +21,7 @@ x0 = np.concatenate([eta0, nu0, u0])
 
 # Simulation timespan
 dt = 0.01 #0.01 
-t_span = (0, 10)  # 20 seconds simulation
+t_span = (0, 3)  # 20 seconds simulation
 n_sim = int(t_span[1]/dt)
 t_eval = np.linspace(t_span[0], t_span[1], n_sim)
 
@@ -47,7 +47,7 @@ def rk4(x, u, dt, fun):
     x_t = x + dt/6 * (k1 + 2*k2 + 2*k3 + k4)
 
     np.set_printoptions(precision=3)
-    print(f"vbs: {x_t.full().flatten()[13]}; vbs_dot: {k1.full().flatten()[13]}")
+    #print(f"vbs: {x_t.full().flatten()[13]}; vbs_dot: {k1.full().flatten()[13]}")
 
     return x_t.full().flatten()
 
@@ -57,11 +57,11 @@ def run_simulation(t_span, x0, dt, sam):
     """
 
     u = np.zeros(6)
-    u[0] = 12000#*np.sin((i/(20/0.02))*(3*np.pi/4))        # VBS
+    u[0] = 50 #*np.sin((i/(20/0.02))*(3*np.pi/4))        # VBS
     u[1] = 50 # LCG
     u[2] = 0 #np.deg2rad(7)    # Vertical (stern)
-    u[3] = 0 #-np.deg2rad(7)   # Horizontal (rudder)
-    u[4] = 0 #1000     # RPM 1
+    u[3] = -np.deg2rad(7)   # Horizontal (rudder)
+    u[4] = 1000 #1000     # RPM 1
     u[5] = u[4]     # RPM 2
 
     # Run integration
@@ -106,12 +106,12 @@ def plot_results(sol):
     _, axs = plt.subplots(8, 3, figsize=(12, 10))
 
     # Position plots
-    axs[0,0].plot(sol.t, sol.y[1], label='x')
-    axs[0,1].plot(sol.t, sol.y[0], label='y')
-    axs[0,2].plot(sol.t, -sol.y[2], label='z')
+    axs[0,0].plot(sol.t, sol.y[0], label='x')
+    axs[0,1].plot(sol.t, sol.y[1], label='y')
+    axs[0,2].plot(sol.t, sol.y[2], label='z')
     axs[0,0].set_ylabel('x Position [m]')
     axs[0,1].set_ylabel('y Position [m]')
-    axs[0,2].set_ylabel('-z Position [m]')
+    axs[0,2].set_ylabel('z Position [m]')
 
     # Euler plots
     axs[1,0].plot(sol.t, np.rad2deg(phi_vec), label='roll')
@@ -200,6 +200,7 @@ def plot_trajectory(sol, numDataPoints, generate_gif=False, filename="3d.gif", F
     
     # Line/trajectory plot
     line = plt.plot(dataSet[0], dataSet[1], dataSet[2], lw=2, c='b')[0] 
+    start = plt.plot(dataSet[0,0], dataSet[1,0], dataSet[2,0], lw=2, c='g', marker='o')[0]
 
     # Setting the axes properties
     ax.set_xlabel('X / East')

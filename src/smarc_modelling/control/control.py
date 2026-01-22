@@ -27,29 +27,30 @@ class NMPC:
         # --------------------------- Cost setup ---------------------------------
         # State weight matrix
         Q_diag = np.ones(self.nx)
-        Q_diag[ 0:2 ] = 100     # Position:         standard 10
-        Q_diag[ 2 ] = 500       # z-Position:         standard 10
-        Q_diag[ 3:7 ] = 10       # Quaternion:       standard 10
-        Q_diag[ 7:10] = 10       # linear velocity:  standard 1
+        Q_diag[ 0 ] = 500     # Position:         standard 10
+        Q_diag[ 1 ] = 10     # Position:         standard 10
+        Q_diag[ 2 ] = 100       # z-Position:         standard 10
+        Q_diag[ 3:7 ] = 1       # Quaternion:       standard 10
+        Q_diag[ 7:10] = 1       # linear velocity:  standard 1
         Q_diag[10:13] = 1       # Angular velocity: standard 1
 
         # Control weight matrix - Costs set according to Bryson's rule
         Q_diag[13] = 1e-5            # VBS:      Standard: 1e-4
         Q_diag[14] = 1e-5            # LCG:      Standard: 1e-4
-        Q_diag[ 15  ] = 5e2             # stern_angle:   Standard: 100
-        Q_diag[ 16  ] = 1e2             # rudder_angle:  Standard: 100
-        Q_diag[17:  ] = 1e-3            # RPM1 And RPM2: Standard: 1e-6
-        Q_diag[13:  ] = Q_diag[13:  ]   # Adjustment to all control weights
+        Q_diag[15] = 5e2             # stern_angle:   Standard: 100
+        Q_diag[16] = 1e2             # rudder_angle:  Standard: 100
+        Q_diag[17:] = 1e-6 #1e-3            # RPM1 And RPM2: Standard: 1e-6
+        #Q_diag[13:] = Q_diag[13:  ]   # Adjustment to all control weights
         Q = np.diag(Q_diag)
 
         # Control rate of change weight matrix - control inputs as [x_vbs, x_lcg, delta_s, delta_r, rpm1, rpm2]
         R_diag = np.ones(self.nu)
-        R_diag[0] = 1e-1        # VBS
+        R_diag[0] = 1e-2 #1e-1        # VBS
         R_diag[1] = 1e-1        # LCG
         R_diag[2] = 1e2
         R_diag[3] = 1e3
         R_diag[4: ] = 1e-5
-        R = np.diag(R_diag)*1e-3
+        R = np.diag(R_diag)#*1e-3
 
         # Stage costs
         self.model.p = ca.MX.sym('ref_param', self.nx+self.nu,1)
@@ -138,12 +139,14 @@ class NMPC:
         self.ocp.solver_options.sim_method_newton_iter = 2 #3 default
 
         self.ocp.solver_options.nlp_solver_type = 'SQP_RTI'
+        #self.ocp.solver_options.nlp_solver_type = 'SQP'
         #self.ocp.solver_options.nlp_solver_type = 'SQP_WITH_FEASIBLE_QP'
         #self.ocp.solver_options.search_direction_mode = 'BYRD_OMOJOKUN'
         #self.ocp.solver_options.allow_direction_mode_switch_to_nominal = False
         self.ocp.solver_options.nlp_solver_max_iter = 1 #80
         self.ocp.solver_options.tol    = 1e-6       # NLP tolerance. 1e-6 is default for tolerances
         self.ocp.solver_options.qp_tol = 1e-6       # QP tolerance
+        #self.ocp.solver_options.qp_mu0 = 5e-1       # QP initial barrier 
 
         self.ocp.solver_options.globalization = 'MERIT_BACKTRACKING'
         #self.ocp.solver_options.regularize_method = 'NO_REGULARIZE'
