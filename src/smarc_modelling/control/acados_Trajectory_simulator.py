@@ -127,7 +127,7 @@ def main():
     #file_path = "/home/admin/smarc_modelling/src/Trajectories/report_update/easy/trajectories/case_easy0.csv"
     #file_path = "/home/parallels/ros2_ws/src/smarc2/behaviours/sam/sam_diving_controller/sam_diving_controller/trajectoryComplexity3.csv"
     #file_path = "/home/parallels/ros2_ws/src/smarc2/behaviours/sam/sam_diving_controller/sam_diving_controller/trajectories/good_trajectory2.csv"
-    file_path = "/home/parallels/ros2_ws/src/smarc2/behaviours/sam/sam_diving_controller/sam_diving_controller/trajectories/straight_trajectory_1.csv"
+    file_path = "/home/orin/colcon_ws/src/smarc2/behaviours/sam/sam_diving_controller/sam_diving_controller/trajectories/straight_trajectory_1.csv"
 
 
     #file_path = "/home/admin/smarc_modelling/src/Trajectories/resolution01.csv"  
@@ -141,13 +141,21 @@ def main():
     simX = np.zeros((Nsim+1, nx))   # Matrix to store the simulated states
 
 
-    # Declare the initial state
-    x0 = trajectory[0] 
-    simX[0,:] = x0
+    # Declare the initial state — pad to nx if CSV has fewer columns
+    x0 = np.zeros(nx)
+    x0[:trajectory.shape[1]] = trajectory[0]
+    simX[0, :] = x0
 
-    # Augment the trajectory and control input reference 
-    Uref = np.zeros((trajectory.shape[0], nu))  # Derivative reference - set to 0 to penalize fast control changes
-    trajectory = np.concatenate((trajectory, Uref), axis=1) 
+    # Augment trajectory: pad to N_PHYS_STATES, then add theta + control columns
+    n_phys = nmpc.N_PHYS_STATES
+    if trajectory.shape[1] < n_phys:
+        trajectory = np.concatenate(
+            (trajectory, np.zeros((trajectory.shape[0], n_phys - trajectory.shape[1]))),
+            axis=1,
+        )
+    theta_col = np.zeros((trajectory.shape[0], 1))
+    Uref = np.zeros((trajectory.shape[0], nu))
+    trajectory = np.concatenate((trajectory, theta_col, Uref), axis=1)
 
     # Run the MPC setup
     ocp_solver, integrator = nmpc.setup()
@@ -216,17 +224,22 @@ def main():
         #ref[:,:] = trajectory[-1, :]
         ref_0[i,:] = ref[0,:]
 
-        # Update reference vector
-        # If the end of the trajectory has been reached, (ref.shape < N_horizon)
-        # set the following waypoints in the horizon to the last waypoint of the trajectory
-        for stage in range(N_horizon):
-            if ref.shape[0] < N_horizon and ref.shape[0] != 0:
-                ocp_solver.set(stage, "p", ref[ref.shape[0]-1,:])
-            else:
-                ocp_solver.set(stage, "p", ref[stage,:])
+        # Build 34-element parameter vector per stage
+        goal_pos = trajectory[-1, :3]
+        t_hat_default = np.array([1.0, 0.0, 0.0])
+        stage_yref = np.zeros(nmpc.n_stage_cost)
+        stage_yref[5] = 0.5
 
-        # Set the terminal state reference
-        ocp_solver.set(N_horizon, "yref", ref[-1,:nx])
+        for stage in range(N_horizon):
+            row = ref[min(stage, ref.shape[0] - 1), :]
+            p = np.r_[row, goal_pos, t_hat_default, 0.0]
+            ocp_solver.set(stage, "p", p)
+            ocp_solver.set(stage, "yref", stage_yref)
+
+        terminal_row = ref[-1, :]
+        p_terminal = np.r_[terminal_row, goal_pos, t_hat_default, 0.0]
+        ocp_solver.set(N_horizon, "p", p_terminal)
+        ocp_solver.set(N_horizon, "yref", np.zeros(nmpc.n_terminal_cost))
  
         # Set current state
         ocp_solver.set(0, "lbx", simX[i, :])
@@ -245,7 +258,7 @@ def main():
             for k in range(nc):
                 simU[i+k, :] = ocp_solver.get(k, "u")
         
-        noise_vector = np.zeros(19)
+        noise_vector = np.zeros(nx)
         #noise_vector[0:3] = np.array([(np.random.random()-0.5)/10,(np.random.random()-0.5)/10, (np.random.random()-0.5)/10])
         simX[i+1, :] = integrator.simulate(x=simX[i, :]+noise_vector, u=simU[i, :])
         np.set_printoptions(precision=3)
@@ -274,7 +287,7 @@ def main():
     zero_values[:,3] = 1.
     #plot.plot_function(x_axis, trajectory, zero_values, simU)
     #plot.plot_function(x_axis, trajectory, simX[:-1], simU)
-    plot.plot_function(x_axis, ref_0, simX[:-1], simU)
+    #plot.plot_function(x_axis, ref_0, simX[:-1], simU)
     ocp_solver = None
 
 

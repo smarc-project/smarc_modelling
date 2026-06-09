@@ -54,9 +54,10 @@ def run_simulation():
     simX = np.zeros((Nsim, nx))   # Matrix to store the simulated states
 
     # Declare the initial state
-    x0 = np.array([1.469e+00, -4.231e-02,  4.699e-03, 1.000e+00, 0.000e+00,0.000e+00, 0.000e+00,    # eta
-                   0.000e+00, 0.000e+00, -0.000e+00,  0.000e+00, 0.000e+00, 0.000e+00,              # nu
-                   0.000e+00,  5.100e+01,  0.000e+00,  0.000e+00,  1.000e-06, 1.000e-06])           # control
+    x0 = np.zeros(nx)
+    x0[:19] = [1.469e+00, -4.231e-02, 4.699e-03, 1.000e+00, 0.0, 0.0, 0.0,    # eta
+               0.0, 0.0, 0.0, 0.0, 0.0, 0.0,                                    # nu
+               0.0, 5.100e+01, 0.0, 0.0, 1e-06, 1e-06]                           # control
 
     wp = np.array([6.613, -0.046, 0.656, 1.000, 0.000, 0.000, 0.000])
 
@@ -73,22 +74,23 @@ def run_simulation():
     #                1.41938657e-02,  8.86158953e-03, -7.84799751e-04,
     #                5.00000000e+01,  5.00000000e+01,  1.22173048e-01,
     #                3.49065850e-02,  2.00000000e+02,  2.00000000e+02])
-    x1 = np.array([5.99753407e+00, -4.06226386e-01,  3.23957708e-01,  
-                   9.42908026e-01, -1.46756791e-02, -8.69794573e-02, -3.29557911e-01,
-                   1.20185214e-01, -2.16300081e-03,  8.24705091e-03,
-                   1.41938657e-02,  8.86158953e-03, -7.84799751e-04,
-                   5.00000000e+01,  5.00000000e+01,  1.22173048e-01,
-                   3.49065850e-02,  2.00000000e+02,  2.00000000e+02])
-    wp1 = np.array([ 6.45819326e+00,  8.81481501e-03,  6.45330350e-01,  
-                    9.87445887e-01, 7.62374772e-03,  1.98414515e-03, -1.60086317e-01,
-                    1.20185214e-01, -2.16300081e-03,  8.24705091e-03,
-                    1.41938657e-02,  8.86158953e-03, -7.84799751e-04,
-                    5.00000000e+01,  5.00000000e+01,  1.22173048e-01,
-                    3.49065850e-02,  2.00000000e+02,  2.00000000e+02])
+    x1 = np.zeros(nx)
+    x1[:19] = [5.99753407e+00, -4.06226386e-01, 3.23957708e-01,
+               9.42908026e-01, -1.46756791e-02, -8.69794573e-02, -3.29557911e-01,
+               1.20185214e-01, -2.16300081e-03, 8.24705091e-03,
+               1.41938657e-02, 8.86158953e-03, -7.84799751e-04,
+               5.00000000e+01, 5.00000000e+01, 1.22173048e-01,
+               3.49065850e-02, 2.00000000e+02, 2.00000000e+02]
+    wp1 = np.zeros(nx)
+    wp1[:19] = [6.45819326e+00, 8.81481501e-03, 6.45330350e-01,
+                9.87445887e-01, 7.62374772e-03, 1.98414515e-03, -1.60086317e-01,
+                1.20185214e-01, -2.16300081e-03, 8.24705091e-03,
+                1.41938657e-02, 8.86158953e-03, -7.84799751e-04,
+                5.00000000e+01, 5.00000000e+01, 1.22173048e-01,
+                3.49065850e-02, 2.00000000e+02, 2.00000000e+02]
 
-    ref = np.zeros((N_horizon, (nx+nu)))
-    #ref[:,:7] = wp
-    ref[:,:19] = wp1
+    ref = np.zeros((N_horizon, nx + nu))
+    ref[:, :nx] = wp1
 
     #print(f"x0: {type(x0)}, simX: {simX[0,:].shape}")
     print(f"x0: {type(x1)}, wp: {type(wp)}")
@@ -110,17 +112,22 @@ def run_simulation():
     # closed loop - simulation
     for i in tqdm(range(Nsim-1)):
 
-        # Update reference vector
-        # If the end of the trajectory has been reached, (ref.shape < N_horizon)
-        # set the following waypoints in the horizon to the last waypoint of the trajectory
-        for stage in range(N_horizon):
-            if ref.shape[0] < N_horizon and ref.shape[0] != 0:
-                ocp_solver.set(stage, "p", ref[ref.shape[0]-1,:])
-            else:
-                ocp_solver.set(stage, "p", ref[stage,:])
+        # Build 34-element parameter vector per stage
+        goal_pos = wp1[:3]
+        t_hat_default = np.array([1.0, 0.0, 0.0])
+        stage_yref = np.zeros(nmpc.n_stage_cost)
+        stage_yref[5] = 0.5
 
-        # Set the terminal state reference
-        ocp_solver.set(N_horizon, "yref", ref[-1,:nx])
+        for stage in range(N_horizon):
+            row = ref[min(stage, ref.shape[0] - 1), :]
+            p = np.r_[row, goal_pos, t_hat_default, 0.0]
+            ocp_solver.set(stage, "p", p)
+            ocp_solver.set(stage, "yref", stage_yref)
+
+        terminal_row = ref[-1, :]
+        p_terminal = np.r_[terminal_row, goal_pos, t_hat_default, 0.0]
+        ocp_solver.set(N_horizon, "p", p_terminal)
+        ocp_solver.set(N_horizon, "yref", np.zeros(nmpc.n_terminal_cost))
  
         # Set current state
         ocp_solver.set(0, "lbx", simX[i, :])
@@ -214,17 +221,17 @@ def plot_results(sol):
     axs[5,1].set_ylabel('rpm1')
     axs[5,2].set_ylabel('rpm2')
 
-    # Control derivatives
-    axs[6,0].plot(sol.t, sol.y[19], label='dot_vbs')
-    axs[6,1].plot(sol.t, sol.y[20], label='dot_lcg')
-    axs[6,2].plot(sol.t, sol.y[21], label='dot_ds')
+    # Control derivatives (indices shift by 1 because of theta at x[19])
+    axs[6,0].plot(sol.t, sol.y[20], label='dot_vbs')
+    axs[6,1].plot(sol.t, sol.y[21], label='dot_lcg')
+    axs[6,2].plot(sol.t, sol.y[22], label='dot_ds')
     axs[6,0].set_ylabel('dot_vbs')
     axs[6,1].set_ylabel('dot_lcg')
     axs[6,2].set_ylabel('dot_ds')
 
-    axs[7,0].plot(sol.t, sol.y[22], label='dot_dr')
-    axs[7,1].plot(sol.t, sol.y[23], label='dot_rpm1')
-    axs[7,2].plot(sol.t, sol.y[24], label='dot_rpm2')
+    axs[7,0].plot(sol.t, sol.y[23], label='dot_dr')
+    axs[7,1].plot(sol.t, sol.y[24], label='dot_rpm1')
+    axs[7,2].plot(sol.t, sol.y[25], label='dot_rpm2')
     axs[7,0].set_ylabel('dot_u_dr')
     axs[7,1].set_ylabel('dot_rpm1')
     axs[7,2].set_ylabel('dot_rpm2')

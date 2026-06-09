@@ -127,7 +127,7 @@ def main():
 
 
     # Run the MPC setup
-    x0= np.zeros(19,)
+    x0 = np.zeros(nx)
     ocp_solver, integrator = nmpc.setup()
 
     case = "medium"
@@ -146,13 +146,21 @@ def main():
         simU = np.zeros((Nsim, nu))     # Matrix to store the optimal control derivative
         simX = np.zeros((Nsim+1, nx))   # Matrix to store the simulated states
 
-        # Declare the initial state
-        x0 = trajectory[0] 
-        simX[0,:] = x0
+        # Declare the initial state — pad to nx if CSV has fewer columns
+        x0 = np.zeros(nx)
+        x0[:trajectory.shape[1]] = trajectory[0]
+        simX[0, :] = x0
 
-        # Augment the trajectory and control input reference 
-        Uref = np.zeros((trajectory.shape[0], nu))  # Derivative reference - set to 0 to penalize fast control changes
-        trajectory = np.concatenate((trajectory, Uref), axis=1) 
+        # Augment trajectory: pad to N_PHYS_STATES if needed, then add theta + control columns
+        n_phys = nmpc.N_PHYS_STATES  # 19
+        if trajectory.shape[1] < n_phys:
+            trajectory = np.concatenate(
+                (trajectory, np.zeros((trajectory.shape[0], n_phys - trajectory.shape[1]))),
+                axis=1,
+            )
+        theta_col = np.zeros((trajectory.shape[0], 1))
+        Uref = np.zeros((trajectory.shape[0], nu))
+        trajectory = np.concatenate((trajectory, theta_col, Uref), axis=1)
 
 
 
@@ -173,17 +181,23 @@ def main():
             else:
                 ref = trajectory[i:, :]
 
-            # Update reference vector
-            # If the end of the trajectory has been reached, (ref.shape < N_horizon)
-            # set the following waypoints in the horizon to the last waypoint of the trajectory
-            for stage in range(N_horizon):
-                if ref.shape[0] < N_horizon and ref.shape[0] != 0:
-                    ocp_solver.set(stage, "p", ref[ref.shape[0]-1,:])
-                else:
-                    ocp_solver.set(stage, "p", ref[stage,:])
+            # Build 34-element parameter vector per stage:
+            #   [state_ref(20), control_ref(7), goal_pos(3), t_hat(3), theta_hat(1)]
+            goal_pos = trajectory[-1, :3]
+            t_hat_default = np.array([1.0, 0.0, 0.0])
+            stage_yref = np.zeros(nmpc.n_stage_cost)
+            stage_yref[5] = 0.5  # v_target (index 5: after e_c(3)+e_l(1)+e_heading(1))
 
-            # Set the terminal state reference
-            ocp_solver.set(N_horizon, "yref", ref[-1,:nx])
+            for stage in range(N_horizon):
+                row = ref[min(stage, ref.shape[0] - 1), :]
+                p = np.r_[row, goal_pos, t_hat_default, 0.0]
+                ocp_solver.set(stage, "p", p)
+                ocp_solver.set(stage, "yref", stage_yref)
+
+            terminal_row = ref[-1, :]
+            p_terminal = np.r_[terminal_row, goal_pos, t_hat_default, 0.0]
+            ocp_solver.set(N_horizon, "p", p_terminal)
+            ocp_solver.set(N_horizon, "yref", np.zeros(nmpc.n_terminal_cost))
     
             # Set current state
             ocp_solver.set(0, "lbx", simX[i, :])
@@ -202,7 +216,7 @@ def main():
                 for k in range(nc):
                     simU[i+k, :] = ocp_solver.get(k, "u")
             
-            noise_vector = np.zeros(19)
+            noise_vector = np.zeros(nx)
             std = 0.09
             bias_set = str(int(std*1000))+"mm"
             #noise_vector[10:13] = np.random.normal(0, std, 3)

@@ -7,6 +7,7 @@ from smarc_modelling.motion_planning.MotionPrimitives.GenerationTree import a_st
 from smarc_modelling.motion_planning.MotionPrimitives.PlotResults import *
 from smarc_modelling.motion_planning.MotionPrimitives.trm_colors import *
 from smarc_modelling.motion_planning.MotionPrimitives.StatisticalAnalysis import runStatisticalAnalysis
+from smarc_modelling.motion_planning.MotionPrimitives.mp_planner import SAMPlanner
 #from smarc_modelling.sam_sim import plot_results, Sol
 import time
 import matplotlib.animation as animation
@@ -164,10 +165,10 @@ def MotionPlanningROS(start_state, goal_state, map_boundaries, map_resolution):
     start_time = time.time()
     if complexity == 0:
         print(f"{bcolors.WARNING}single tree search{bcolors.ENDC}")
-        trajectory, succesfulSearch, debguMsg = a_star_search(None, None, map_instance, False, typeFunction, dec)
+        trajectory, succesfulSearch, debguMsg, tree = a_star_search(None, None, map_instance, False, typeFunction, dec)
     else:
         print(f"{bcolors.WARNING}double tree search{bcolors.ENDC}")
-        trajectory, succesfulSearch, debugMsg = double_a_star_search(None, None, map_instance, False, typeFunction, dec)
+        trajectory, succesfulSearch, debugMsg, tree, connections = double_a_star_search(None, None, map_instance, False, typeFunction, dec)
     print(f"{bcolors.OKGREEN}[ OK ]{bcolors.ENDC}")
     end_time = time.time()
 
@@ -176,93 +177,34 @@ def MotionPlanningROS(start_state, goal_state, map_boundaries, map_resolution):
     # print(f"total time for Astar:...{end_time-start_time:.4f} seconds")
     
     # Save the trajectory into saved_trajectory.csv file
-    print(f"{bcolors.HEADER}>> Save the trajectory >> saved_trajectory.csv{bcolors.ENDC}")
-    df = pd.DataFrame(trajectory, columns=["x", "y", "z", "q0", "q1", "q2", "q3", "u", "v", "w", "q", "p", "r", "V_bs", "l_cg", "ds", "dr", "rpm_1", "rpm_2"])
-    df.to_csv("saved_trajectory.csv", index=False)
-    print(f"{bcolors.OKGREEN}[ OK ]{bcolors.ENDC}")
+    if succesfulSearch:
+        print(f"{bcolors.HEADER}>> Save the trajectory >> saved_trajectory.csv{bcolors.ENDC}")
+        df = pd.DataFrame(trajectory, columns=["x", "y", "z", "q0", "q1", "q2", "q3", "u", "v", "w", "q", "p", "r", "vbs", "lcg", "ds", "dr", "rpm_1", "rpm_2"])
+        df.to_csv("saved_trajectory.csv", index=False)
     
     print(f"{bcolors.OKGREEN}THE END{bcolors.ENDC}")
 
-    return (trajectory, succesfulSearch, debugMsg)
+    return (trajectory, succesfulSearch, debugMsg, tree, connections)
 
-'''
-if __name__ == "__main__":
 
-    # # SAM initial state 
-    # eta0 = np.zeros(13)
-    # eta0[0] = 3#3.35140089e+00
-    # eta0[1] = 0#1.39057753e-01
-    # eta0[2] = 0.6#2.20124902e+00
-    # eta0[3] = 0.93969262#-4.48740911e-02
-    # eta0[4] = 0#-6.28489231e-01
-    # eta0[5] = 0#3.44557419e-02
-    # eta0[6] = -0.34202014#.75757954e-01
-    # eta0[7] = 0#7.02536865e-02
-    # eta0[8] = 0#1.44681268e-02
-    # eta0[9] = 0#-2.48074309e-02
-    # eta0[10] = 0#3.36878054e-01
-    # eta0[11] = 0#1.18841045e-01
-    # eta0[12] = 0#-2.79456531e-02
-    # #nu0 = np.zeros(6)   # Zero initial velocities
-    # u0 = np.zeros(6)    #The initial control inputs for SAM
-    # u0[0] = 50          #Vbs
-    # u0[1] = 50          #lcg
-    # x0 = np.concatenate([eta0, u0])
+def PathPlannerROS(start_state, goal_state, map_boundaries, map_resolution):
+
+    print(">> Creating the map")
+    map_instance = MapGen.generateMapInstance(start_state, goal_state, map_boundaries, map_resolution)
+    print(f"{bcolors.OKGREEN}[ OK ]{bcolors.ENDC}")
     
-    # # SAM final state
-    # finalState = x0.copy()
-    # finalState[0] = 5#5.25401611
-    # finalState[1] = 1#-0.07726609
-    # finalState[2] = 1.8#0.80653607
-    # finalState[3] = 0.98480775#0.4092956
-    # finalState[4] = 0#0.69630861
-    # finalState[5] = 0.17364818#0.14047186
-    # finalState[6] = 0#0.57262472
+    planner = SAMPlanner()
+    planner.instantiate(start_state, goal_state, map_instance)
+    trajectory, succesfulSearch, tree, connections = planner.plan_path()
 
-
-    # SAM initial state 
-    eta0 = np.zeros(7)
-    eta0[0] = 1.55
-    eta0[1] = 0.25
-    eta0[2] = 0.75
-    initial_yaw = np.deg2rad(0)   # in deg
-    initial_pitch = np.deg2rad(0) # in deg
-    initial_roll = np.deg2rad(0)  # in deg 
-    r = R.from_euler('zyx', [initial_yaw, initial_pitch, initial_roll])
-    q0 = r.as_quat()
-    eta0[3] = q0[3]
-    eta0[4:7] = q0[0:3]
-    nu0 = np.zeros(6)   # Zero initial velocities
-    u0 = np.zeros(6)    #The initial control inputs for SAM
-    u0[0] = 50          #Vbs
-    u0[1] = 50          #lcg
-    x0 = np.concatenate([eta0, nu0, u0])
+    # Save the trajectory into saved_trajectory.csv file
+    # if succesfulSearch:
+    #     print(f"{bcolors.HEADER}>> Save the trajectory >> saved_trajectory.csv{bcolors.ENDC}")
+    #     df = pd.DataFrame(trajectory, columns=["x", "y", "z", "q0", "q1", "q2", "q3", "u", "v", "w", "q", "p", "r", "vbs", "lcg", "ds", "dr", "rpm_1", "rpm_2"])
+    #     df.to_csv("saved_trajectory.csv", index=False)
     
-    # SAM final state
-    finalState = x0.copy()
-    finalState[0:3] = (7.75, -0.25, 2.75)
-    final_yaw = np.deg2rad(0)   # in deg
-    final_pitch = np.deg2rad(0) # in deg
-    final_roll = np.deg2rad(0)  # in deg 
-    r = R.from_euler('zyx', [final_yaw, final_pitch, final_roll])
-    q = r.as_quat()
-    finalState[3] = q[3]
-    finalState[4:7] = q[0:3]
-    
-    # Define the map
-    map_bounds = (10, 2.5, 3, 0, -2.5, -0.5)   # (x_max, y_max, z_max, x_min, y_min, z_min)
-    map_res = 0.5   # Resolution of the map_grid (used for goal area)
+    print(f"{bcolors.OKGREEN}THE END{bcolors.ENDC}")
 
-    # Generate a map instance compatible with the algorithm 
-    map_instance = MapGen.generateMapInstance(x0, finalState, map_bounds, map_res)
-    initial_and_final = [x0]
-    initial_and_final.append(finalState)
-    draw_map_and_toredo(map_instance, initial_and_final)
-
-    # Test with images and GIF
-    MotionPlanningAlgorithm(True, map_instance)
-
-    #Test for ROS and draw the final path
-    #trajectory, successfulFlag = MotionPlanningROS(x0, finalState, map_bounds, map_res)
-    #draw_map_and_toredo(map_instance, trajectory)
-'''
+    # Nacho: for now
+    debugMsg = "Path planned successfully" if succesfulSearch else "Path planning failed"
+    return (trajectory, succesfulSearch, debugMsg, tree, connections)

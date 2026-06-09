@@ -40,13 +40,21 @@ def join_trees_optimization(trajectory,N_hor, T_s, build):       ##CHANGE: input
     simX = np.zeros((Nsim+1, nx))   # Matrix to store the simulated states
 
 
-    # Declare the initial state
-    x0 = trajectory[0] 
-    simX[0,:] = x0
+    # Declare the initial state — pad to nx if CSV has fewer columns
+    x0 = np.zeros(nx)
+    x0[:trajectory.shape[1]] = trajectory[0]
+    simX[0, :] = x0
 
-    # Augment the trajectory and control input reference 
-    Uref = np.zeros((trajectory.shape[0], nu))  # Derivative reference - set to 0 to penalize fast control changes
-    trajectory = np.concatenate((trajectory, Uref), axis=1) 
+    # Augment trajectory: pad to N_PHYS_STATES, then add theta + control columns
+    n_phys = nmpc.N_PHYS_STATES
+    if trajectory.shape[1] < n_phys:
+        trajectory = np.concatenate(
+            (trajectory, np.zeros((trajectory.shape[0], n_phys - trajectory.shape[1]))),
+            axis=1,
+        )
+    theta_col = np.zeros((trajectory.shape[0], 1))
+    Uref = np.zeros((trajectory.shape[0], nu))
+    trajectory = np.concatenate((trajectory, theta_col, Uref), axis=1)
 
     # Run the MPC setup
     # ocp_solver, integrator = nmpc.setup_path_planner(x0, map_instance)
@@ -72,18 +80,22 @@ def join_trees_optimization(trajectory,N_hor, T_s, build):       ##CHANGE: input
         else:
             ref = trajectory[i:, :]
 
-        # Update reference vector
-        # If the end of the trajectory has been reached, (ref.shape < N_horizon)
-        # set the following waypoints in the horizon to the last waypoint of the trajectory
-        for stage in range(N_horizon):
-            #print(ref.shape[0], stage)
-            if ref.shape[0] < N_horizon and ref.shape[0] != 0:
-                ocp_solver.set(stage, "p", ref[ref.shape[0]-1,:])
-            else:
-                ocp_solver.set(stage, "p", ref[stage,:])
+        # Build 34-element parameter vector per stage
+        goal_pos = trajectory[-1, :3]
+        t_hat_default = np.array([1.0, 0.0, 0.0])
+        stage_yref = np.zeros(nmpc.n_stage_cost)
+        stage_yref[5] = 0.5
 
-        # Set the terminal state reference
-        ocp_solver.set(N_horizon, "yref", ref[-1,:nx])
+        for stage in range(N_horizon):
+            row = ref[min(stage, ref.shape[0] - 1), :]
+            p = np.r_[row, goal_pos, t_hat_default, 0.0]
+            ocp_solver.set(stage, "p", p)
+            ocp_solver.set(stage, "yref", stage_yref)
+
+        terminal_row = ref[-1, :]
+        p_terminal = np.r_[terminal_row, goal_pos, t_hat_default, 0.0]
+        ocp_solver.set(N_horizon, "p", p_terminal)
+        ocp_solver.set(N_horizon, "yref", np.zeros(nmpc.n_terminal_cost))
  
         # Set current state
         ocp_solver.set(0, "lbx", simX[i, :])

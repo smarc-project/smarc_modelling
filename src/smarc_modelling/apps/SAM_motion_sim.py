@@ -131,8 +131,8 @@ def get_state_and_control():
                 else:
                     ocp_solver.set(stage, "p", ref[stage,:])
 
-            # Set the terminal state reference
-            ocp_solver.set(N_horizon, "yref", ref[-1,:nx])
+            # Set the terminal state reference (zeros — cost_y_expr_e computes the error)
+            ocp_solver.set(N_horizon, "yref", np.zeros(nmpc.n_terminal_cost))
     
             # Set current state
             ocp_solver.set(0, "lbx", simX[i, :])
